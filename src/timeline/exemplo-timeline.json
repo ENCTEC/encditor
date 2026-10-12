@@ -1,0 +1,31 @@
+{
+  "fps": 30,
+  "largura": 1280,
+  "altura": 720,
+  "duracaoTransicao": 0.5,
+  "clipes": [
+    {
+      "url": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+      "inicio": 0,
+      "fim": 4,
+      "transicao": "corte"
+    },
+    {
+      "url": "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
+      "inicio": 2,
+      "fim": 6,
+      "transicao": "fade"
+    },
+    {
+      "url": "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
+      "inicio": 1,
+      "fim": 5,
+      "transicao": "slide"
+    }
+  ],
+  "legendas": [
+    { "texto": "Bem-vindo ao Encditor", "inicio": 0.3, "fim": 3.2 },
+    { "texto": "Transição com fade", "inicio": 3.8, "fim": 6.8 },
+    { "texto": "E agora um slide!", "inicio": 7.6, "fim": 10.8 }
+  ]
+}

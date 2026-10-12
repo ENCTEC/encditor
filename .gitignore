@@ -1,0 +1,20 @@
+node_modules
+dist
+.DS_Store
+
+# Chaves e segredos (Supabase, Claude API etc.) nunca vão para o git.
+.env
+.env.*
+!.env.example
+
+# Vídeo renderizado.
+out
+
+# Vídeos/áudios de teste locais (os reais ficam no Storage).
+public/midia
+*.mp4
+*.mov
+*.webm
+*.mkv
+*.wav
+*.mp3
