@@ -3,20 +3,19 @@ import {
   AbsoluteFill,
   CalculateMetadataFunction,
   OffthreadVideo,
+  useVideoConfig,
 } from "remotion";
 import { linearTiming, TransitionSeries } from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
-import { slide } from "@remotion/transitions/slide";
 import { Timeline } from "../../timeline/schema";
 import {
   calcularClipes,
   calcularDuracaoTotal,
-  ClipeCalculado,
   validarTimeline,
 } from "../../timeline/calculos";
 import { Audios } from "./Audios";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
+import { criarTransicao } from "./transicoes";
 import { Zoom } from "./Zoom";
 
 // Ajusta duração, fps e tamanho do vídeo a partir do JSON recebido.
@@ -33,13 +32,11 @@ export const calcularMetadata: CalculateMetadataFunction<Timeline> = ({
   };
 };
 
-const apresentacao = (clipe: ClipeCalculado) =>
-  clipe.transicao === "slide" ? slide({ direction: "from-right" }) : fade();
-
 // Camadas, de baixo para cima: trilha principal (com zoom) → inserts →
 // legendas. O áudio não aparece na tela.
 export const EditorTimeline: React.FC<Timeline> = (timeline) => {
   const clipes = calcularClipes(timeline);
+  const { width, height } = useVideoConfig();
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
@@ -47,9 +44,14 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
         <TransitionSeries>
           {clipes.map((clipe, i) => (
             <React.Fragment key={i}>
-              {clipe.transicaoFrames > 0 ? (
+              {clipe.transicaoFrames > 0 && clipe.transicao !== "corte" ? (
                 <TransitionSeries.Transition
-                  presentation={apresentacao(clipe)}
+                  presentation={criarTransicao(
+                    clipe.transicao,
+                    clipe.direcao,
+                    width,
+                    height,
+                  )}
                   timing={linearTiming({
                     durationInFrames: clipe.transicaoFrames,
                   })}

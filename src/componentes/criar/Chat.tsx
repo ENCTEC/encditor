@@ -10,6 +10,7 @@ import {
 } from "@/projeto/midia-cliente";
 import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia, PapelMidia } from "@/projeto/tipos";
+import type { RespostaIA } from "@/app/api/ia/route";
 
 type Anexo = {
   id: string;
@@ -20,11 +21,11 @@ type Anexo = {
 };
 
 const EXEMPLOS = [
-  "Coloque o Insert 1 enquanto a Cena 2 passa",
-  "Adicione o Áudio 1 a partir de 0:15",
-  "Corte 2 segundos do começo da Cena 3",
-  "Dê zoom no final da Cena 1",
-  "Legende o vídeo",
+  "Bote o Insert 1 a partir dos 2 segundos",
+  "Coloque um fade entre todas as cenas",
+  "Adicione o Áudio 1 como música de fundo",
+  "Corte 2 segundos do começo da cena 2",
+  "Dê um zoom no final da cena 1",
 ];
 
 // Papéis possíveis por formato: vídeo pode ser cena ou insert; imagem só
@@ -42,7 +43,9 @@ const ROTULO_PAPEL: Record<PapelMidia, string> = {
 };
 
 export const Chat: React.FC = () => {
-  const { projeto, adicionarMidia, adicionarMensagem } = useProjeto();
+  const { projeto, adicionarMidia, adicionarMensagem, aplicar, obterTimeline } =
+    useProjeto();
+  const [pensando, setPensando] = useState(false);
   const [texto, setTexto] = useState("");
   const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [enviando, setEnviando] = useState(false);
@@ -53,7 +56,7 @@ export const Chat: React.FC = () => {
 
   useEffect(() => {
     fimDaLista.current?.scrollIntoView({ behavior: "smooth" });
-  }, [projeto.mensagens.length]);
+  }, [projeto.mensagens.length, pensando]);
 
   const anexar = (arquivos: FileList | File[]) => {
     const novos: Anexo[] = [];
@@ -123,19 +126,25 @@ export const Chat: React.FC = () => {
             .filter((a) => !anexosEnviados.has(a.id))
             .map((a) => ({ ...a, progresso: null })),
         );
-        if (enviados.length) registrarMensagens(enviados, "");
+        if (enviados.length) await registrarMensagens(enviados, "");
         setEnviando(false);
         return;
       }
     }
 
-    registrarMensagens(enviados, texto.trim());
     setTexto("");
     setAnexos([]);
+    await registrarMensagens(enviados, texto.trim());
     setEnviando(false);
   };
 
-  const registrarMensagens = (enviados: Midia[], pedido: string) => {
+  const registrarMensagens = async (enviados: Midia[], pedido: string) => {
+    // Histórico antes desta mensagem (só texto), para a IA ter contexto.
+    const historico = projeto.mensagens.map((m) => ({
+      autor: m.autor,
+      texto: m.texto,
+    }));
+
     adicionarMensagem({
       autor: "usuario",
       texto: pedido,
@@ -143,24 +152,59 @@ export const Chat: React.FC = () => {
     });
 
     const partes: string[] = [];
-    if (enviados.length) {
-      const cenas = enviados.filter((m) => m.papel === "cena");
-      const outros = enviados.filter((m) => m.papel !== "cena");
-      if (cenas.length) {
-        partes.push(
-          `Coloquei ${cenas.map((m) => m.nome).join(", ")} no fim da trilha principal.`,
-        );
-      }
+    const cenas = enviados.filter((m) => m.papel === "cena");
+    const outros = enviados.filter((m) => m.papel !== "cena");
+    if (cenas.length) {
+      partes.push(
+        `Coloquei ${cenas.map((m) => m.nome).join(", ")} no fim da trilha principal.`,
+      );
+    }
+    if (!pedido) {
       if (outros.length) {
         partes.push(
           `Guardei ${outros.map((m) => m.nome).join(", ")} na biblioteca — me diga onde usar.`,
         );
       }
+      adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
+      return;
     }
-    if (pedido) {
-      partes.push(
-        "Ainda não estou conectada ao Claude, então não consigo aplicar pedidos em texto. Na próxima etapa vou entender pedidos como esse e editar a timeline sozinha. Por enquanto, faça esse ajuste na aba Timeline.",
-      );
+
+    // Pedido em texto: o Claude edita a timeline no servidor.
+    setPensando(true);
+    try {
+      const resposta = await fetch("/api/ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pedido,
+          anexos: enviados.map((m) => m.nome),
+          historico,
+          timeline: obterTimeline(),
+          biblioteca: [
+            ...projeto.biblioteca.filter(
+              (m) => !enviados.some((e) => e.id === m.id),
+            ),
+            ...enviados,
+          ],
+        }),
+      });
+      const dados = (await resposta.json().catch(() => ({}))) as Partial<
+        RespostaIA & { erro: string }
+      >;
+      if (!resposta.ok || dados.erro) {
+        throw new Error(dados.erro ?? `Falha na IA (${resposta.status}).`);
+      }
+      if (dados.timeline) {
+        const nova = dados.timeline;
+        if (!aplicar(() => nova)) {
+          throw new Error("A edição da IA veio inválida e não foi aplicada.");
+        }
+      }
+      partes.push(dados.resposta ?? "Pronto.");
+    } catch (e) {
+      partes.push(`⚠️ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setPensando(false);
     }
     adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
   };
@@ -235,6 +279,13 @@ export const Chat: React.FC = () => {
             </div>
           </div>
         ))}
+        {pensando ? (
+          <div className="flex justify-start">
+            <div className="rounded-2xl bg-zinc-800 px-4 py-2.5 text-sm text-zinc-400">
+              Editando<span className="animate-pulse">…</span>
+            </div>
+          </div>
+        ) : null}
         <div ref={fimDaLista} />
       </div>
 

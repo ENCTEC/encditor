@@ -30,10 +30,11 @@ Ambas leem/alteram o MESMO JSON de timeline.
 
 ## Etapa atual
 App Next.js 16 funcionando localmente com as duas abas:
-- **Criar:** chat com anexos (cena/insert/áudio), upload para o disco (`/api/midia`, com Range), preview e biblioteca. Cenas entram sozinhas na trilha principal. Pedidos em texto ainda NÃO são interpretados (resposta provisória) — falta ligar ao Claude.
+- **Criar:** chat com anexos (cena/insert/áudio), upload para o disco (`/api/midia`, com Range), preview e biblioteca. Cenas entram sozinhas na trilha principal. Pedidos em texto vão para `/api/ia`: Claude Opus 5.5 (tool runner do SDK, `src/ia/ferramentas.ts`) edita uma cópia da timeline e o app aplica tudo como um único passo de desfazer. Precisa de `ANTHROPIC_API_KEY` no `.env.local` (ainda não configurada).
+- Transições: corte, fade, slide, cortina (wipe), virar (flip), relogio (clock-wipe), iris, impacto (push-cut); direção e duração por cena. Transições "shader" do Remotion ficaram de fora (dependem de recurso experimental do navegador).
 - **Timeline:** player + faixas (cenas, inserts, áudio, zoom, legendas), arrastar para mover/aparar, inspetor com campos, desfazer/refazer (Ctrl+Z/Ctrl+Y), Delete remove.
 - Estado salvo no localStorage (depois: Supabase). Edições passam por `src/timeline/operacoes.ts` (serão as ferramentas da IA).
-Próximo: ligar o chat ao Claude (tool use com as operações) — precisa de chave da API Anthropic (paga, pedir confirmação).
+Próximo: usuário configurar a chave e testar o chat; depois exportar MP4, login (contato@enctec.com.br, senha só como hash no .env.local) e deploy na VPS.
 
 Estrutura: Next.js na raiz; composição Remotion em `src/remotion/` (Studio: `npm run remotion`).
 

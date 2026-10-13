@@ -12,14 +12,22 @@ import {
 } from "@/timeline/operacoes";
 import { Selecao } from "./Trilhas";
 
+// "opcional": campo pode ficar vazio (= usar o padrão do projeto).
 type Campo =
-  | { chave: string; rotulo: string; tipo: "numero"; passo?: number }
+  | {
+      chave: string;
+      rotulo: string;
+      tipo: "numero";
+      passo?: number;
+      opcional?: boolean;
+    }
   | { chave: string; rotulo: string; tipo: "texto" }
   | {
       chave: string;
       rotulo: string;
       tipo: "opcoes";
       opcoes: { valor: string; rotulo: string }[];
+      opcional?: boolean;
     };
 
 const CAMPOS: Record<Faixa, Campo[]> = {
@@ -32,9 +40,33 @@ const CAMPOS: Record<Faixa, Campo[]> = {
       tipo: "opcoes",
       opcoes: [
         { valor: "corte", rotulo: "Corte seco" },
-        { valor: "fade", rotulo: "Fade" },
-        { valor: "slide", rotulo: "Slide" },
+        { valor: "fade", rotulo: "Fade (dissolve)" },
+        { valor: "slide", rotulo: "Slide (empurra)" },
+        { valor: "cortina", rotulo: "Cortina" },
+        { valor: "virar", rotulo: "Virar (carta)" },
+        { valor: "relogio", rotulo: "Relógio" },
+        { valor: "iris", rotulo: "Íris (círculo)" },
+        { valor: "impacto", rotulo: "Impacto (zoom + flash)" },
       ],
+    },
+    {
+      chave: "direcao",
+      rotulo: "Direção (slide, cortina, virar)",
+      tipo: "opcoes",
+      opcional: true,
+      opcoes: [
+        { valor: "", rotulo: "Padrão" },
+        { valor: "esquerda", rotulo: "Da esquerda" },
+        { valor: "direita", rotulo: "Da direita" },
+        { valor: "cima", rotulo: "De cima" },
+        { valor: "baixo", rotulo: "De baixo" },
+      ],
+    },
+    {
+      chave: "duracaoTransicao",
+      rotulo: "Duração da transição (s, vazio = padrão)",
+      tipo: "numero",
+      opcional: true,
     },
     { chave: "volume", rotulo: "Volume (0 = mudo)", tipo: "numero" },
   ],
@@ -221,7 +253,12 @@ export const Inspetor: React.FC<{
   const { faixa, indice } = selecao;
 
   const confirmar = (campo: Campo, valor: string) => {
-    const convertido = campo.tipo === "numero" ? Number(valor) : valor;
+    const vazio = valor.trim() === "" && "opcional" in campo && campo.opcional;
+    const convertido = vazio
+      ? undefined
+      : campo.tipo === "numero"
+        ? Number(valor)
+        : valor;
     aplicar((t) =>
       atualizarItem(t, faixa, indice, {
         [campo.chave]: convertido,
@@ -242,7 +279,7 @@ export const Inspetor: React.FC<{
           </span>
           {campo.tipo === "opcoes" ? (
             <select
-              value={String(item[campo.chave])}
+              value={String(item[campo.chave] ?? "")}
               onChange={(e) => confirmar(campo, e.target.value)}
               className={estiloCampo}
             >
@@ -254,7 +291,7 @@ export const Inspetor: React.FC<{
             </select>
           ) : (
             <CampoEditavel
-              valor={String(item[campo.chave])}
+              valor={String(item[campo.chave] ?? "")}
               numerico={campo.tipo === "numero"}
               passo={campo.tipo === "numero" ? campo.passo : undefined}
               aoConfirmar={(v) => confirmar(campo, v)}

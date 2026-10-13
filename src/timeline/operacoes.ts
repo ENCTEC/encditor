@@ -89,3 +89,47 @@ export const definirFormato = (
   largura: number,
   altura: number,
 ): Timeline => ({ ...t, largura, altura });
+
+// Coloca um clipe numa posição da trilha (0 = primeiro). Sem posição, vai
+// para o fim. Permite também repetir uma cena já usada.
+export const inserirClipe = (
+  t: Timeline,
+  clipe: Clipe,
+  posicao?: number,
+): Timeline => {
+  const clipes = [...t.clipes];
+  const indice =
+    posicao === undefined
+      ? clipes.length
+      : Math.max(0, Math.min(posicao, clipes.length));
+  clipes.splice(indice, 0, clipe);
+  return { ...t, clipes };
+};
+
+// Divide um clipe em dois. "segundosNoClipe" é contado a partir do início
+// do clipe (não do vídeo de origem). A 2ª parte entra com corte seco.
+export const dividirClipe = (
+  t: Timeline,
+  indice: number,
+  segundosNoClipe: number,
+): Timeline => {
+  conferirIndice(t, "clipes", indice);
+  const clipe = t.clipes[indice];
+  const ponto = Math.round((clipe.inicio + segundosNoClipe) * 100) / 100;
+  if (ponto <= clipe.inicio + 0.05 || ponto >= clipe.fim - 0.05) {
+    throw new Error(
+      `Ponto de divisão fora da cena ${indice + 1} (ela dura ${(clipe.fim - clipe.inicio).toFixed(2)}s).`,
+    );
+  }
+  const primeira: Clipe = { ...clipe, fim: ponto };
+  const segunda: Clipe = {
+    ...clipe,
+    inicio: ponto,
+    transicao: "corte",
+    direcao: undefined,
+    duracaoTransicao: undefined,
+  };
+  const clipes = [...t.clipes];
+  clipes.splice(indice, 1, primeira, segunda);
+  return { ...t, clipes };
+};

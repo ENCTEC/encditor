@@ -6,8 +6,25 @@ import { z } from "zod";
 //   timeline FINAL (já editada).
 // - "origemInicio" = a partir de que segundo do arquivo de origem tocar.
 
-// Tipos de transição de entrada de um clipe (em relação ao clipe anterior).
-export const tipoTransicaoSchema = z.enum(["corte", "fade", "slide"]);
+// Tipos de transição de entrada de um clipe (em relação ao clipe anterior):
+// corte = corte seco; fade = dissolve; slide = a cena nova empurra a antiga;
+// cortina = a cena nova é revelada passando por cima (wipe); virar = gira
+// como uma carta (flip); relogio = revela em círculo como ponteiro;
+// iris = revela por um círculo que abre do centro; impacto = corte com
+// zoom rápido e flash (push-cut).
+export const tipoTransicaoSchema = z.enum([
+  "corte",
+  "fade",
+  "slide",
+  "cortina",
+  "virar",
+  "relogio",
+  "iris",
+  "impacto",
+]);
+
+// De onde a cena nova entra (vale para slide, cortina e virar).
+export const direcaoSchema = z.enum(["esquerda", "direita", "cima", "baixo"]);
 
 // Trilha principal: as cenas, em sequência.
 export const clipeSchema = z.object({
@@ -15,6 +32,10 @@ export const clipeSchema = z.object({
   inicio: z.number().min(0),
   fim: z.number().min(0),
   transicao: tipoTransicaoSchema,
+  // Opcional; sem valor, cada tipo usa a sua direção padrão.
+  direcao: direcaoSchema.optional(),
+  // Opcional; sem valor, usa a duração padrão do projeto.
+  duracaoTransicao: z.number().min(0).optional(),
   // 0 = mudo, 1 = volume original.
   volume: z.number().min(0),
 });
@@ -75,6 +96,7 @@ export const timelineSchema = z.object({
 });
 
 export type TipoTransicao = z.infer<typeof tipoTransicaoSchema>;
+export type Direcao = z.infer<typeof direcaoSchema>;
 export type Clipe = z.infer<typeof clipeSchema>;
 export type Insert = z.infer<typeof insertSchema>;
 export type AudioFaixa = z.infer<typeof audioSchema>;

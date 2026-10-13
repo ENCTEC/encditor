@@ -55,9 +55,14 @@ export const calcularClipes = (timeline: Timeline): ClipeCalculado[] => {
     }
     const anterior = clipes[i - 1];
     const limite = Math.min(anterior.duracaoFrames, clipe.duracaoFrames) - 1;
+    // A cena pode ter duração de transição própria; senão vale a do projeto.
+    const desejada =
+      clipe.duracaoTransicao !== undefined
+        ? segParaFrames(clipe.duracaoTransicao, fps)
+        : transicaoPadrao;
     return {
       ...clipe,
-      transicaoFrames: Math.max(0, Math.min(transicaoPadrao, limite)),
+      transicaoFrames: Math.max(0, Math.min(desejada, limite)),
     };
   });
 };

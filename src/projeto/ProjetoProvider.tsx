@@ -96,6 +96,9 @@ type ContextoProjeto = {
   // Aplica uma operação (de timeline/operacoes.ts). Se a timeline ficar
   // inválida, nada muda e o erro aparece na tela.
   aplicar: (operacao: (t: Timeline) => Timeline) => boolean;
+  // Timeline mais recente, inclusive mudanças feitas neste mesmo clique
+  // (o "projeto" só atualiza na próxima renderização).
+  obterTimeline: () => Timeline;
   desfazer: () => void;
   refazer: () => void;
   // Coloca a mídia na biblioteca; se for cena, também no fim da trilha.
@@ -192,6 +195,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       erro,
       limparErro: () => setErro(null),
       aplicar,
+      obterTimeline: () => timelineAtual.current,
       desfazer: () => dispatch({ tipo: "desfazer" }),
       refazer: () => dispatch({ tipo: "refazer" }),
       adicionarMidia,

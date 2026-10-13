@@ -22,14 +22,18 @@ src/
   projeto/              Estado do projeto no navegador (biblioteca, mensagens, desfazer)
   servidor/             Código que só roda no servidor (armazenamento em disco)
   timeline/             Formato do JSON de timeline, cálculos e operações de edição
+  ia/                   Ferramentas, instruções e resumo do projeto usados pelo Claude
   remotion/             Composição "EditorTimeline" que transforma o JSON em vídeo
 midia/                  Arquivos enviados (fora do git)
 ```
 
-## Variáveis de ambiente (opcionais)
+## Variáveis de ambiente
+
+Copie `.env.example` para `.env.local` e preencha. Depois de mudar o `.env.local`, reinicie o `npm run dev`.
 
 | Variável | Padrão | Uso |
 |---|---|---|
+| `ANTHROPIC_API_KEY` | — | **Obrigatória para o chat editar sozinho.** Chave da API do Claude |
 | `MIDIA_DIR` | `./midia` | Pasta onde os arquivos enviados são gravados |
 | `MIDIA_LIMITE_MB` | `1024` | Tamanho máximo por arquivo |
 
