@@ -16,22 +16,30 @@ Ambas leem/alteram o MESMO JSON de timeline.
 - Cada arquivo enviado vira item da biblioteca com nome/número ("insert 2", "áudio 1") para a IA entender referências como "esse insert".
 - A API do Claude NÃO transcreve áudio. Legendas exigem transcrição separada (Whisper local via @remotion/install-whisper-cpp, ou API paga: OpenAI/Deepgram/AssemblyAI). Claude entra depois: quebrar legendas, analisar jeito de falar, copy.
 
-## Stack
-- Next.js no Vercel + Supabase (Storage para vídeos, banco para projetos).
-- Uploads vão direto do navegador para o Supabase Storage (URL assinada) — não passam pela função do Vercel (limite de ~4,5 MB por requisição).
-- Remotion: composição "EditorTimeline" alimentada pelo JSON. Preview com Remotion Player; render final via Remotion Lambda.
+## Stack e infraestrutura
+- **VPS Contabo (Europa):** Ubuntu, 6 vCPU, 12 GB RAM, 100 GB NVMe. Hospeda tudo, provavelmente via Docker:
+  - App Next.js (sem Vercel → sem limite de 4,5 MB de upload).
+  - Arquivos de mídia no disco da VPS (pastas simples, sem MinIO), servidos com HTTPS. São material de trabalho reciclável: os originais ficam no Higgsfield.
+  - Limpeza automática: apagar mídia de projetos X dias após exportar, ou quando o disco passar de um limite.
+  - Render final do MP4 com Remotion na própria VPS (sem Remotion Lambda / AWS), uma render por vez em fila.
+- **Supabase (plano grátis), região na Europa (Frankfurt), perto da VPS:** apenas banco (projetos, timeline JSON, histórico do chat) e login. Sem Supabase Storage.
+- Armazenamento isolado em um único módulo do código, para poder migrar (ex.: Cloudflare R2) sem mexer no resto.
+- Remotion: composição "EditorTimeline" alimentada pelo JSON. Preview no app com Remotion Player.
+- Repositório: https://github.com/ENCTEC/encditor (branch main). Commits como "Encditor" <contato@enctec.com.br> (config local do repo).
+- Pendente: domínio apontado para a VPS (necessário para HTTPS).
 
 ## Etapa atual
 Base Remotion criada (composição EditorTimeline com clipes, transições corte/fade/slide e legendas). Próximo: ampliar schema/composição (inserts, áudio, zoom) e depois o app Next.js com as duas telas.
 
 ## Custos e licenças a considerar
 - Remotion: gratuito só para empresas de até 3 pessoas. Acima disso, licença "Remotion for Automators" (US$ 0,01 por render, mínimo US$ 100/mês).
+- VPS Contabo: custo fixo mensal; sem cobrança por tráfego de vídeo como em storage na nuvem.
 - Higgsfield: o plano do site NÃO dá acesso à API. A API é produto separado, saldo pré-pago em dólar, chave gerada em console.higgsfield.ai.
 - Claude API e serviço de transcrição: pagos por uso.
 
 ## Ambiente
 - Windows, VS Code, terminal PowerShell.
-- Conectores do claude.ai desativados no Claude Code (disableClaudeAiConnectors). Supabase e Vercel serão adicionados localmente só quando necessário.
+- Conectores do claude.ai desativados no Claude Code (disableClaudeAiConnectors). Supabase será adicionado localmente só quando necessário.
 
 ## Como trabalhar comigo
 - Responder sempre em português.
