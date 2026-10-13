@@ -90,7 +90,10 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
         </TransitionSeries>
         <Inserts inserts={timeline.inserts} />
       </Zoom>
-      <Legendas legendas={timeline.legendas} />
+      <Legendas
+        legendas={timeline.legendas}
+        estiloPadrao={timeline.estiloLegenda}
+      />
       <Audios audios={timeline.audios} />
     </AbsoluteFill>
   );

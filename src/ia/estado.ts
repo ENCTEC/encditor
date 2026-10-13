@@ -23,6 +23,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     fps: t.fps,
     duracao_total_s: s(calcularDuracaoTotal(clipes) / t.fps),
     duracao_padrao_transicao_s: t.duracaoTransicao,
+    estilo_das_legendas: t.estiloLegenda ?? "classico",
     cenas: clipes.map((c, i) => ({
       cena: i + 1,
       arquivo: nome(c.url),
@@ -71,6 +72,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     legendas: t.legendas.map((x, i) => ({
       numero: i + 1,
       texto: x.texto,
+      ...(x.estilo ? { estilo: x.estilo } : {}),
       de: x.inicio,
       ate: x.fim,
     })),

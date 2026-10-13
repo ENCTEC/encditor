@@ -18,6 +18,7 @@ import {
 } from "@/timeline/operacoes";
 import {
   direcaoSchema,
+  estiloLegendaSchema,
   Timeline,
   tipoTransicaoSchema,
 } from "@/timeline/schema";
@@ -729,6 +730,11 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         substituir_existentes: z
           .boolean()
           .describe("true = apaga as legendas atuais antes."),
+        estilo: estiloLegendaSchema
+          .nullable()
+          .describe(
+            "Estilo de animação (#karaoke, #pop...). null = mantém o atual.",
+          ),
       }),
       run: (e) => {
         const palavras = palavrasNoVideoFinal(
@@ -744,12 +750,48 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         return aplicar(
           (t) => ({
             ...t,
+            ...(e.estilo ? { estiloLegenda: e.estilo } : {}),
             legendas: [
               ...(e.substituir_existentes ? [] : t.legendas),
               ...novas,
             ],
           }),
-          `${novas.length} legendas automáticas criadas`,
+          `${novas.length} legendas automáticas criadas${e.estilo ? ` no estilo #${e.estilo}` : ""}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "estilo_das_legendas",
+      description:
+        "Muda o estilo de animação das legendas (#classico, #karaoke, #pop, #destaque, #gigante, #spray, #maquina, #neon): de todas (padrão do projeto) ou de uma legenda específica.",
+      inputSchema: z.object({
+        estilo: estiloLegendaSchema,
+        legenda: z
+          .number()
+          .int()
+          .min(1)
+          .nullable()
+          .describe(
+            "Número da legenda; null = todas (vira o padrão do projeto).",
+          ),
+      }),
+      run: (e) => {
+        if (e.legenda === null) {
+          return aplicar(
+            (t) => ({
+              ...t,
+              estiloLegenda: e.estilo,
+              // Tira estilos próprios para todas seguirem o padrão.
+              legendas: t.legendas.map((l) => ({ ...l, estilo: undefined })),
+            }),
+            `todas as legendas agora no estilo #${e.estilo}`,
+          );
+        }
+        const indice = e.legenda - 1;
+        return aplicar(
+          (t) => atualizarItem(t, "legendas", indice, { estilo: e.estilo }),
+          `legenda ${e.legenda} agora no estilo #${e.estilo}`,
         );
       },
     }),

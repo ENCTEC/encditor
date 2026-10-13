@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
 import { useProjeto } from "@/projeto/ProjetoProvider";
+import { EstiloLegenda } from "@/timeline/schema";
 import {
   atualizarItem,
   definirFormato,
@@ -38,16 +40,10 @@ const CAMPOS: Record<Faixa, Campo[]> = {
       chave: "transicao",
       rotulo: "Transição de entrada",
       tipo: "opcoes",
-      opcoes: [
-        { valor: "corte", rotulo: "Corte seco" },
-        { valor: "fade", rotulo: "Fade (dissolve)" },
-        { valor: "slide", rotulo: "Slide (empurra)" },
-        { valor: "cortina", rotulo: "Cortina" },
-        { valor: "virar", rotulo: "Virar (carta)" },
-        { valor: "relogio", rotulo: "Relógio" },
-        { valor: "iris", rotulo: "Íris (círculo)" },
-        { valor: "impacto", rotulo: "Impacto (zoom + flash)" },
-      ],
+      opcoes: TRANSICOES.map((t) => ({
+        valor: t.id,
+        rotulo: `${t.nome} (${t.tag})`,
+      })),
     },
     {
       chave: "direcao",
@@ -114,6 +110,19 @@ const CAMPOS: Record<Faixa, Campo[]> = {
     { chave: "texto", rotulo: "Texto", tipo: "texto" },
     { chave: "inicio", rotulo: "Início (s)", tipo: "numero" },
     { chave: "fim", rotulo: "Fim (s)", tipo: "numero" },
+    {
+      chave: "estilo",
+      rotulo: "Estilo desta legenda",
+      tipo: "opcoes",
+      opcional: true,
+      opcoes: [
+        { valor: "", rotulo: "Padrão do projeto" },
+        ...ESTILOS_LEGENDA.map((e) => ({
+          valor: e.id,
+          rotulo: `${e.nome} (${e.tag})`,
+        })),
+      ],
+    },
   ],
 };
 
@@ -249,8 +258,30 @@ export const Inspetor: React.FC<{
             }
           />
         </label>
+        <label className="block">
+          <span className="mb-1 block text-xs text-zinc-400">
+            Estilo das legendas
+          </span>
+          <select
+            value={timeline.estiloLegenda ?? "classico"}
+            onChange={(e) =>
+              aplicar((t) => ({
+                ...t,
+                estiloLegenda: e.target.value as EstiloLegenda,
+              }))
+            }
+            className={estiloCampo}
+          >
+            {ESTILOS_LEGENDA.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome} ({e.tag})
+              </option>
+            ))}
+          </select>
+        </label>
         <p className="text-xs text-zinc-500">
-          Clique num item da timeline para editar.
+          Clique num item da timeline para editar. Veja os exemplos de cada
+          estilo na aba Estilos.
         </p>
       </div>
     );

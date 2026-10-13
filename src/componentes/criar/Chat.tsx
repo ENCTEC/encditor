@@ -4,8 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import type { RespostaIA } from "@/app/api/ia/route";
 import { ListaDeAnexos } from "@/componentes/ListaDeAnexos";
 import {
-  filtrarMencoes,
+  EVENTO_CITAR,
   inserirMencao,
+  Prefixo,
+  Sugestao,
+  sugestoesDeMencao,
   SugestoesMencao,
   termoDeMencao,
   TextoComMencoes,
@@ -48,9 +51,11 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     "parado",
   );
   // Sugestões de @apelido enquanto digita.
-  const [mencao, setMencao] = useState<{ termo: string; ativa: number } | null>(
-    null,
-  );
+  const [mencao, setMencao] = useState<{
+    prefixo: Prefixo;
+    termo: string;
+    ativa: number;
+  } | null>(null);
   const gravador = useRef<MediaRecorder | null>(null);
   const caixa = useRef<HTMLTextAreaElement>(null);
   const inputArquivo = useRef<HTMLInputElement>(null);
@@ -58,8 +63,19 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
 
   const ocupado = envio.enviando || pensando !== null;
   const opcoesMencao = mencao
-    ? filtrarMencoes(projeto.biblioteca, mencao.termo)
+    ? sugestoesDeMencao(projeto.biblioteca, mencao.prefixo, mencao.termo)
     : [];
+
+  // "Citar no chat" (menu Estilos): acrescenta a #tag na caixa de texto.
+  useEffect(() => {
+    const aoCitar = (e: Event) => {
+      const tag = (e as CustomEvent<string>).detail;
+      setTexto((t) => `${t.trim() ? `${t.trimEnd()} ` : ""}${tag} `);
+      requestAnimationFrame(() => caixa.current?.focus());
+    };
+    window.addEventListener(EVENTO_CITAR, aoCitar);
+    return () => window.removeEventListener(EVENTO_CITAR, aoCitar);
+  }, []);
 
   useEffect(() => {
     fimDaLista.current?.scrollIntoView({ behavior: "smooth" });
@@ -187,14 +203,19 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
   };
 
   const atualizarMencao = (valor: string, cursor: number) => {
-    const termo = termoDeMencao(valor, cursor);
-    setMencao(termo === null ? null : { termo, ativa: 0 });
+    const achado = termoDeMencao(valor, cursor);
+    setMencao(achado ? { ...achado, ativa: 0 } : null);
   };
 
-  const escolherMencao = (midia: Midia) => {
+  const escolherMencao = (sugestao: Sugestao) => {
     const el = caixa.current;
     const cursor = el?.selectionStart ?? texto.length;
-    const novo = inserirMencao(texto, cursor, midia.apelido);
+    const novo = inserirMencao(
+      texto,
+      cursor,
+      mencao?.prefixo ?? "@",
+      sugestao.valor,
+    );
     setTexto(novo.texto);
     setMencao(null);
     requestAnimationFrame(() => {
@@ -444,7 +465,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
               }
             }}
             rows={2}
-            placeholder="Peça uma edição, cite arquivos com @ ou arraste arquivos para cá…"
+            placeholder="Peça uma edição: @ cita arquivos, # cita transições e legendas…"
             className="min-h-0 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-zinc-500"
           />
           <button

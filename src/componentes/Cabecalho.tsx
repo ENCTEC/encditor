@@ -11,6 +11,7 @@ const ABAS = [
   { href: "/", rotulo: "Criar" },
   { href: "/timeline", rotulo: "Timeline" },
   { href: "/arquivos", rotulo: "Arquivos" },
+  { href: "/estilos", rotulo: "Estilos" },
 ];
 
 const botao =

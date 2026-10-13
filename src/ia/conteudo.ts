@@ -208,6 +208,13 @@ export const gerarLegendas = (
         .replace(/\s+([,.!?;:])/g, "$1"),
       inicio: r2(de),
       fim: r2(ate),
+      // Tempo de cada palavra (contado do início da legenda), para as
+      // animações karaokê/pop/destaque seguirem a fala.
+      palavras: grupo.map((p) => ({
+        texto: p.palavra,
+        de: r2(p.de - de),
+        ate: r2(p.ate - de),
+      })),
     });
     grupo = [];
   };

@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { EVENTO_CITAR } from "@/componentes/Mencoes";
 import { Chat } from "@/componentes/criar/Chat";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 
@@ -15,6 +16,13 @@ export const AreaDeTrabalho: React.FC<{ children: React.ReactNode }> = ({
   const naCriar = usePathname() === "/";
   const { carregado } = useProjeto();
   const [chatAberto, setChatAberto] = useState(true);
+
+  // Citar algo no chat (menu Estilos) reabre o chat se estiver oculto.
+  useEffect(() => {
+    const abrir = () => setChatAberto(true);
+    window.addEventListener(EVENTO_CITAR, abrir);
+    return () => window.removeEventListener(EVENTO_CITAR, abrir);
+  }, []);
 
   const classeChat = naCriar
     ? "order-1 min-w-0 flex-1 border-r-[3px] border-tinta"

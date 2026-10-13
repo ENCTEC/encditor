@@ -82,10 +82,30 @@ export const zoomSchema = z.object({
   rampa: z.number().min(0).optional(),
 });
 
+// Estilos de legenda (animações). Ver src/catalogo/estilos.ts.
+export const estiloLegendaSchema = z.enum([
+  "classico",
+  "karaoke",
+  "pop",
+  "destaque",
+  "gigante",
+  "spray",
+  "maquina",
+  "neon",
+]);
+
 export const legendaSchema = z.object({
   texto: z.string(),
   inicio: z.number().min(0),
   fim: z.number().min(0),
+  // Estilo só desta legenda (sem valor = o estilo padrão do projeto).
+  estilo: estiloLegendaSchema.optional(),
+  // Tempo de cada palavra, em segundos CONTADOS DO INÍCIO da legenda
+  // (vem da transcrição; anima karaokê/pop/destaque). Sem valor, o tempo
+  // é dividido igualmente entre as palavras.
+  palavras: z
+    .array(z.object({ texto: z.string(), de: z.number(), ate: z.number() }))
+    .optional(),
 });
 
 export const timelineSchema = z.object({
@@ -99,6 +119,8 @@ export const timelineSchema = z.object({
   audios: z.array(audioSchema),
   zooms: z.array(zoomSchema),
   legendas: z.array(legendaSchema),
+  // Estilo padrão das legendas (sem valor = clássico).
+  estiloLegenda: estiloLegendaSchema.optional(),
 });
 
 export type TipoTransicao = z.infer<typeof tipoTransicaoSchema>;
@@ -108,4 +130,5 @@ export type Insert = z.infer<typeof insertSchema>;
 export type AudioFaixa = z.infer<typeof audioSchema>;
 export type Zoom = z.infer<typeof zoomSchema>;
 export type Legenda = z.infer<typeof legendaSchema>;
+export type EstiloLegenda = z.infer<typeof estiloLegendaSchema>;
 export type Timeline = z.infer<typeof timelineSchema>;
