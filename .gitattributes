@@ -1,0 +1,3 @@
+# Quebra de linha padrão Linux (LF) em todos os arquivos de texto,
+# igual na VPS. Evita os avisos "LF will be replaced by CRLF" no Windows.
+* text=auto eol=lf
