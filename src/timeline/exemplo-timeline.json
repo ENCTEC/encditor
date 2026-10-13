@@ -8,24 +8,67 @@
       "url": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
       "inicio": 0,
       "fim": 4,
-      "transicao": "corte"
+      "transicao": "corte",
+      "volume": 1
     },
     {
       "url": "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
       "inicio": 2,
       "fim": 6,
-      "transicao": "fade"
+      "transicao": "fade",
+      "volume": 1
     },
     {
       "url": "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
       "inicio": 1,
       "fim": 5,
-      "transicao": "slide"
+      "transicao": "slide",
+      "volume": 1
+    }
+  ],
+  "inserts": [
+    {
+      "url": "https://picsum.photos/id/1018/1280/720.jpg",
+      "tipo": "imagem",
+      "inicio": 1.2,
+      "fim": 3.2,
+      "origemInicio": 0,
+      "posicao": "janela",
+      "volume": 0
+    },
+    {
+      "url": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+      "tipo": "video",
+      "inicio": 5,
+      "fim": 6.5,
+      "origemInicio": 6,
+      "posicao": "tela-cheia",
+      "volume": 0
+    }
+  ],
+  "audios": [
+    {
+      "url": "https://remotion.media/music.mp3",
+      "inicio": 0,
+      "fim": 11,
+      "origemInicio": 0,
+      "volume": 0.5,
+      "fadeEntrada": 1,
+      "fadeSaida": 1.5
+    }
+  ],
+  "zooms": [
+    {
+      "inicio": 8,
+      "fim": 10.5,
+      "escala": 1.4,
+      "focoX": 50,
+      "focoY": 40
     }
   ],
   "legendas": [
     { "texto": "Bem-vindo ao Encditor", "inicio": 0.3, "fim": 3.2 },
     { "texto": "Transição com fade", "inicio": 3.8, "fim": 6.8 },
-    { "texto": "E agora um slide!", "inicio": 7.6, "fim": 10.8 }
+    { "texto": "E agora um slide com zoom!", "inicio": 7.6, "fim": 10.8 }
   ]
 }

@@ -29,7 +29,7 @@ Ambas leem/alteram o MESMO JSON de timeline.
 - Domínio: enctec.com.br (registro/hospedagem na HostGator, mas o DNS é gerenciado na **Cloudflare**; e-mail no Google). O app usará um subdomínio (sugestão: encditor.enctec.com.br) com registro A apontando para o IP da VPS, em modo "DNS only" (nuvem cinza, sem proxy da Cloudflare — o proxy grátis limita uploads a 100 MB e restringe tráfego de vídeo). HTTPS via Let's Encrypt na própria VPS. Não mexer no domínio raiz nem nos registros MX.
 
 ## Etapa atual
-Base Remotion criada (composição EditorTimeline com clipes, transições corte/fade/slide e legendas). Próximo: ampliar schema/composição (inserts, áudio, zoom) e depois o app Next.js com as duas telas.
+Composição EditorTimeline pronta com: clipes (corte/fade/slide, volume), inserts (vídeo/imagem, tela cheia ou janela), áudios (volume, fade de entrada/saída), zooms (escala + ponto de foco) e legendas. Próximo: app Next.js com as duas telas (Criar e Timeline) usando Remotion Player.
 
 ## Custos e licenças a considerar
 - Remotion: gratuito só para empresas de até 3 pessoas. Acima disso, licença "Remotion for Automators" (US$ 0,01 por render, mínimo US$ 100/mês).

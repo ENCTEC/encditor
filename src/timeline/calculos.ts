@@ -1,6 +1,6 @@
 import { Clipe, Timeline } from "./schema";
 
-const segParaFrames = (segundos: number, fps: number) =>
+export const segParaFrames = (segundos: number, fps: number) =>
   Math.round(segundos * fps);
 
 export type ClipeCalculado = Clipe & {
@@ -13,26 +13,40 @@ export type ClipeCalculado = Clipe & {
   transicaoFrames: number;
 };
 
+const validarIntervalo = (
+  item: string,
+  { inicio, fim }: { inicio: number; fim: number },
+) => {
+  if (fim <= inicio) {
+    throw new Error(
+      `${item}: "fim" (${fim}) precisa ser maior que "inicio" (${inicio}).`,
+    );
+  }
+};
+
+// Confere todos os intervalos do JSON e mostra um erro claro no primeiro
+// que estiver errado.
+export const validarTimeline = (timeline: Timeline) => {
+  timeline.clipes.forEach((c, i) => validarIntervalo(`Clipe ${i + 1}`, c));
+  timeline.inserts.forEach((c, i) => validarIntervalo(`Insert ${i + 1}`, c));
+  timeline.audios.forEach((c, i) => validarIntervalo(`Áudio ${i + 1}`, c));
+  timeline.zooms.forEach((c, i) => validarIntervalo(`Zoom ${i + 1}`, c));
+  timeline.legendas.forEach((c, i) => validarIntervalo(`Legenda ${i + 1}`, c));
+};
+
 // Converte segundos -> frames e garante que as transições não fiquem
 // maiores que os clipes que elas sobrepõem.
 export const calcularClipes = (timeline: Timeline): ClipeCalculado[] => {
   const { fps } = timeline;
   const transicaoPadrao = segParaFrames(timeline.duracaoTransicao, fps);
 
-  const clipes = timeline.clipes.map((clipe, i) => {
-    if (clipe.fim <= clipe.inicio) {
-      throw new Error(
-        `Clipe ${i + 1}: "fim" (${clipe.fim}) precisa ser maior que "inicio" (${clipe.inicio}).`,
-      );
-    }
-    return {
-      ...clipe,
-      duracaoFrames: segParaFrames(clipe.fim - clipe.inicio, fps),
-      trimInicio: segParaFrames(clipe.inicio, fps),
-      trimFim: segParaFrames(clipe.fim, fps),
-      transicaoFrames: 0,
-    };
-  });
+  const clipes = timeline.clipes.map((clipe) => ({
+    ...clipe,
+    duracaoFrames: segParaFrames(clipe.fim - clipe.inicio, fps),
+    trimInicio: segParaFrames(clipe.inicio, fps),
+    trimFim: segParaFrames(clipe.fim, fps),
+    transicaoFrames: 0,
+  }));
 
   return clipes.map((clipe, i) => {
     // O primeiro clipe não tem com quem fazer transição.
@@ -54,5 +68,3 @@ export const calcularDuracaoTotal = (clipes: ClipeCalculado[]) =>
     (total, clipe) => total + clipe.duracaoFrames - clipe.transicaoFrames,
     0,
   );
-
-export { segParaFrames };

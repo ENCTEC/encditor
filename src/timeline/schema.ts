@@ -1,21 +1,62 @@
 import { z } from "zod";
 
+// Convenção de tempos (sempre em segundos):
+// - "inicio"/"fim" de clipes = trecho dentro do vídeo de ORIGEM.
+// - "inicio"/"fim" de inserts, áudios, zooms e legendas = posição na
+//   timeline FINAL (já editada).
+// - "origemInicio" = a partir de que segundo do arquivo de origem tocar.
+
 // Tipos de transição de entrada de um clipe (em relação ao clipe anterior).
 export const tipoTransicaoSchema = z.enum(["corte", "fade", "slide"]);
 
+// Trilha principal: as cenas, em sequência.
 export const clipeSchema = z.object({
-  // URL pública do vídeo (Supabase Storage no futuro).
   url: z.string(),
-  // Trecho do vídeo de origem a ser usado, em segundos.
   inicio: z.number().min(0),
   fim: z.number().min(0),
-  // Como este clipe entra: corte seco, fade ou slide.
   transicao: tipoTransicaoSchema,
+  // 0 = mudo, 1 = volume original.
+  volume: z.number().min(0),
+});
+
+// Vídeo ou imagem por cima da trilha principal (B-roll, insert).
+export const insertSchema = z.object({
+  url: z.string(),
+  tipo: z.enum(["video", "imagem"]),
+  inicio: z.number().min(0),
+  fim: z.number().min(0),
+  // Só para vídeo: de que segundo do arquivo começar.
+  origemInicio: z.number().min(0),
+  // Tela cheia cobre o vídeo principal; janela fica no canto (picture-in-picture).
+  posicao: z.enum(["tela-cheia", "janela"]),
+  volume: z.number().min(0),
+});
+
+// Música, narração ou efeito sonoro.
+export const audioSchema = z.object({
+  url: z.string(),
+  inicio: z.number().min(0),
+  fim: z.number().min(0),
+  origemInicio: z.number().min(0),
+  volume: z.number().min(0),
+  // Duração do fade de entrada/saída, em segundos (0 = sem fade).
+  fadeEntrada: z.number().min(0),
+  fadeSaida: z.number().min(0),
+});
+
+// Zoom na trilha principal durante um trecho.
+export const zoomSchema = z.object({
+  inicio: z.number().min(0),
+  fim: z.number().min(0),
+  // 1 = sem zoom, 1.5 = 50% mais perto.
+  escala: z.number().min(1),
+  // Ponto para onde o zoom aproxima, em % da tela (50/50 = centro).
+  focoX: z.number().min(0).max(100),
+  focoY: z.number().min(0).max(100),
 });
 
 export const legendaSchema = z.object({
   texto: z.string(),
-  // Tempo na timeline FINAL (já editada), em segundos.
   inicio: z.number().min(0),
   fim: z.number().min(0),
 });
@@ -27,10 +68,16 @@ export const timelineSchema = z.object({
   // Duração das transições fade/slide, em segundos.
   duracaoTransicao: z.number().min(0),
   clipes: z.array(clipeSchema).min(1),
+  inserts: z.array(insertSchema),
+  audios: z.array(audioSchema),
+  zooms: z.array(zoomSchema),
   legendas: z.array(legendaSchema),
 });
 
 export type TipoTransicao = z.infer<typeof tipoTransicaoSchema>;
 export type Clipe = z.infer<typeof clipeSchema>;
+export type Insert = z.infer<typeof insertSchema>;
+export type AudioFaixa = z.infer<typeof audioSchema>;
+export type Zoom = z.infer<typeof zoomSchema>;
 export type Legenda = z.infer<typeof legendaSchema>;
 export type Timeline = z.infer<typeof timelineSchema>;
