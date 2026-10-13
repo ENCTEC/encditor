@@ -166,6 +166,7 @@ export const Trilhas: React.FC<{
             max={200}
             value={pxPorSegundo}
             onChange={(e) => setPxPorSegundo(Number(e.target.value))}
+            className="accent-violet-500"
           />
         </label>
       </div>

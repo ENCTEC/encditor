@@ -150,7 +150,10 @@ export default function PaginaTimeline() {
             </h2>
             <Biblioteca
               biblioteca={projeto.biblioteca}
-              acao={{ rotulo: "+ aqui", executar: colocarDaBiblioteca }}
+              acao={{
+                rotulo: `+ em ${inicio.toFixed(1)}s`,
+                executar: colocarDaBiblioteca,
+              }}
             />
           </div>
         </aside>

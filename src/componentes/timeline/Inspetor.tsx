@@ -156,7 +156,10 @@ export const Inspetor: React.FC<{
           <div className="grid grid-cols-4 gap-1">
             {FORMATOS.map((f) => {
               const ativo =
-                timeline.largura === f.largura && timeline.altura === f.altura;
+                // Compara a proporção (1280x720 também é 16:9).
+                Math.abs(
+                  timeline.largura / timeline.altura - f.largura / f.altura,
+                ) < 0.01;
               return (
                 <button
                   key={f.rotulo}
