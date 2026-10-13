@@ -6,6 +6,7 @@ import {
   analisarMidia,
   podeAnalisar,
 } from "@/projeto/midia-cliente";
+import { VERSAO_ANALISE } from "@/projeto/analise";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 
@@ -33,10 +34,12 @@ export const AnaliseAutomatica: React.FC = () => {
   useEffect(() => {
     if (!carregado) return;
     for (const midia of projeto.biblioteca) {
+      const a = midia.analise;
       const pendente =
-        !midia.analise ||
-        (midia.analise.status === "analisando" &&
-          !analiseEmAndamento(midia.id));
+        !a ||
+        (a.status === "analisando" && !analiseEmAndamento(midia.id)) ||
+        // Analisada com uma versão antiga: refaz com as melhorias.
+        (a.status === "pronta" && a.versao !== VERSAO_ANALISE);
       if (podeAnalisar(midia) && pendente) {
         iniciarAnalise(midia, atualizarAnalise);
       }

@@ -205,8 +205,8 @@ export default function PaginaArquivos() {
                     : `Enviar ${envio.anexos.length} arquivo(s)`}
                 </button>
                 <span className="text-xs text-zinc-500">
-                  Cenas entram no fim da trilha principal; inserts e áudios
-                  ficam na biblioteca.
+                  Tudo fica na biblioteca. Depois, diga no chat a ordem das
+                  cenas — ou use “+ trilha” na Timeline.
                 </span>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Anton, Archivo, Permanent_Marker, Space_Mono } from "next/font/google";
 import { AnaliseAutomatica } from "@/componentes/AnaliseAutomatica";
+import { AreaDeTrabalho } from "@/componentes/AreaDeTrabalho";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { Cabecalho } from "@/componentes/Cabecalho";
 import { ProjetoProvider } from "@/projeto/ProjetoProvider";
@@ -43,7 +44,9 @@ export default function RootLayout({
       <body className="flex h-screen flex-col overflow-hidden font-sans antialiased">
         <ProjetoProvider>
           <Cabecalho />
-          <main className="min-h-0 flex-1">{children}</main>
+          <main className="min-h-0 flex-1">
+            <AreaDeTrabalho>{children}</AreaDeTrabalho>
+          </main>
           <AvisoErro />
           <AnaliseAutomatica />
         </ProjetoProvider>

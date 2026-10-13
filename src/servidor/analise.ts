@@ -5,6 +5,7 @@ import path from "node:path";
 import {
   Analise,
   analiseSchema,
+  VERSAO_ANALISE,
   Transcricao,
   Visual,
   visualSchema,
@@ -23,12 +24,26 @@ import { clienteOpenAI, comNovaTentativa, MODELOS } from "./openai";
 const LIMITE_QUADROS = 24;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-// Muda quando o formato da análise melhora: análises salvas com versão
-// anterior são refeitas.
-const VERSAO_ANALISE = 3;
+// Escritas que não deveriam aparecer num áudio transcrito como idioma de
+// alfabeto latino (chinês, japonês, coreano): sinal de texto inventado.
+const ESCRITA_ASIATICA = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
 
-// Acima disso, o trecho é tratado como "não é fala" (ruído, música).
-const LIMITE_SEM_FALA = 0.5;
+// Frases que o whisper costuma "inventar" em trechos de silêncio.
+const FRASES_FANTASMA =
+  /amara\.org|obrigad[oa] por assistir|legendas? (pela|por|de)|thanks? (you )?for watching|subtitles? by|inscreva-se no canal/i;
+
+// Trecho inventado = o whisper acha provável que NÃO seja fala E há outro
+// sinal ruim: confiança baixa, escrita asiática ou frase fantasma conhecida.
+// (Só a probabilidade não basta: fala real às vezes vem com 0,6.)
+const pareceInventado = (s: {
+  no_speech_prob: number;
+  avg_logprob: number;
+  text: string;
+}) =>
+  s.no_speech_prob > 0.5 &&
+  (s.avg_logprob < -1 ||
+    ESCRITA_ASIATICA.test(s.text) ||
+    FRASES_FANTASMA.test(s.text));
 
 const soLetrasENumeros = (t: string) =>
   t
@@ -82,10 +97,9 @@ const transcrever = async (audio: string): Promise<Transcricao | null> => {
     }),
   );
   // Em trechos sem voz (só música/ruído) o whisper às vezes "inventa" frases
-  // (ex.: texto em chinês num vídeo mudo). Esses trechos vêm com alta
-  // probabilidade de "não é fala": são descartados junto com suas palavras.
+  // (ex.: texto em chinês num vídeo mudo): são descartados com suas palavras.
   const segmentos = (resposta.segments ?? []).filter(
-    (s) => s.no_speech_prob <= LIMITE_SEM_FALA && s.text.trim(),
+    (s) => s.text.trim() && !pareceInventado(s),
   );
   const texto = segmentos.map((s) => s.text.trim()).join(" ");
   if (!texto) return null;
@@ -208,12 +222,11 @@ export const analisarArquivo = async (
   formato: "video" | "imagem" | "audio",
   duracao: number | null,
 ): Promise<Analise> => {
-  const bruta = (await lerAnaliseSalva(nome)) as { versao?: number } | null;
-  const salva = analiseSchema.safeParse(bruta);
+  const salva = analiseSchema.safeParse(await lerAnaliseSalva(nome));
   if (
     salva.success &&
     salva.data.status === "pronta" &&
-    bruta?.versao === VERSAO_ANALISE
+    salva.data.versao === VERSAO_ANALISE
   ) {
     return salva.data;
   }
@@ -252,8 +265,9 @@ export const analisarArquivo = async (
       erro: null,
       transcricao,
       visual,
+      versao: VERSAO_ANALISE,
     };
-    await salvarAnalise(nome, { ...analise, versao: VERSAO_ANALISE });
+    await salvarAnalise(nome, analise);
     return analise;
   } finally {
     await rm(temporaria, { recursive: true, force: true });

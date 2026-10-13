@@ -10,9 +10,9 @@ import {
   adicionarItem,
   atualizarItem,
   definirFormato,
+  colocarCena,
   dividirClipe,
   Faixa,
-  inserirClipe,
   moverClipe,
   removerItem,
 } from "@/timeline/operacoes";
@@ -425,23 +425,51 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         if (midia.formato !== "video") {
           throw new Error(`"${midia.nome}" não é vídeo; use colocar_insert.`);
         }
-        const de = e.de ?? 0;
-        const ate = e.ate ?? Math.floor((midia.duracao ?? 5) * 100) / 100;
         const posicao = e.posicao === null ? undefined : e.posicao - 1;
         return aplicar(
           (t) =>
-            inserirClipe(
-              t,
-              {
-                url: midia.url,
-                inicio: de,
-                fim: ate,
-                transicao: "corte",
-                volume: 1,
-              },
+            colocarCena(t, midia, {
               posicao,
+              de: e.de ?? undefined,
+              ate: e.ate ?? undefined,
+            }),
+          `${midia.nome} adicionada como cena ${e.posicao ?? sessao.timeline.clipes.length + 1}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "montar_sequencia",
+      description:
+        "Monta a trilha principal com vários vídeos da biblioteca, na ordem dada (cada um inteiro). Use quando o usuário disser a ordem das cenas, ou pedir para usar a ordem em que enviou.",
+      inputSchema: z.object({
+        midias: z
+          .array(z.string())
+          .min(1)
+          .describe(
+            'Na ordem: nomes ou @apelidos, ex.: ["@abertura", "Cena 2"].',
+          ),
+        substituir: z
+          .boolean()
+          .describe(
+            "true = apaga as cenas atuais da trilha antes; false = coloca no fim.",
+          ),
+      }),
+      run: (e) => {
+        const videos = e.midias.map((nome) => {
+          const midia = acharMidia(nome);
+          if (midia.formato !== "video") {
+            throw new Error(`"${midia.nome}" não é vídeo; use colocar_insert.`);
+          }
+          return midia;
+        });
+        return aplicar(
+          (t) =>
+            videos.reduce(
+              (acc, v) => colocarCena(acc, v),
+              e.substituir ? { ...t, clipes: [] } : t,
             ),
-          `${midia.nome} (${de}s–${ate}s) adicionada como cena ${e.posicao ?? sessao.timeline.clipes.length + 1}`,
+          `trilha ${e.substituir ? "montada" : "ampliada"}: ${videos.map((v) => v.nome).join(" → ")}`,
         );
       },
     }),

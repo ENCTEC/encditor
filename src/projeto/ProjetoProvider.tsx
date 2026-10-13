@@ -11,7 +11,7 @@ import React, {
   useState,
 } from "react";
 import { validarTimeline } from "@/timeline/calculos";
-import { adicionarItem, timelineVazia } from "@/timeline/operacoes";
+import { timelineVazia } from "@/timeline/operacoes";
 import { Timeline } from "@/timeline/schema";
 import { Analise } from "./analise";
 import { gerarApelido } from "./midia-cliente";
@@ -38,6 +38,7 @@ type Acao =
   | { tipo: "analise"; id: string; analise: Analise }
   | { tipo: "editarMidia"; id: string; mudancas: Partial<Midia> }
   | { tipo: "mensagem"; mensagem: Mensagem }
+  | { tipo: "limparMensagens" }
   | { tipo: "substituir"; projeto: Projeto };
 
 const projetoVazio = (): Projeto => ({
@@ -118,6 +119,8 @@ const reducer = (estado: Estado, acao: Acao): Estado => {
           mensagens: [...projeto.mensagens, acao.mensagem],
         },
       };
+    case "limparMensagens":
+      return { ...estado, projeto: { ...projeto, mensagens: [] } };
     case "substituir":
       return { projeto: acao.projeto, passado: [], futuro: [] };
   }
@@ -143,10 +146,12 @@ type ContextoProjeto = {
   editarMidia: (id: string, mudancas: Partial<Midia>) => boolean;
   desfazer: () => void;
   refazer: () => void;
-  // Coloca a mídia na biblioteca; se for cena, também no fim da trilha.
+  // Coloca a mídia na biblioteca (não mexe na timeline).
   adicionarMidia: (midia: Midia) => void;
   adicionarMensagem: (mensagem: Omit<Mensagem, "id" | "criadaEm">) => void;
   substituirProjeto: (projeto: Projeto) => void;
+  // Apaga a conversa (a edição e os arquivos continuam).
+  limparChat: () => void;
   novoProjeto: () => void;
 };
 
@@ -208,27 +213,11 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, []);
 
-  const adicionarMidia = useCallback(
-    (midia: Midia) => {
-      dispatch({ tipo: "midia", midia });
-      if (midia.papel !== "cena" || midia.formato !== "video") return;
-      aplicar((t) => {
-        // A primeira cena define o formato do vídeo final.
-        const formato =
-          t.clipes.length === 0 && midia.largura && midia.altura
-            ? { largura: midia.largura, altura: midia.altura }
-            : {};
-        return adicionarItem({ ...t, ...formato }, "clipes", {
-          url: midia.url,
-          inicio: 0,
-          fim: Math.max(0.1, Math.floor((midia.duracao ?? 5) * 100) / 100),
-          transicao: "corte",
-          volume: 1,
-        });
-      });
-    },
-    [aplicar],
-  );
+  // Só guarda na biblioteca: a ordem das cenas na trilha é o usuário quem
+  // decide (pelo chat ou pela Timeline).
+  const adicionarMidia = useCallback((midia: Midia) => {
+    dispatch({ tipo: "midia", midia });
+  }, []);
 
   const valor = useMemo<ContextoProjeto>(
     () => ({
@@ -266,6 +255,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
           mensagem: { ...m, id: novoId(), criadaEm: Date.now() },
         }),
       substituirProjeto: (projeto) => dispatch({ tipo: "substituir", projeto }),
+      limparChat: () => dispatch({ tipo: "limparMensagens" }),
       novoProjeto: () =>
         dispatch({ tipo: "substituir", projeto: projetoVazio() }),
     }),

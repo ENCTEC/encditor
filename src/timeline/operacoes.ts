@@ -133,3 +133,30 @@ export const dividirClipe = (
   clipes.splice(indice, 1, primeira, segunda);
   return { ...t, clipes };
 };
+
+// Põe um vídeo da biblioteca na trilha principal (no fim, ou na posição
+// indicada). Se for a primeira cena, ela define o formato do vídeo final.
+export const colocarCena = (
+  t: Timeline,
+  video: {
+    url: string;
+    duracao: number | null;
+    largura: number | null;
+    altura: number | null;
+  },
+  opcoes: { posicao?: number; de?: number; ate?: number } = {},
+): Timeline => {
+  const formato =
+    t.clipes.length === 0 && video.largura && video.altura
+      ? { largura: video.largura, altura: video.altura }
+      : {};
+  const de = opcoes.de ?? 0;
+  const ate =
+    opcoes.ate ??
+    Math.max(de + 0.1, Math.floor((video.duracao ?? 5) * 100) / 100);
+  return inserirClipe(
+    { ...t, ...formato },
+    { url: video.url, inicio: de, fim: ate, transicao: "corte", volume: 1 },
+    opcoes.posicao,
+  );
+};

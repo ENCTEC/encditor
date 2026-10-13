@@ -25,6 +25,10 @@ export const visualSchema = z.object({
   ),
 });
 
+// Muda quando a análise melhora: análises com versão anterior são refeitas
+// automaticamente (no servidor e no navegador).
+export const VERSAO_ANALISE = 4;
+
 export const analiseSchema = z.object({
   status: z.enum(["analisando", "pronta", "erro"]),
   erro: z.string().nullable(),
@@ -32,6 +36,7 @@ export const analiseSchema = z.object({
   transcricao: transcricaoSchema.nullable(),
   // null = não se aplica (áudio) ou não analisado.
   visual: visualSchema.nullable(),
+  versao: z.number().optional(),
 });
 
 export type Transcricao = z.infer<typeof transcricaoSchema>;

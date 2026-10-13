@@ -71,7 +71,7 @@ const EstadoAnalise: React.FC<{ midia: Midia }> = ({ midia }) => {
 // botão de colocar o item na posição atual.
 export const Biblioteca: React.FC<{
   biblioteca: Midia[];
-  acao?: { rotulo: string; executar: (midia: Midia) => void };
+  acao?: { rotulo: (midia: Midia) => string; executar: (midia: Midia) => void };
 }> = ({ biblioteca, acao }) => {
   if (biblioteca.length === 0) {
     return (
@@ -101,12 +101,12 @@ export const Biblioteca: React.FC<{
           <span className="shrink-0 tabular-nums text-zinc-500">
             {midia.duracao !== null ? formatarTempo(midia.duracao) : ""}
           </span>
-          {acao && midia.papel !== "cena" ? (
+          {acao ? (
             <button
               onClick={() => acao.executar(midia)}
               className="shrink-0 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 hover:bg-violet-600 hover:text-tinta"
             >
-              {acao.rotulo}
+              {acao.rotulo(midia)}
             </button>
           ) : null}
         </li>

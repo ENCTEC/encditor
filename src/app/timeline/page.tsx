@@ -8,7 +8,7 @@ import { Inspetor } from "@/componentes/timeline/Inspetor";
 import { Selecao, Trilhas } from "@/componentes/timeline/Trilhas";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
-import { adicionarItem, removerItem } from "@/timeline/operacoes";
+import { adicionarItem, colocarCena, removerItem } from "@/timeline/operacoes";
 
 const arredondar = (n: number) => Math.round(n * 100) / 100;
 
@@ -83,6 +83,13 @@ export default function PaginaTimeline() {
   };
 
   const colocarDaBiblioteca = (midia: Midia) => {
+    if (midia.papel === "cena" && midia.formato === "video") {
+      const novoIndice = timeline.clipes.length;
+      if (aplicar((t) => colocarCena(t, midia))) {
+        setSelecao({ faixa: "clipes", indice: novoIndice });
+      }
+      return;
+    }
     const duracao = midia.duracao ?? 3;
     if (midia.papel === "audio") {
       const novoIndice = timeline.audios.length;
@@ -149,7 +156,11 @@ export default function PaginaTimeline() {
             <Biblioteca
               biblioteca={projeto.biblioteca}
               acao={{
-                rotulo: `+ em ${inicio.toFixed(1)}s`,
+                // Cenas vão para o fim da trilha; o resto, para o cursor.
+                rotulo: (m) =>
+                  m.papel === "cena"
+                    ? "+ trilha"
+                    : `+ em ${inicio.toFixed(1)}s`,
                 executar: colocarDaBiblioteca,
               }}
             />

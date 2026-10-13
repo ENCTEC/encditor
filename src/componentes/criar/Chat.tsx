@@ -25,13 +25,18 @@ const EXEMPLOS = [
   "Coloque o @meuinsert quando eu falo “promoção”",
 ];
 
-export const Chat: React.FC = () => {
+// "compacto" = coluna lateral nas abas Timeline e Arquivos.
+export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
+  compacto = false,
+  aoOcultar,
+}) => {
   const {
     projeto,
     adicionarMensagem,
     aplicar,
     obterTimeline,
     obterBiblioteca,
+    limparChat,
   } = useProjeto();
   const envio = useEnvio();
   const [texto, setTexto] = useState("");
@@ -85,18 +90,14 @@ export const Chat: React.FC = () => {
 
     const partes: string[] = [];
     const cenas = enviados.filter((m) => m.papel === "cena");
-    const outros = enviados.filter((m) => m.papel !== "cena");
-    if (cenas.length) {
-      partes.push(
-        `Coloquei ${cenas.map((m) => m.nome).join(", ")} no fim da trilha principal.`,
-      );
-    }
     if (!pedido) {
-      if (outros.length) {
-        partes.push(
-          `Guardei ${outros.map((m) => `${m.nome} (@${m.apelido})`).join(", ")} na biblioteca — me diga onde usar.`,
-        );
-      }
+      const nomes = enviados.map((m) => `${m.nome} (@${m.apelido})`);
+      partes.push(
+        `Guardei ${nomes.join(", ")} na biblioteca.`,
+        cenas.length
+          ? "Me diga a ordem das cenas (ex.: “monte na ordem @abertura, @produto”) ou peça “use a ordem em que enviei”."
+          : "Me diga onde usar.",
+      );
       adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
       return;
     }
@@ -221,20 +222,55 @@ export const Chat: React.FC = () => {
         envio.anexar(e.dataTransfer.files);
       }}
     >
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
+      <div className="flex items-center gap-3 border-b-2 border-tinta px-4 py-1.5">
+        <span className="rotulo-zine">Chat com a IA</span>
+        <button
+          onClick={() => {
+            if (
+              projeto.mensagens.length &&
+              confirm("Apagar a conversa? A edição e os arquivos continuam.")
+            ) {
+              limparChat();
+            }
+          }}
+          disabled={!projeto.mensagens.length || ocupado}
+          className="ml-auto font-mono text-[11px] tracking-wider text-zinc-500 uppercase hover:text-spray disabled:opacity-30 disabled:hover:text-zinc-500"
+        >
+          Limpar chat
+        </button>
+        {aoOcultar ? (
+          <button
+            onClick={aoOcultar}
+            className="font-mono text-[11px] tracking-wider text-zinc-500 uppercase hover:text-tinta"
+            title="Ocultar o chat (a conversa continua)"
+          >
+            Ocultar ›
+          </button>
+        ) : null}
+      </div>
+
+      <div
+        className={`min-h-0 flex-1 space-y-4 overflow-y-auto ${compacto ? "px-4 py-4" : "px-6 py-6"}`}
+      >
         {projeto.mensagens.length === 0 ? (
           // Tela inicial em composição de pôster.
-          <div className="relative mx-auto mt-4 max-w-2xl pl-10">
+          <div
+            className={`relative mx-auto max-w-2xl pl-10 ${compacto ? "mt-1" : "mt-4"}`}
+          >
             <span className="rotulo-zine absolute top-1 left-0 rotate-180 [writing-mode:vertical-rl]">
               Nº 1 — edição com IA — cenas · inserts · áudio
             </span>
-            <h1 className="relative font-display text-7xl leading-[0.82] tracking-tight text-tinta uppercase">
+            <h1
+              className={`relative font-display leading-[0.82] tracking-tight text-tinta uppercase ${compacto ? "text-5xl" : "text-7xl"}`}
+            >
               O que
               <br />
               vamos
               <br />
               editar
-              <span className="absolute top-[58%] left-[13.5rem] -rotate-12 font-marca text-6xl normal-case text-spray">
+              <span
+                className={`absolute top-[58%] -rotate-12 font-marca normal-case text-spray ${compacto ? "left-[9.5rem] text-4xl" : "left-[13.5rem] text-6xl"}`}
+              >
                 hoje?!
               </span>
             </h1>
