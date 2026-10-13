@@ -5,21 +5,21 @@
   "duracaoTransicao": 0.5,
   "clipes": [
     {
-      "url": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+      "url": "https://samplelib.com/mp4/sample-10s.mp4",
       "inicio": 0,
       "fim": 4,
       "transicao": "corte",
       "volume": 1
     },
     {
-      "url": "https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_1MB.mp4",
+      "url": "https://samplelib.com/mp4/sample-15s.mp4",
       "inicio": 2,
       "fim": 6,
       "transicao": "fade",
       "volume": 1
     },
     {
-      "url": "https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4",
+      "url": "https://remotion.media/video.mp4",
       "inicio": 1,
       "fim": 5,
       "transicao": "slide",
@@ -37,11 +37,11 @@
       "volume": 0
     },
     {
-      "url": "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4",
+      "url": "https://samplelib.com/mp4/sample-5s.mp4",
       "tipo": "video",
       "inicio": 5,
       "fim": 6.5,
-      "origemInicio": 6,
+      "origemInicio": 0,
       "posicao": "tela-cheia",
       "volume": 0
     }
@@ -67,8 +67,20 @@
     }
   ],
   "legendas": [
-    { "texto": "Bem-vindo ao Encditor", "inicio": 0.3, "fim": 3.2 },
-    { "texto": "Transição com fade", "inicio": 3.8, "fim": 6.8 },
-    { "texto": "E agora um slide com zoom!", "inicio": 7.6, "fim": 10.8 }
+    {
+      "texto": "Bem-vindo ao Encditor",
+      "inicio": 0.3,
+      "fim": 3.2
+    },
+    {
+      "texto": "Transição com fade",
+      "inicio": 3.8,
+      "fim": 6.8
+    },
+    {
+      "texto": "E agora um slide com zoom!",
+      "inicio": 7.6,
+      "fim": 10.8
+    }
   ]
 }
