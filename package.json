@@ -1,30 +1,43 @@
 {
   "name": "Encditor",
   "version": "1.0.0",
-  "description": "My Remotion video",
+  "description": "Encditor — editor de vídeo com IA",
   "repository": {},
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
     "@remotion/cli": "4.0.535",
+    "@remotion/player": "4.0.535",
     "@remotion/transitions": "4.0.535",
+    "next": "16.4.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "remotion": "4.0.535",
     "zod": "4.5.4"
   },
   "devDependencies": {
-    "@remotion/eslint-config-flat": "4.0.535",
+    "@eslint/js": "9.38.0",
+    "@next/eslint-plugin-next": "16.4.0",
+    "@remotion/eslint-plugin": "4.0.535",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "20.12.14",
     "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
     "@types/web": "0.0.166",
     "eslint": "9.39.5",
+    "postcss": "8.5.23",
     "prettier": "3.8.1",
-    "typescript": "5.9.3"
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.0"
   },
   "scripts": {
-    "dev": "remotion studio",
-    "build": "remotion bundle",
-    "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "remotion": "remotion studio",
+    "render": "remotion render",
+    "lint": "eslint . && tsc",
+    "upgrade": "remotion upgrade"
   }
 }

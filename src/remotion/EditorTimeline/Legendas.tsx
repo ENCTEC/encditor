@@ -6,8 +6,8 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { Legenda } from "../timeline/schema";
-import { segParaFrames } from "../timeline/calculos";
+import { Legenda } from "../../timeline/schema";
+import { segParaFrames } from "../../timeline/calculos";
 
 const FADE_FRAMES = 6;
 

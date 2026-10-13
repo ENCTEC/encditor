@@ -3,8 +3,8 @@ import {
   calcularMetadata,
   EditorTimeline,
 } from "./EditorTimeline/EditorTimeline";
-import { Timeline, timelineSchema } from "./timeline/schema";
-import exemploTimeline from "./timeline/exemplo-timeline.json";
+import { Timeline, timelineSchema } from "../timeline/schema";
+import exemploTimeline from "../timeline/exemplo-timeline.json";
 
 export const RemotionRoot: React.FC = () => {
   return (

@@ -1,7 +1,7 @@
 import React from "react";
 import { Html5Audio, interpolate, Sequence, useVideoConfig } from "remotion";
-import { AudioFaixa } from "../timeline/schema";
-import { segParaFrames } from "../timeline/calculos";
+import { AudioFaixa } from "../../timeline/schema";
+import { segParaFrames } from "../../timeline/calculos";
 
 // Volume ao longo do tempo: sobe no fade de entrada, desce no de saída.
 const curvaVolume = (

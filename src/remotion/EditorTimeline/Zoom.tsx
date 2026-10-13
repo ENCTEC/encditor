@@ -6,8 +6,8 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { Zoom as ZoomItem } from "../timeline/schema";
-import { segParaFrames } from "../timeline/calculos";
+import { Zoom as ZoomItem } from "../../timeline/schema";
+import { segParaFrames } from "../../timeline/calculos";
 
 // Tempo para aproximar e para voltar ao normal.
 const RAMPA_SEGUNDOS = 0.4;

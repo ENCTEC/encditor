@@ -1,6 +1,11 @@
 node_modules
 dist
 .DS_Store
+*.tsbuildinfo
+
+# Next.js
+/.next/
+next-env.d.ts
 
 # Chaves e segredos (Supabase, Claude API etc.) nunca vão para o git.
 .env
@@ -10,8 +15,10 @@ dist
 # Vídeo renderizado.
 out
 
-# Vídeos/áudios de teste locais (os reais ficam no Storage).
-public/midia
+# Mídia enviada pelo app (na VPS fica no disco, fora do git).
+/midia
+
+# Vídeos/áudios de teste locais.
 *.mp4
 *.mov
 *.webm

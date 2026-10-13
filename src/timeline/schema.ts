@@ -67,7 +67,7 @@ export const timelineSchema = z.object({
   altura: z.number().int().positive(),
   // Duração das transições fade/slide, em segundos.
   duracaoTransicao: z.number().min(0),
-  clipes: z.array(clipeSchema).min(1),
+  clipes: z.array(clipeSchema),
   inserts: z.array(insertSchema),
   audios: z.array(audioSchema),
   zooms: z.array(zoomSchema),

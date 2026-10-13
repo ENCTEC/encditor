@@ -68,3 +68,16 @@ export const calcularDuracaoTotal = (clipes: ClipeCalculado[]) =>
     (total, clipe) => total + clipe.duracaoFrames - clipe.transicaoFrames,
     0,
   );
+
+// Em que frame da timeline FINAL cada clipe começa (já descontando as
+// sobreposições das transições).
+export const inicioDosClipes = (clipes: ClipeCalculado[]) => {
+  const inicios: number[] = [];
+  let cursor = 0;
+  clipes.forEach((clipe) => {
+    cursor -= clipe.transicaoFrames;
+    inicios.push(cursor);
+    cursor += clipe.duracaoFrames;
+  });
+  return inicios;
+};

@@ -29,7 +29,13 @@ Ambas leem/alteram o MESMO JSON de timeline.
 - Domínio: enctec.com.br (registro/hospedagem na HostGator, mas o DNS é gerenciado na **Cloudflare**; e-mail no Google). O app usará um subdomínio (sugestão: encditor.enctec.com.br) com registro A apontando para o IP da VPS, em modo "DNS only" (nuvem cinza, sem proxy da Cloudflare — o proxy grátis limita uploads a 100 MB e restringe tráfego de vídeo). HTTPS via Let's Encrypt na própria VPS. Não mexer no domínio raiz nem nos registros MX.
 
 ## Etapa atual
-Composição EditorTimeline pronta com: clipes (corte/fade/slide, volume), inserts (vídeo/imagem, tela cheia ou janela), áudios (volume, fade de entrada/saída), zooms (escala + ponto de foco) e legendas. Próximo: app Next.js com as duas telas (Criar e Timeline) usando Remotion Player.
+App Next.js 16 funcionando localmente com as duas abas:
+- **Criar:** chat com anexos (cena/insert/áudio), upload para o disco (`/api/midia`, com Range), preview e biblioteca. Cenas entram sozinhas na trilha principal. Pedidos em texto ainda NÃO são interpretados (resposta provisória) — falta ligar ao Claude.
+- **Timeline:** player + faixas (cenas, inserts, áudio, zoom, legendas), arrastar para mover/aparar, inspetor com campos, desfazer/refazer (Ctrl+Z/Ctrl+Y), Delete remove.
+- Estado salvo no localStorage (depois: Supabase). Edições passam por `src/timeline/operacoes.ts` (serão as ferramentas da IA).
+Próximo: ligar o chat ao Claude (tool use com as operações) — precisa de chave da API Anthropic (paga, pedir confirmação).
+
+Estrutura: Next.js na raiz; composição Remotion em `src/remotion/` (Studio: `npm run remotion`).
 
 ## Custos e licenças a considerar
 - Remotion: gratuito só para empresas de até 3 pessoas. Acima disso, licença "Remotion for Automators" (US$ 0,01 por render, mínimo US$ 100/mês).

@@ -1,0 +1,34 @@
+import { Timeline } from "@/timeline/schema";
+
+// Para que o arquivo foi enviado. "cena" entra direto na trilha principal;
+// inserts e áudios ficam na biblioteca esperando um pedido no chat.
+export type PapelMidia = "cena" | "insert" | "audio";
+
+export type Midia = {
+  id: string;
+  // Nome curto para citar no chat: "Cena 1", "Insert 2", "Áudio 1".
+  nome: string;
+  papel: PapelMidia;
+  formato: "video" | "imagem" | "audio";
+  url: string;
+  nomeArquivo: string;
+  // Em segundos (imagens não têm duração).
+  duracao: number | null;
+  largura: number | null;
+  altura: number | null;
+};
+
+export type Mensagem = {
+  id: string;
+  autor: "usuario" | "ia";
+  texto: string;
+  // Ids das mídias anexadas nesta mensagem.
+  anexos: string[];
+  criadaEm: number;
+};
+
+export type Projeto = {
+  timeline: Timeline;
+  biblioteca: Midia[];
+  mensagens: Mensagem[];
+};

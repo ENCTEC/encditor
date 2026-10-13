@@ -1,12 +1,13 @@
 /**
- * Note: When using the Node.JS APIs, the config file
- * doesn't apply. Instead, pass options directly to the APIs.
+ * Configuração do Remotion Studio/CLI (npm run remotion).
+ * Não vale para as APIs Node.js — nelas as opções são passadas direto.
  *
- * All configuration options: https://remotion.dev/docs/config
+ * Todas as opções: https://remotion.dev/docs/config
  */
 
 import { Config } from "@remotion/cli/config";
 
+Config.setEntryPoint("src/remotion/index.ts");
 Config.setRspack(true);
 Config.setVideoImageFormat("jpeg");
 Config.setOverwriteOutput(true);

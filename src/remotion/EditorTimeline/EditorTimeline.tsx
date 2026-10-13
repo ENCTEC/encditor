@@ -7,13 +7,13 @@ import {
 import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { fade } from "@remotion/transitions/fade";
 import { slide } from "@remotion/transitions/slide";
-import { Timeline } from "../timeline/schema";
+import { Timeline } from "../../timeline/schema";
 import {
   calcularClipes,
   calcularDuracaoTotal,
   ClipeCalculado,
   validarTimeline,
-} from "../timeline/calculos";
+} from "../../timeline/calculos";
 import { Audios } from "./Audios";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
