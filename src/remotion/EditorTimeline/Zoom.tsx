@@ -9,10 +9,11 @@ import {
 import { Zoom as ZoomItem } from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
 
-// Tempo para aproximar e para voltar ao normal.
-const RAMPA_SEGUNDOS = 0.4;
+// Tempo padrão para aproximar e para voltar ao normal.
+const RAMPA_PADRAO = 0.4;
 
-// Aplica os zooms da timeline em tudo que estiver dentro (a trilha principal).
+// Aplica os zooms da timeline em tudo que estiver dentro: é a "câmera" do
+// vídeo (cenas e inserts juntos; as legendas ficam fora).
 export const Zoom: React.FC<{
   zooms: ZoomItem[];
   children: React.ReactNode;
@@ -30,7 +31,7 @@ export const Zoom: React.FC<{
       continue;
     }
     const rampa = Math.min(
-      segParaFrames(RAMPA_SEGUNDOS, fps),
+      segParaFrames(zoom.rampa ?? RAMPA_PADRAO, fps),
       Math.floor((ate - de) / 2),
     );
     escala =

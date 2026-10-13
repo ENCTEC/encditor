@@ -29,6 +29,9 @@ export const direcaoSchema = z.enum(["esquerda", "direita", "cima", "baixo"]);
 // Trilha principal: as cenas, em sequência.
 export const clipeSchema = z.object({
   url: z.string(),
+  // Cenas podem ser vídeos ou imagens paradas (sem valor = vídeo).
+  // Numa imagem, inicio/fim só definem quanto tempo ela fica na tela.
+  tipo: z.enum(["video", "imagem"]).optional(),
   inicio: z.number().min(0),
   fim: z.number().min(0),
   transicao: tipoTransicaoSchema,
@@ -74,6 +77,9 @@ export const zoomSchema = z.object({
   // Ponto para onde o zoom aproxima, em % da tela (50/50 = centro).
   focoX: z.number().min(0).max(100),
   focoY: z.number().min(0).max(100),
+  // Segundos para chegar na escala (e para voltar ao normal no fim).
+  // Sem valor = 0,4s (zoom rápido). Valores maiores = zoom lento.
+  rampa: z.number().min(0).optional(),
 });
 
 export const legendaSchema = z.object({

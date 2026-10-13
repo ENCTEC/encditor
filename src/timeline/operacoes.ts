@@ -134,12 +134,13 @@ export const dividirClipe = (
   return { ...t, clipes };
 };
 
-// Põe um vídeo da biblioteca na trilha principal (no fim, ou na posição
-// indicada). Se for a primeira cena, ela define o formato do vídeo final.
+// Põe um vídeo ou imagem da biblioteca na trilha principal (no fim, ou na
+// posição indicada). Se for a primeira cena, ela define o formato do vídeo.
 export const colocarCena = (
   t: Timeline,
   video: {
     url: string;
+    formato?: "video" | "imagem" | "audio";
     duracao: number | null;
     largura: number | null;
     altura: number | null;
@@ -150,6 +151,21 @@ export const colocarCena = (
     t.clipes.length === 0 && video.largura && video.altura
       ? { largura: video.largura, altura: video.altura }
       : {};
+  // Imagem parada: fica 3s na tela, salvo outra duração pedida.
+  if (video.formato === "imagem") {
+    return inserirClipe(
+      { ...t, ...formato },
+      {
+        url: video.url,
+        tipo: "imagem",
+        inicio: 0,
+        fim: Math.max(0.1, (opcoes.ate ?? 3) - (opcoes.de ?? 0)),
+        transicao: "corte",
+        volume: 0,
+      },
+      opcoes.posicao,
+    );
+  }
   const de = opcoes.de ?? 0;
   const ate =
     opcoes.ate ??

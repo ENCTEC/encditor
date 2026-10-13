@@ -26,6 +26,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     cenas: clipes.map((c, i) => ({
       cena: i + 1,
       arquivo: nome(c.url),
+      ...(c.tipo === "imagem" ? { tipo: "imagem" } : {}),
       no_video_final: {
         de: s(inicios[i] / t.fps),
         ate: s((inicios[i] + c.duracaoFrames) / t.fps),
@@ -65,6 +66,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       escala: x.escala,
       foco_x: x.focoX,
       foco_y: x.focoY,
+      ...(x.rampa !== undefined ? { rampa_s: x.rampa } : {}),
     })),
     legendas: t.legendas.map((x, i) => ({
       numero: i + 1,

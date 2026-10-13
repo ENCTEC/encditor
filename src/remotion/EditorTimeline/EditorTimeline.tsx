@@ -2,6 +2,7 @@ import React from "react";
 import {
   AbsoluteFill,
   CalculateMetadataFunction,
+  Img,
   OffthreadVideo,
   useVideoConfig,
 } from "remotion";
@@ -32,8 +33,8 @@ export const calcularMetadata: CalculateMetadataFunction<Timeline> = ({
   };
 };
 
-// Camadas, de baixo para cima: trilha principal (com zoom) → inserts →
-// legendas. O áudio não aparece na tela.
+// Camadas, de baixo para cima: trilha principal → inserts (os dois sob o
+// zoom, como uma câmera) → legendas. O áudio não aparece na tela.
 export const EditorTimeline: React.FC<Timeline> = (timeline) => {
   const clipes = calcularClipes(timeline);
   const { width, height } = useVideoConfig();
@@ -61,19 +62,34 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
                 durationInFrames={clipe.duracaoFrames}
                 name={`Clipe ${i + 1}`}
               >
-                <OffthreadVideo
-                  src={clipe.url}
-                  trimBefore={clipe.trimInicio}
-                  trimAfter={clipe.trimFim}
-                  volume={clipe.volume}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+                {clipe.tipo === "imagem" ? (
+                  <Img
+                    src={clipe.url}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <OffthreadVideo
+                    src={clipe.url}
+                    trimBefore={clipe.trimInicio}
+                    trimAfter={clipe.trimFim}
+                    volume={clipe.volume}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                )}
               </TransitionSeries.Sequence>
             </React.Fragment>
           ))}
         </TransitionSeries>
+        <Inserts inserts={timeline.inserts} />
       </Zoom>
-      <Inserts inserts={timeline.inserts} />
       <Legendas legendas={timeline.legendas} />
       <Audios audios={timeline.audios} />
     </AbsoluteFill>

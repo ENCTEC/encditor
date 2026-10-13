@@ -400,7 +400,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_cena",
       description:
-        "Põe um vídeo da biblioteca na trilha principal numa posição. Também serve para repetir uma cena.",
+        "Põe um vídeo OU UMA IMAGEM da biblioteca na trilha principal, como cena. Use para imagens quando quiser transição com efeito entre um vídeo e a imagem (transições só existem entre cenas). Também serve para repetir uma cena.",
       inputSchema: z.object({
         midia: z.string(),
         posicao: z
@@ -413,17 +413,19 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .number()
           .min(0)
           .nullable()
-          .describe("Início no arquivo. Padrão 0."),
+          .describe("Vídeo: início no arquivo (padrão 0). Imagem: ignore."),
         ate: z
           .number()
           .min(0)
           .nullable()
-          .describe("Fim no arquivo. Padrão: fim do arquivo."),
+          .describe(
+            "Vídeo: fim no arquivo (padrão: fim do arquivo). Imagem: quantos segundos fica na tela (padrão 3).",
+          ),
       }),
       run: (e) => {
         const midia = acharMidia(e.midia);
-        if (midia.formato !== "video") {
-          throw new Error(`"${midia.nome}" não é vídeo; use colocar_insert.`);
+        if (midia.formato === "audio") {
+          throw new Error(`"${midia.nome}" é áudio; use colocar_audio.`);
         }
         const posicao = e.posicao === null ? undefined : e.posicao - 1;
         return aplicar(
@@ -441,7 +443,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "montar_sequencia",
       description:
-        "Monta a trilha principal com vários vídeos da biblioteca, na ordem dada (cada um inteiro). Use quando o usuário disser a ordem das cenas, ou pedir para usar a ordem em que enviou.",
+        "Monta a trilha principal com vários vídeos e/ou imagens da biblioteca, na ordem dada (vídeos inteiros; imagens 3s). Use quando o usuário disser a ordem das cenas, ou pedir para usar a ordem em que enviou.",
       inputSchema: z.object({
         midias: z
           .array(z.string())
@@ -458,8 +460,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       run: (e) => {
         const videos = e.midias.map((nome) => {
           const midia = acharMidia(nome);
-          if (midia.formato !== "video") {
-            throw new Error(`"${midia.nome}" não é vídeo; use colocar_insert.`);
+          if (midia.formato === "audio") {
+            throw new Error(`"${midia.nome}" é áudio; use colocar_audio.`);
           }
           return midia;
         });
@@ -494,7 +496,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_zoom",
       description:
-        "Dá zoom (aproxima) na cena durante um intervalo do vídeo final.",
+        "Zoom de câmera: aproxima TODA a imagem do vídeo (cenas e inserts, inclusive imagens) num intervalo do vídeo final. O zoom começa em 'de', leva 'rampa_s' segundos para chegar na escala, fica parado e volta ao normal TERMINANDO em 'ate'. Ex.: 'zoom in aos 39s e zoom out aos 42s' = de 39, ate 42 + rampa_s. Zoom lento/contínuo (efeito Ken Burns) = rampa_s grande, perto da metade do intervalo.",
       inputSchema: z.object({
         de: z.number().min(0),
         ate: z.number().min(0),
@@ -515,6 +517,14 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .max(100)
           .nullable()
           .describe("% vertical (50 = centro)."),
+        rampa_s: z
+          .number()
+          .min(0.1)
+          .max(10)
+          .nullable()
+          .describe(
+            "Segundos para aproximar e para voltar. null = 0.4 (rápido).",
+          ),
       }),
       run: (e) =>
         aplicar(
@@ -525,8 +535,9 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
               escala: e.escala,
               focoX: e.foco_x ?? 50,
               focoY: e.foco_y ?? 50,
+              ...(e.rampa_s !== null ? { rampa: e.rampa_s } : {}),
             }),
-          `zoom ${e.escala}x de ${s(e.de)}s a ${s(e.ate)}s`,
+          `zoom ${e.escala}x de ${s(e.de)}s a ${s(e.ate)}s${e.rampa_s !== null ? ` (rampa ${e.rampa_s}s)` : ""}`,
         ),
     }),
 
@@ -569,6 +580,11 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         fade_entrada: z.number().min(0).nullable(),
         fade_saida: z.number().min(0).nullable(),
         comeca_no_segundo_do_arquivo: z.number().min(0).nullable(),
+        rampa_s: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe("Só zoom: segundos para aproximar/voltar."),
       }),
       run: (e) => {
         const faixa = FAIXA_POR_TIPO[e.tipo];
@@ -585,6 +601,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           fadeEntrada: e.fade_entrada,
           fadeSaida: e.fade_saida,
           origemInicio: e.comeca_no_segundo_do_arquivo,
+          rampa: e.rampa_s,
         };
         if (faixa === "clipes") {
           // Em cenas, inicio/fim são do arquivo: só o volume é editável aqui.

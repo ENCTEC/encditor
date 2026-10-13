@@ -103,6 +103,12 @@ const CAMPOS: Record<Faixa, Campo[]> = {
     },
     { chave: "focoX", rotulo: "Foco horizontal (%)", tipo: "numero", passo: 1 },
     { chave: "focoY", rotulo: "Foco vertical (%)", tipo: "numero", passo: 1 },
+    {
+      chave: "rampa",
+      rotulo: "Rampa (s para aproximar/voltar; vazio = 0.4)",
+      tipo: "numero",
+      opcional: true,
+    },
   ],
   legendas: [
     { chave: "texto", rotulo: "Texto", tipo: "texto" },
