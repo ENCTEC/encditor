@@ -3,6 +3,7 @@ import { Anton, Archivo, Permanent_Marker, Space_Mono } from "next/font/google";
 import { AnaliseAutomatica } from "@/componentes/AnaliseAutomatica";
 import { AreaDeTrabalho } from "@/componentes/AreaDeTrabalho";
 import { AvisoErro } from "@/componentes/AvisoErro";
+import { AvisoNavegador } from "@/componentes/AvisoNavegador";
 import { Cabecalho } from "@/componentes/Cabecalho";
 import { ProjetoProvider } from "@/projeto/ProjetoProvider";
 import "./globals.css";
@@ -43,6 +44,7 @@ export default function RootLayout({
     >
       <body className="flex h-screen flex-col overflow-hidden font-sans antialiased">
         <ProjetoProvider>
+          <AvisoNavegador />
           <Cabecalho />
           <main className="min-h-0 flex-1">
             <AreaDeTrabalho>{children}</AreaDeTrabalho>
