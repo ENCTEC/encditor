@@ -17,6 +17,9 @@ Ambas leem/alteram o MESMO JSON de timeline.
 - **IA = OpenAI (decisão do usuário, 2026-10-13):** uma chave (`OPENAI_API_KEY`) para tudo. Editor do chat: `gpt-6.1-sol` (Responses API + function calling, `src/ia/openai.ts`). Transcrição com tempo por palavra (legendas e "quando eu falo X"): `whisper-1` (único da OpenAI com timestamps de palavra). Ditado do chat: `gpt-transcribe`. Análise visual: quadros extraídos com ffmpeg (OpenAI não aceita vídeo) descritos pelo `gpt-6.1-sol`, com texto na tela e minutagem. Claude (`src/ia/claude.ts`) ficou como alternativa, usado só se não houver chave da OpenAI.
 - Cada arquivo enviado é analisado automaticamente (`/api/analisar`); resultado salvo em `midia/<arquivo>.analise.json` e na biblioteca. `src/ia/conteudo.ts` converte tempos do arquivo para o vídeo final (cortes, transições, posição).
 
+## Identidade visual (pedido do usuário, 2026-10-13)
+Estilo pôster punk/zine (referência: pôster grafitado preto/vermelho): papel claro com retícula e grão, tinta preta, tipografia condensada (Anton), spray vermelho (Permanent Marker), texto em Archivo e ficha técnica em Space Mono; cantos retos, bordas grossas e sombras "carimbadas". Implementado em `src/app/globals.css`: a escala zinc do Tailwind foi redefinida como papel→tinta e violet como vermelho, então classes zinc/violet nos componentes já seguem o tema. Rabiscos SVG em `src/componentes/Rabiscos.tsx`; classes `.botao-spray`, `.cartao-zine`, `.rotulo-zine`. Usar só o estilo — nada de marcas/textos do pôster original.
+
 ## Stack e infraestrutura
 - **VPS Contabo (Europa):** Ubuntu, 6 vCPU, 12 GB RAM, 100 GB NVMe. Hospeda tudo, provavelmente via Docker:
   - App Next.js (sem Vercel → sem limite de 4,5 MB de upload).

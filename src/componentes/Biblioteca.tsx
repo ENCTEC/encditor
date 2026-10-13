@@ -86,7 +86,7 @@ export const Biblioteca: React.FC<{
       {biblioteca.map((midia) => (
         <li
           key={midia.id}
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-zinc-800/60"
+          className="flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-zinc-800/60"
         >
           <span>{ICONE[midia.formato]}</span>
           <span className="shrink-0 whitespace-nowrap font-medium">
@@ -104,7 +104,7 @@ export const Biblioteca: React.FC<{
           {acao && midia.papel !== "cena" ? (
             <button
               onClick={() => acao.executar(midia)}
-              className="shrink-0 rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 hover:bg-violet-600 hover:text-white"
+              className="shrink-0 bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300 hover:bg-violet-600 hover:text-tinta"
             >
               {acao.rotulo}
             </button>

@@ -130,13 +130,13 @@ export default function PaginaTimeline() {
             </span>
             <button
               onClick={() => adicionar("legendas")}
-              className="rounded-md border border-zinc-700 px-3 py-1 text-sm hover:bg-zinc-800"
+              className="border-2 border-tinta px-3 py-1 font-mono text-xs tracking-wider uppercase hover:bg-tinta hover:text-papel"
             >
               + Legenda aqui
             </button>
             <button
               onClick={() => adicionar("zooms")}
-              className="rounded-md border border-zinc-700 px-3 py-1 text-sm hover:bg-zinc-800"
+              className="border-2 border-tinta px-3 py-1 font-mono text-xs tracking-wider uppercase hover:bg-tinta hover:text-papel"
             >
               + Zoom aqui
             </button>
@@ -145,9 +145,7 @@ export default function PaginaTimeline() {
         <aside className="flex w-80 shrink-0 flex-col gap-6 overflow-y-auto border-l border-zinc-800 p-4">
           <Inspetor selecao={selecao} aoSelecionar={setSelecao} />
           <div>
-            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-              Biblioteca
-            </h2>
+            <h2 className="rotulo-zine mb-2">Biblioteca</h2>
             <Biblioteca
               biblioteca={projeto.biblioteca}
               acao={{

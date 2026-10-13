@@ -19,12 +19,12 @@ export const AvisoErro: React.FC = () => {
   return (
     <div
       role="alert"
-      className="fixed bottom-4 right-4 z-50 flex max-w-md items-start gap-3 rounded-lg border border-red-800 bg-red-950 px-4 py-3 text-sm text-red-100 shadow-xl"
+      className="fixed bottom-4 right-4 z-50 flex max-w-md items-start gap-3 border-2 border-red-800 bg-red-950 px-4 py-3 font-mono text-xs text-red-100 shadow-[4px_4px_0_var(--color-spray)]"
     >
       <span>{erro}</span>
       <button
         onClick={limparErro}
-        className="text-red-300 hover:text-white"
+        className="text-red-300 hover:text-papel"
         aria-label="Fechar"
       >
         ✕

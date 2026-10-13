@@ -20,7 +20,7 @@ export const PreviewPlayer = forwardRef<
   if (timeline.clipes.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center rounded-lg border border-dashed border-zinc-700 text-sm text-zinc-500 ${className ?? ""}`}
+        className={`flex items-center justify-center border-[3px] border-dashed border-tinta font-display text-2xl tracking-wide text-zinc-500 uppercase ${className ?? ""}`}
       >
         Suba a primeira cena para ver o preview
       </div>
@@ -28,7 +28,9 @@ export const PreviewPlayer = forwardRef<
   }
 
   return (
-    <div className={`overflow-hidden rounded-lg bg-black ${className ?? ""}`}>
+    <div
+      className={`overflow-hidden border-[3px] border-tinta bg-black shadow-[6px_6px_0_var(--color-spray)] ${className ?? ""}`}
+    >
       <Player
         ref={ref}
         component={EditorTimeline}

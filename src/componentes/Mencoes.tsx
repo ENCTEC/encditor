@@ -19,7 +19,7 @@ export const TextoComMencoes: React.FC<{
       return midia ? (
         <span
           key={i}
-          className="rounded bg-black/30 px-1 font-medium"
+          className="bg-tinta px-1 font-mono text-[0.85em] text-papel"
           title={`${midia.nome} — ${midia.nomeArquivo}`}
         >
           {parte}
@@ -65,7 +65,7 @@ export const SugestoesMencao: React.FC<{
   ativa: number;
   aoEscolher: (midia: Midia) => void;
 }> = ({ opcoes, ativa, aoEscolher }) => (
-  <ul className="absolute bottom-full left-0 z-30 mb-2 w-80 overflow-hidden rounded-lg border border-zinc-700 bg-zinc-900 py-1 text-sm shadow-xl">
+  <ul className="absolute bottom-full left-0 z-30 mb-2 w-80 overflow-hidden border border-zinc-700 bg-zinc-900 py-1 text-sm shadow-xl">
     {opcoes.map((m, i) => (
       <li key={m.id}>
         <button

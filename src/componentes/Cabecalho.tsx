@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { projetoExemplo } from "@/projeto/exemplo";
 import { useProjeto } from "@/projeto/ProjetoProvider";
+import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
 
 const ABAS = [
   { href: "/", rotulo: "Criar" },
@@ -13,7 +14,7 @@ const ABAS = [
 ];
 
 const botao =
-  "rounded-md px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-transparent";
+  "px-2.5 py-1 font-mono text-[11px] tracking-[0.12em] text-zinc-300 uppercase hover:bg-tinta hover:text-papel disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-300";
 
 export const Cabecalho: React.FC = () => {
   const caminho = usePathname();
@@ -46,25 +47,34 @@ export const Cabecalho: React.FC = () => {
   }, [desfazer, refazer]);
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-6 border-b border-zinc-800 bg-zinc-900 px-4">
-      <span className="font-semibold tracking-tight">
-        Enc<span className="text-violet-400">ditor</span>
+    <header className="flex h-14 shrink-0 items-center gap-6 border-b-[3px] border-tinta px-4">
+      {/* Logo: letras condensadas pretas + assinatura em spray vermelho. */}
+      <span className="relative flex items-baseline gap-1.5 pr-2">
+        <span className="font-display text-3xl leading-none tracking-tight text-tinta uppercase">
+          Encditor
+        </span>
+        <span className="-rotate-6 font-marca text-sm text-spray">edit!</span>
+        <SublinhadoSpray className="-bottom-2 left-0 h-3 w-28" />
       </span>
 
       <nav className="flex gap-1">
-        {ABAS.map((aba) => (
-          <Link
-            key={aba.href}
-            href={aba.href}
-            className={`rounded-md px-3 py-1.5 text-sm ${
-              caminho === aba.href
-                ? "bg-zinc-800 text-white"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            {aba.rotulo}
-          </Link>
-        ))}
+        {ABAS.map((aba) => {
+          const ativa = caminho === aba.href;
+          return (
+            <Link
+              key={aba.href}
+              href={aba.href}
+              className={`relative px-4 py-1 font-display text-lg tracking-wide uppercase ${
+                ativa ? "text-tinta" : "text-zinc-500 hover:text-tinta"
+              }`}
+            >
+              {aba.rotulo}
+              {ativa ? (
+                <CirculoSpray className="-inset-x-1 -inset-y-1.5" />
+              ) : null}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="ml-auto flex items-center gap-1">
@@ -84,7 +94,7 @@ export const Cabecalho: React.FC = () => {
         >
           ↷ Refazer
         </button>
-        <span className="mx-2 h-5 w-px bg-zinc-700" />
+        <span className="mx-2 h-5 w-0.5 bg-tinta" />
         <button
           className={botao}
           onClick={() => substituirProjeto(projetoExemplo())}

@@ -35,7 +35,7 @@ export const ListaDeAnexos: React.FC<{
       {anexos.map((a) => (
         <div
           key={a.id}
-          className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs"
+          className="flex flex-wrap items-center gap-2 border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-xs"
         >
           <span
             className={`truncate ${variante === "compacta" ? "max-w-36" : "min-w-0 flex-1"}`}
@@ -55,7 +55,7 @@ export const ListaDeAnexos: React.FC<{
                   ...(papel === "cena" ? { usarIA: true } : {}),
                 });
               }}
-              className="rounded bg-zinc-800 px-1 py-0.5"
+              className="bg-zinc-800 px-1 py-0.5"
             >
               {PAPEIS[a.formato].map((p) => (
                 <option key={p} value={p}>
@@ -67,7 +67,7 @@ export const ListaDeAnexos: React.FC<{
             <span className="text-zinc-400">{ROTULO_PAPEL[a.papel]}</span>
           )}
 
-          <label className="flex items-center rounded bg-zinc-800 px-1">
+          <label className="flex items-center bg-zinc-800 px-1">
             <span className="text-violet-300">@</span>
             <input
               value={a.apelido}
@@ -82,7 +82,7 @@ export const ListaDeAnexos: React.FC<{
           </label>
 
           <label
-            className={`flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 ${
+            className={`flex cursor-pointer items-center gap-1 px-1.5 py-0.5 ${
               a.usarIA
                 ? "bg-violet-600/30 text-violet-200"
                 : "bg-zinc-800 text-zinc-400"
@@ -113,7 +113,7 @@ export const ListaDeAnexos: React.FC<{
             <button
               disabled={enviando}
               onClick={() => removerAnexo(a.id)}
-              className="text-zinc-500 hover:text-white"
+              className="text-zinc-500 hover:text-tinta"
               aria-label={`Remover ${a.arquivo.name}`}
             >
               ✕

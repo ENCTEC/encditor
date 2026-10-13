@@ -231,7 +231,7 @@ export const Trilhas: React.FC<{
                     <div
                       key={b.indice}
                       onPointerDown={(e) => iniciarArrasto(e, original)}
-                      className={`absolute top-1 bottom-1 flex items-center overflow-hidden rounded border px-2 text-xs text-white ${cor} ${
+                      className={`absolute top-1 bottom-1 flex items-center overflow-hidden border px-2 text-xs text-white ${cor} ${
                         selecionado
                           ? "z-10 ring-2 ring-white"
                           : "border-transparent opacity-90"

@@ -1,18 +1,121 @@
 @import "tailwindcss";
 
+/*
+ * Identidade visual: pôster punk/zine — papel claro com retícula, tinta
+ * preta, tipografia condensada e vermelho de spray.
+ *
+ * Os componentes usam as classes zinc/violet do Tailwind; aqui a escala é
+ * redefinida: zinc vira "papel → tinta" (950 = papel, 100 = tinta) e violet
+ * vira o vermelho. Assim o app inteiro muda de tema sem reescrever cada tela.
+ */
+@theme {
+  --font-sans: var(--fonte-texto), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--fonte-titulo), Impact, sans-serif;
+  --font-marca: var(--fonte-spray), cursive;
+  --font-mono: var(--fonte-mono), ui-monospace, monospace;
+
+  --color-papel: #ebe8e1;
+  --color-tinta: #111110;
+  --color-spray: #e1251b;
+
+  /* papel (950) → tinta (50) */
+  --color-zinc-950: #ebe8e1;
+  --color-zinc-900: #e2ded5;
+  --color-zinc-800: #d3cec3;
+  --color-zinc-700: #2b2926;
+  --color-zinc-600: #55514b;
+  --color-zinc-500: #67625b;
+  --color-zinc-400: #3f3c37;
+  --color-zinc-300: #2a2825;
+  --color-zinc-200: #1c1b19;
+  --color-zinc-100: #111110;
+  --color-zinc-50: #0a0a09;
+
+  /* vermelho de spray no lugar do roxo */
+  --color-violet-950: #f4c9c3;
+  --color-violet-600: #e1251b;
+  --color-violet-500: #c91d14;
+  --color-violet-400: #c91d14;
+  --color-violet-300: #c91d14;
+  --color-violet-200: #8f130c;
+
+  /* estados, legíveis sobre o papel */
+  --color-emerald-400: #1c6b34;
+  --color-emerald-200: #124a23;
+  --color-amber-400: #b05300;
+  --color-amber-300: #a14c00;
+  --color-amber-200: #6e3400;
+  --color-sky-300: #1d4f8c;
+  --color-red-400: #c91d14;
+  --color-red-300: #e1251b;
+  --color-red-100: #ebe8e1;
+  --color-red-800: #e1251b;
+  --color-red-900: #e1251b;
+  --color-red-950: #111110;
+
+  /* faixas da timeline */
+  --color-sky-700: #111110;
+  --color-sky-400: #111110;
+  --color-emerald-700: #4b4741;
+  --color-amber-700: #d4600f;
+  --color-pink-700: #8f130c;
+  --color-pink-400: #8f130c;
+}
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
 body {
   height: 100%;
-  background-color: var(--color-zinc-950);
-  color: var(--color-zinc-100);
+  color: var(--color-tinta);
+  background-color: var(--color-papel);
+  /* retícula sutil + grão de papel */
+  background-image:
+    radial-gradient(rgb(17 17 16 / 0.07) 0.6px, transparent 0.8px),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='g'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.09 0'/></filter><rect width='100%' height='100%' filter='url(%23g)'/></svg>");
+  background-size:
+    4px 4px,
+    160px 160px;
 }
 
-/* Barra de rolagem discreta, no tema escuro. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-zinc-700) transparent;
+  scrollbar-color: var(--color-tinta) transparent;
+}
+
+::selection {
+  background: var(--color-spray);
+  color: var(--color-papel);
+}
+
+@layer components {
+  /* Botão principal: vermelho, letras condensadas e sombra "carimbada". */
+  .botao-spray {
+    @apply font-display border-2 border-tinta bg-spray px-4 py-2 text-base tracking-wide text-papel uppercase transition-transform;
+    box-shadow: 3px 3px 0 var(--color-tinta);
+  }
+  .botao-spray:hover:not(:disabled) {
+    transform: translate(-1px, -1px);
+    box-shadow: 4px 4px 0 var(--color-tinta);
+  }
+  .botao-spray:active:not(:disabled) {
+    transform: translate(2px, 2px);
+    box-shadow: 1px 1px 0 var(--color-tinta);
+  }
+  .botao-spray:disabled {
+    @apply opacity-40;
+  }
+
+  /* Cartão de papel com borda de tinta (balões da IA, painéis). */
+  .cartao-zine {
+    @apply border-2 border-tinta bg-zinc-950;
+    box-shadow: 4px 4px 0 var(--color-tinta);
+  }
+
+  /* Rótulo pequeno de seção, estilo ficha técnica de pôster. */
+  .rotulo-zine {
+    @apply font-mono text-[11px] tracking-[0.18em] text-zinc-500 uppercase;
+  }
 }

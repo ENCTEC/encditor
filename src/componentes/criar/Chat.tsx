@@ -14,6 +14,7 @@ import { aguardarAnalises, transcreverGravacao } from "@/projeto/midia-cliente";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 import { useEnvio } from "@/projeto/useEnvio";
+import { XSpray } from "@/componentes/Rabiscos";
 
 const EXEMPLOS = [
   "Bote o Insert 1 a partir dos 2 segundos",
@@ -222,19 +223,35 @@ export const Chat: React.FC = () => {
     >
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
         {projeto.mensagens.length === 0 ? (
-          <div className="mx-auto mt-10 max-w-lg text-center">
-            <h1 className="text-xl font-semibold">O que vamos editar hoje?</h1>
-            <p className="mt-2 text-sm text-zinc-400">
-              Anexe as cenas geradas no Higgsfield (entram em ordem na trilha
+          // Tela inicial em composição de pôster.
+          <div className="relative mx-auto mt-4 max-w-2xl pl-10">
+            <span className="rotulo-zine absolute top-1 left-0 rotate-180 [writing-mode:vertical-rl]">
+              Nº 1 — edição com IA — cenas · inserts · áudio
+            </span>
+            <h1 className="relative font-display text-7xl leading-[0.82] tracking-tight text-tinta uppercase">
+              O que
+              <br />
+              vamos
+              <br />
+              editar
+              <span className="absolute top-[58%] left-[13.5rem] -rotate-12 font-marca text-6xl normal-case text-spray">
+                hoje?!
+              </span>
+            </h1>
+            <XSpray className="top-2 right-10 h-12 w-16 rotate-6" />
+            <p className="mt-6 max-w-md font-mono text-xs leading-relaxed text-zinc-400">
+              Anexe as cenas do Higgsfield (entram em ordem na trilha
               principal), inserts e áudios — ou suba tudo pela aba Arquivos.
-              Cite um arquivo com @apelido. Depois peça a edição, como:
+              Cite um arquivo com @apelido, fale pelo 🎤 e peça a edição:
             </p>
-            <ul className="mt-4 space-y-2 text-sm">
-              {EXEMPLOS.map((exemplo) => (
+            <ul className="mt-5 flex flex-wrap gap-2 text-sm">
+              {EXEMPLOS.map((exemplo, i) => (
                 <li key={exemplo}>
                   <button
                     onClick={() => setTexto(exemplo)}
-                    className="rounded-full border border-zinc-700 px-3 py-1 text-zinc-300 hover:border-violet-500 hover:text-white"
+                    className={`border-2 border-tinta bg-zinc-950 px-3 py-1 text-left hover:bg-tinta hover:text-papel ${
+                      i % 2 ? "rotate-[0.6deg]" : "-rotate-[0.6deg]"
+                    }`}
                   >
                     “{exemplo}”
                   </button>
@@ -250,10 +267,10 @@ export const Chat: React.FC = () => {
             className={`flex ${m.autor === "usuario" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+              className={`max-w-[80%] px-4 py-2.5 text-sm leading-relaxed ${
                 m.autor === "usuario"
-                  ? "bg-violet-600 text-white"
-                  : "bg-zinc-800 text-zinc-100"
+                  ? "balao-usuario -rotate-[0.5deg] border-2 border-tinta bg-spray text-papel shadow-[3px_3px_0_var(--color-tinta)]"
+                  : "balao-ia cartao-zine text-tinta"
               }`}
             >
               {m.anexos.length ? (
@@ -261,7 +278,7 @@ export const Chat: React.FC = () => {
                   {m.anexos.map((id) => (
                     <span
                       key={id}
-                      className="rounded bg-black/25 px-2 py-0.5 text-xs"
+                      className="bg-tinta/80 px-2 py-0.5 font-mono text-[11px] text-papel"
                     >
                       📎 {nomeDaMidia(id)}
                     </span>
@@ -281,8 +298,10 @@ export const Chat: React.FC = () => {
         ))}
         {pensando ? (
           <div className="flex justify-start">
-            <div className="rounded-2xl bg-zinc-800 px-4 py-2.5 text-sm text-zinc-400">
-              <span className="animate-pulse">{pensando}</span>
+            <div className="cartao-zine px-4 py-2.5">
+              <span className="animate-pulse font-marca text-spray">
+                {pensando}
+              </span>
             </div>
           </div>
         ) : null}
@@ -300,7 +319,7 @@ export const Chat: React.FC = () => {
           <p className="mb-2 text-sm text-red-400">{envio.erro}</p>
         ) : null}
 
-        <div className="relative flex items-end gap-2 rounded-xl border border-zinc-700 bg-zinc-900 p-2 focus-within:border-violet-500">
+        <div className="relative flex items-end gap-2 border-2 border-tinta bg-zinc-950 p-2 shadow-[4px_4px_0_var(--color-tinta)] focus-within:shadow-[4px_4px_0_var(--color-spray)]">
           {opcoesMencao.length ? (
             <SugestoesMencao
               opcoes={opcoesMencao}
@@ -311,7 +330,7 @@ export const Chat: React.FC = () => {
           <button
             onClick={() => inputArquivo.current?.click()}
             disabled={ocupado}
-            className="rounded-lg px-2 py-1.5 text-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
+            className="px-2 py-1.5 text-lg text-zinc-400 hover:bg-zinc-800 hover:text-tinta"
             title="Anexar arquivos"
           >
             📎
@@ -330,10 +349,10 @@ export const Chat: React.FC = () => {
           <button
             onClick={() => void alternarDitado()}
             disabled={ocupado || ditado === "transcrevendo"}
-            className={`rounded-lg px-2 py-1.5 text-lg hover:bg-zinc-800 ${
+            className={`px-2 py-1.5 text-lg hover:bg-zinc-800 ${
               ditado === "gravando"
                 ? "animate-pulse text-red-400"
-                : "text-zinc-400 hover:text-white"
+                : "text-zinc-400 hover:text-tinta"
             }`}
             title={
               ditado === "gravando"
@@ -395,7 +414,7 @@ export const Chat: React.FC = () => {
           <button
             onClick={() => void enviar()}
             disabled={ocupado || (!texto.trim() && envio.anexos.length === 0)}
-            className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40"
+            className="botao-spray"
           >
             {envio.enviando ? "Enviando…" : pensando ? "Editando…" : "Enviar"}
           </button>

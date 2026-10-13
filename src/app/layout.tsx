@@ -1,9 +1,29 @@
 import type { Metadata } from "next";
-import { Cabecalho } from "@/componentes/Cabecalho";
+import { Anton, Archivo, Permanent_Marker, Space_Mono } from "next/font/google";
 import { AnaliseAutomatica } from "@/componentes/AnaliseAutomatica";
 import { AvisoErro } from "@/componentes/AvisoErro";
+import { Cabecalho } from "@/componentes/Cabecalho";
 import { ProjetoProvider } from "@/projeto/ProjetoProvider";
 import "./globals.css";
+
+// Fontes do estilo pôster: títulos condensados e pesados, spray à mão,
+// texto corrido grotesco e ficha técnica em monoespaçada.
+const titulo = Anton({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--fonte-titulo",
+});
+const spray = Permanent_Marker({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--fonte-spray",
+});
+const texto = Archivo({ subsets: ["latin"], variable: "--fonte-texto" });
+const mono = Space_Mono({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  variable: "--fonte-mono",
+});
 
 export const metadata: Metadata = {
   title: "Encditor",
@@ -16,8 +36,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
-      <body className="flex h-screen flex-col overflow-hidden antialiased">
+    <html
+      lang="pt-BR"
+      className={`${titulo.variable} ${spray.variable} ${texto.variable} ${mono.variable}`}
+    >
+      <body className="flex h-screen flex-col overflow-hidden font-sans antialiased">
         <ProjetoProvider>
           <Cabecalho />
           <main className="min-h-0 flex-1">{children}</main>

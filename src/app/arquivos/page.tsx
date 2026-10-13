@@ -26,7 +26,7 @@ const CampoApelido: React.FC<{ midia: Midia }> = ({ midia }) => {
     else setRascunho(apelido);
   };
   return (
-    <label className="flex items-center rounded border border-zinc-700 bg-zinc-900 px-1.5 focus-within:border-violet-500">
+    <label className="flex items-center border border-zinc-700 bg-zinc-900 px-1.5 focus-within:border-violet-500">
       <span className="text-violet-300">@</span>
       <input
         value={rascunho}
@@ -59,7 +59,7 @@ const SituacaoIA: React.FC<{ midia: Midia }> = ({ midia }) => {
     return (
       <button
         onClick={analisar}
-        className="rounded border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-violet-500 hover:text-white"
+        className="border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-violet-500 hover:text-tinta"
         title="Arquivo frio: a IA não sabe o que ele fala ou mostra"
       >
         ❄ frio — analisar com IA
@@ -143,7 +143,12 @@ export default function PaginaArquivos() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl space-y-8 p-6">
         <section>
-          <h1 className="text-lg font-semibold">Arquivos</h1>
+          <h1 className="relative inline-block font-display text-6xl leading-none tracking-tight uppercase">
+            Arquivos
+            <span className="absolute -top-5 -right-44 -rotate-12 font-marca text-3xl normal-case text-spray">
+              suba tudo!
+            </span>
+          </h1>
           <p className="mt-1 text-sm text-zinc-400">
             Suba cenas, inserts e áudios. Para cada um, escolha se a IA deve
             analisar (ler a fala e o que aparece) ou se é um arquivo <b>frio</b>
@@ -162,13 +167,13 @@ export default function PaginaArquivos() {
               envio.anexar(e.dataTransfer.files);
             }}
             onClick={() => inputArquivo.current?.click()}
-            className={`mt-4 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-sm ${
+            className={`mt-6 flex cursor-pointer flex-col items-center justify-center border-[3px] border-dashed px-6 py-10 font-mono text-xs uppercase tracking-widest ${
               arrastando
-                ? "border-violet-500 bg-violet-950/30 text-white"
+                ? "border-spray bg-violet-950/40 text-tinta"
                 : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
             }`}
           >
-            <span className="text-2xl">⬆</span>
+            <span className="font-display text-4xl text-spray">↑</span>
             Arraste arquivos aqui ou clique para escolher
             <span className="mt-1 text-xs text-zinc-500">
               Vídeos, imagens e áudios
@@ -193,7 +198,7 @@ export default function PaginaArquivos() {
                 <button
                   onClick={() => void envio.enviarTodos()}
                   disabled={envio.enviando}
-                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40"
+                  className="botao-spray"
                 >
                   {envio.enviando
                     ? "Enviando…"
@@ -212,7 +217,7 @@ export default function PaginaArquivos() {
         </section>
 
         <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+          <h2 className="rotulo-zine mb-3">
             Biblioteca ({projeto.biblioteca.length})
           </h2>
           {projeto.biblioteca.length === 0 ? (

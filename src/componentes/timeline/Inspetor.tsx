@@ -120,7 +120,7 @@ const TITULO: Record<Faixa, string> = {
 };
 
 const estiloCampo =
-  "w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm outline-none focus:border-violet-500";
+  "w-full border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm outline-none focus:border-violet-500";
 
 // Campo que só aplica a mudança ao sair do campo ou apertar Enter (assim
 // cada tecla não vira um passo no desfazer).
@@ -198,9 +198,9 @@ export const Inspetor: React.FC<{
                   onClick={() =>
                     aplicar((t) => definirFormato(t, f.largura, f.altura))
                   }
-                  className={`rounded-md border px-2 py-1.5 text-xs ${
+                  className={`border px-2 py-1.5 text-xs ${
                     ativo
-                      ? "border-violet-500 bg-violet-600/20 text-white"
+                      ? "border-tinta bg-tinta text-papel"
                       : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
                   }`}
                 >
@@ -309,7 +309,7 @@ export const Inspetor: React.FC<{
                 aoSelecionar({ faixa, indice: indice - 1 });
               }
             }}
-            className="flex-1 rounded-md border border-zinc-700 py-1.5 text-sm hover:bg-zinc-800 disabled:opacity-40"
+            className="flex-1 border border-zinc-700 py-1.5 text-sm hover:bg-zinc-800 disabled:opacity-40"
           >
             ← Antes
           </button>
@@ -320,7 +320,7 @@ export const Inspetor: React.FC<{
                 aoSelecionar({ faixa, indice: indice + 1 });
               }
             }}
-            className="flex-1 rounded-md border border-zinc-700 py-1.5 text-sm hover:bg-zinc-800 disabled:opacity-40"
+            className="flex-1 border border-zinc-700 py-1.5 text-sm hover:bg-zinc-800 disabled:opacity-40"
           >
             Depois →
           </button>
@@ -333,7 +333,7 @@ export const Inspetor: React.FC<{
             aoSelecionar(null);
           }
         }}
-        className="w-full rounded-md border border-red-900 py-1.5 text-sm text-red-300 hover:bg-red-950"
+        className="w-full border border-red-900 py-1.5 text-sm text-red-300 hover:bg-red-950"
       >
         Remover (Delete)
       </button>

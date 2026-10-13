@@ -19,9 +19,7 @@ export default function PaginaCriar() {
       <aside className="flex w-[44%] max-w-2xl flex-col gap-4 overflow-y-auto p-4">
         <PreviewPlayer timeline={projeto.timeline} className="aspect-video" />
         <div>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
-            Biblioteca
-          </h2>
+          <h2 className="rotulo-zine mb-2">Biblioteca</h2>
           <Biblioteca biblioteca={projeto.biblioteca} />
         </div>
       </aside>
