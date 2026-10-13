@@ -26,7 +26,7 @@ Ambas leem/alteram o MESMO JSON de timeline.
 - Armazenamento isolado em um único módulo do código, para poder migrar (ex.: Cloudflare R2) sem mexer no resto.
 - Remotion: composição "EditorTimeline" alimentada pelo JSON. Preview no app com Remotion Player.
 - Repositório: https://github.com/ENCTEC/encditor (branch main). Commits como "Encditor" <contato@enctec.com.br> (config local do repo).
-- Pendente: domínio apontado para a VPS (necessário para HTTPS).
+- Domínio: enctec.com.br (registro/hospedagem na HostGator, mas o DNS é gerenciado na **Cloudflare**; e-mail no Google). O app usará um subdomínio (sugestão: encditor.enctec.com.br) com registro A apontando para o IP da VPS, em modo "DNS only" (nuvem cinza, sem proxy da Cloudflare — o proxy grátis limita uploads a 100 MB e restringe tráfego de vídeo). HTTPS via Let's Encrypt na própria VPS. Não mexer no domínio raiz nem nos registros MX.
 
 ## Etapa atual
 Base Remotion criada (composição EditorTimeline com clipes, transições corte/fade/slide e legendas). Próximo: ampliar schema/composição (inserts, áudio, zoom) e depois o app Next.js com as duas telas.
