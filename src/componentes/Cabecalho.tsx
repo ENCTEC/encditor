@@ -25,6 +25,7 @@ export const Cabecalho: React.FC = () => {
     podeRefazer,
     substituirProjeto,
     novoProjeto,
+    salvamento,
   } = useProjeto();
 
   // Ctrl+Z desfaz; Ctrl+Y ou Ctrl+Shift+Z refaz (fora de campos de texto).
@@ -78,6 +79,18 @@ export const Cabecalho: React.FC = () => {
       </nav>
 
       <div className="ml-auto flex items-center gap-1">
+        <span
+          className={`mr-3 font-mono text-[11px] tracking-[0.12em] uppercase ${
+            salvamento === "erro" ? "text-spray" : "text-zinc-500"
+          }`}
+          title="O projeto é salvo no banco do servidor"
+        >
+          {salvamento === "salvando"
+            ? "salvando…"
+            : salvamento === "erro"
+              ? "⚠ não salvou"
+              : "✓ salvo"}
+        </span>
         <button
           className={botao}
           onClick={desfazer}

@@ -25,3 +25,6 @@ out
 *.mkv
 *.wav
 *.mp3
+
+# Banco de dados local (projetos e análises).
+/dados

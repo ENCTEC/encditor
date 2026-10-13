@@ -21,7 +21,17 @@ import { Mensagem, Midia, Projeto } from "./tipos";
 // Por enquanto fica salvo no navegador (localStorage); depois vai para o
 // Supabase.
 
-const CHAVE_STORAGE = "encditor:projeto:v1";
+// Qual projeto abrir: "principal", ou outro passado na URL (?projeto=x),
+// usado em testes. Fica guardado na aba para valer ao trocar de página.
+const idDoProjeto = () => {
+  const daUrl = new URLSearchParams(location.search).get("projeto");
+  if (daUrl && /^[a-z0-9-]{1,40}$/.test(daUrl)) {
+    sessionStorage.setItem("encditor:projeto-id", daUrl);
+  }
+  return sessionStorage.getItem("encditor:projeto-id") ?? "principal";
+};
+const chaveLocal = (id: string) =>
+  id === "principal" ? "encditor:projeto:v1" : `encditor:projeto:v1:${id}`;
 const LIMITE_HISTORICO = 100;
 
 type Estado = {
@@ -129,6 +139,8 @@ const reducer = (estado: Estado, acao: Acao): Estado => {
 type ContextoProjeto = {
   projeto: Projeto;
   carregado: boolean;
+  // Situação do salvamento no banco do servidor.
+  salvamento: "salvo" | "salvando" | "erro";
   podeDesfazer: boolean;
   podeRefazer: boolean;
   erro: string | null;
@@ -169,6 +181,9 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   }));
   const [carregado, setCarregado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [salvamento, setSalvamento] = useState<"salvo" | "salvando" | "erro">(
+    "salvo",
+  );
 
   // Sempre aponta para a timeline mais recente (usado dentro de callbacks).
   const timelineAtual = useRef(estado.projeto.timeline);
@@ -176,29 +191,88 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   const bibliotecaAtual = useRef(estado.projeto.biblioteca);
   bibliotecaAtual.current = estado.projeto.biblioteca;
 
-  // Carrega o projeto salvo (só no navegador, depois da 1ª renderização).
+  // Carrega o projeto: do banco do servidor; se não houver (1ª vez, ou
+  // servidor fora do ar), da cópia guardada no navegador.
   useEffect(() => {
-    try {
-      const salvo = localStorage.getItem(CHAVE_STORAGE);
-      if (salvo) {
-        const projeto = migrarProjeto(JSON.parse(salvo) as Projeto);
-        validarTimeline(projeto.timeline);
-        dispatch({ tipo: "substituir", projeto });
+    const carregar = async () => {
+      let projeto: Projeto | null = null;
+      try {
+        const resposta = await fetch(`/api/projeto?id=${idDoProjeto()}`, {
+          cache: "no-store",
+        });
+        if (resposta.ok) {
+          projeto = ((await resposta.json()) as { projeto: Projeto | null })
+            .projeto;
+        }
+      } catch {
+        // sem servidor: usa a cópia local abaixo
       }
-    } catch {
-      setErro("O projeto salvo estava corrompido e foi descartado.");
-    }
-    setCarregado(true);
+      if (!projeto) {
+        try {
+          const local = localStorage.getItem(chaveLocal(idDoProjeto()));
+          if (local) projeto = JSON.parse(local) as Projeto;
+        } catch {
+          // cópia local ilegível: começa vazio
+        }
+      }
+      if (projeto) {
+        try {
+          const migrado = migrarProjeto(projeto);
+          validarTimeline(migrado.timeline);
+          dispatch({ tipo: "substituir", projeto: migrado });
+        } catch {
+          setErro("O projeto salvo estava corrompido e foi descartado.");
+        }
+      }
+      setCarregado(true);
+    };
+    void carregar();
   }, []);
 
+  // Salva no banco ~0,8s depois da última mudança (e uma cópia no
+  // navegador). Ao fechar a página, envia o que estiver pendente.
+  const pendente = useRef<string | null>(null);
   useEffect(() => {
     if (!carregado) return;
+    const json = JSON.stringify(estado.projeto);
     try {
-      localStorage.setItem(CHAVE_STORAGE, JSON.stringify(estado.projeto));
+      localStorage.setItem(chaveLocal(idDoProjeto()), json);
     } catch {
-      setErro("Não foi possível salvar o projeto no navegador.");
+      // cópia local é só reserva; o banco do servidor é o principal
     }
+    pendente.current = json;
+    setSalvamento("salvando");
+    const timer = setTimeout(async () => {
+      try {
+        const resposta = await fetch(`/api/projeto?id=${idDoProjeto()}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: json,
+        });
+        if (!resposta.ok) throw new Error(String(resposta.status));
+        if (pendente.current === json) {
+          pendente.current = null;
+          setSalvamento("salvo");
+        }
+      } catch {
+        setSalvamento("erro");
+      }
+    }, 800);
+    return () => clearTimeout(timer);
   }, [estado.projeto, carregado]);
+
+  useEffect(() => {
+    const aoSair = () => {
+      if (pendente.current) {
+        navigator.sendBeacon(
+          `/api/projeto?id=${idDoProjeto()}`,
+          new Blob([pendente.current], { type: "application/json" }),
+        );
+      }
+    };
+    window.addEventListener("pagehide", aoSair);
+    return () => window.removeEventListener("pagehide", aoSair);
+  }, []);
 
   const aplicar = useCallback((operacao: (t: Timeline) => Timeline) => {
     try {
@@ -223,6 +297,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
     () => ({
       projeto: estado.projeto,
       carregado,
+      salvamento,
       podeDesfazer: estado.passado.length > 0,
       podeRefazer: estado.futuro.length > 0,
       erro,
@@ -259,7 +334,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       novoProjeto: () =>
         dispatch({ tipo: "substituir", projeto: projetoVazio() }),
     }),
-    [estado, carregado, erro, aplicar, adicionarMidia],
+    [estado, carregado, salvamento, erro, aplicar, adicionarMidia],
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;

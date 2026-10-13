@@ -25,6 +25,7 @@ src/
   ia/                   Ferramentas de edição da IA, instruções e adaptadores (OpenAI e Claude)
   remotion/             Composição "EditorTimeline" que transforma o JSON em vídeo
 midia/                  Arquivos enviados (fora do git)
+dados/                  Banco SQLite com projetos e análises (fora do git)
 ```
 
 ## Requisitos
@@ -41,6 +42,7 @@ Copie `.env.example` para `.env.local` e preencha. Depois de mudar o `.env.local
 | `OPENAI_MODELO` / `OPENAI_MODELO_VISAO` / `OPENAI_MODELO_DITADO` | `gpt-6.1-sol` / `gpt-6.1-sol` / `gpt-transcribe` | Modelos usados |
 | `FFMPEG_PATH` | ffmpeg do sistema | Usado para extrair áudio e quadros dos vídeos |
 | `ANTHROPIC_API_KEY` | — | Alternativa: editor com Claude (só se não houver chave da OpenAI) |
+| `BANCO_ARQUIVO` | `./dados/encditor.db` | Banco SQLite (projetos e análises de IA) |
 | `MIDIA_DIR` | `./midia` | Pasta onde os arquivos enviados são gravados |
 | `MIDIA_LIMITE_MB` | `1024` | Tamanho máximo por arquivo |
 

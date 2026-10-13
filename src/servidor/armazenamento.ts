@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { lerAnaliseDoBanco, salvarAnaliseNoBanco } from "./banco";
 
 // Único lugar do código que sabe ONDE a mídia fica guardada. Hoje é o
 // disco (pasta "midia" no PC, ou na VPS). Para trocar por outro serviço
@@ -99,17 +100,25 @@ export const nomeDaUrl = (url: string) => {
   return nome;
 };
 
-// A análise de cada arquivo fica salva ao lado dele, para não pagar duas
-// vezes pela mesma transcrição/descrição.
+// A análise de cada arquivo fica no banco, para não pagar duas vezes pela
+// mesma transcrição/descrição. Análises antigas (arquivo .analise.json ao
+// lado da mídia) são migradas para o banco na primeira leitura.
 export const lerAnaliseSalva = async (nome: string): Promise<unknown> => {
+  caminhoSeguro(nome);
+  const doBanco = lerAnaliseDoBanco(nome);
+  if (doBanco) return doBanco;
   try {
-    return JSON.parse(
+    const antiga = JSON.parse(
       await readFile(`${caminhoSeguro(nome)}.analise.json`, "utf8"),
     );
+    salvarAnaliseNoBanco(nome, antiga);
+    return antiga;
   } catch {
     return null;
   }
 };
 
-export const salvarAnalise = (nome: string, analise: unknown) =>
-  writeFile(`${caminhoSeguro(nome)}.analise.json`, JSON.stringify(analise));
+export const salvarAnalise = async (nome: string, analise: unknown) => {
+  caminhoSeguro(nome);
+  salvarAnaliseNoBanco(nome, analise);
+};
