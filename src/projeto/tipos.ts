@@ -1,4 +1,5 @@
 import { Timeline } from "@/timeline/schema";
+import { Analise } from "./analise";
 
 // Para que o arquivo foi enviado. "cena" entra direto na trilha principal;
 // inserts e áudios ficam na biblioteca esperando um pedido no chat.
@@ -16,6 +17,8 @@ export type Midia = {
   duracao: number | null;
   largura: number | null;
   altura: number | null;
+  // Transcrição e descrição visual (feitas pela IA depois do envio).
+  analise?: Analise;
 };
 
 export type Mensagem = {

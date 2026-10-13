@@ -1,3 +1,4 @@
+import { Analise } from "./analise";
 import { Midia, PapelMidia } from "./tipos";
 
 // Funções que rodam no navegador para enviar arquivos e ler suas
@@ -94,3 +95,67 @@ const PREFIXO: Record<PapelMidia, string> = {
 // "Cena 3", "Insert 1"... numerado por papel, para citar no chat.
 export const proximoNome = (biblioteca: Midia[], papel: PapelMidia) =>
   `${PREFIXO[papel]} ${biblioteca.filter((m) => m.papel === papel).length + 1}`;
+
+// Análise (fala + conteúdo visual) feita no servidor depois do envio.
+// Guarda as que estão em andamento, para o chat esperar por elas antes de
+// mandar um pedido à IA.
+const analisesEmAndamento = new Map<string, Promise<Analise>>();
+
+export const podeAnalisar = (midia: Midia) =>
+  midia.url.startsWith("/api/midia/");
+
+export const analisarMidia = (midia: Midia): Promise<Analise> => {
+  const existente = analisesEmAndamento.get(midia.id);
+  if (existente) return existente;
+  const promessa = fetch("/api/analisar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      url: midia.url,
+      formato: midia.formato,
+      duracao: midia.duracao,
+    }),
+  })
+    .then(async (r) => (await r.json()) as Analise)
+    .catch(
+      (e): Analise => ({
+        status: "erro",
+        erro: e instanceof Error ? e.message : String(e),
+        transcricao: null,
+        visual: null,
+      }),
+    )
+    .finally(() => analisesEmAndamento.delete(midia.id));
+  analisesEmAndamento.set(midia.id, promessa);
+  return promessa;
+};
+
+export const analiseEmAndamento = (id: string) => analisesEmAndamento.has(id);
+
+// Espera as análises em andamento e devolve o resultado de cada uma.
+export const aguardarAnalises = async () =>
+  new Map(
+    await Promise.all(
+      [...analisesEmAndamento.entries()].map(([id, p]) =>
+        p.then((a) => [id, a] as const),
+      ),
+    ),
+  );
+
+// Ditado: envia a gravação do microfone e devolve o texto.
+export const transcreverGravacao = async (audio: Blob) => {
+  const dados = new FormData();
+  dados.append("audio", audio, "gravacao.webm");
+  const resposta = await fetch("/api/transcrever", {
+    method: "POST",
+    body: dados,
+  });
+  const corpo = (await resposta.json().catch(() => ({}))) as {
+    texto?: string;
+    erro?: string;
+  };
+  if (!resposta.ok || corpo.erro) {
+    throw new Error(corpo.erro ?? `Falha no ditado (${resposta.status}).`);
+  }
+  return corpo.texto ?? "";
+};

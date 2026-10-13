@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cabecalho } from "@/componentes/Cabecalho";
+import { AnaliseAutomatica } from "@/componentes/AnaliseAutomatica";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { ProjetoProvider } from "@/projeto/ProjetoProvider";
 import "./globals.css";
@@ -21,6 +22,7 @@ export default function RootLayout({
           <Cabecalho />
           <main className="min-h-0 flex-1">{children}</main>
           <AvisoErro />
+          <AnaliseAutomatica />
         </ProjetoProvider>
       </body>
     </html>

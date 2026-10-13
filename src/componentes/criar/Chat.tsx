@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
 import {
+  aguardarAnalises,
   enviarArquivo,
   formatoDoArquivo,
   lerMetadados,
   papelSugerido,
+  podeAnalisar,
   proximoNome,
+  transcreverGravacao,
 } from "@/projeto/midia-cliente";
 import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia, PapelMidia } from "@/projeto/tipos";
@@ -25,7 +29,8 @@ const EXEMPLOS = [
   "Coloque um fade entre todas as cenas",
   "Adicione o Áudio 1 como música de fundo",
   "Corte 2 segundos do começo da cena 2",
-  "Dê um zoom no final da cena 1",
+  "Legende o vídeo",
+  "Coloque o Insert 2 quando eu falo “promoção”",
 ];
 
 // Papéis possíveis por formato: vídeo pode ser cena ou insert; imagem só
@@ -43,9 +48,22 @@ const ROTULO_PAPEL: Record<PapelMidia, string> = {
 };
 
 export const Chat: React.FC = () => {
-  const { projeto, adicionarMidia, adicionarMensagem, aplicar, obterTimeline } =
-    useProjeto();
-  const [pensando, setPensando] = useState(false);
+  const {
+    projeto,
+    adicionarMidia,
+    adicionarMensagem,
+    aplicar,
+    obterTimeline,
+    obterBiblioteca,
+    atualizarAnalise,
+  } = useProjeto();
+  // Texto do indicador enquanto a IA trabalha ("Editando…").
+  const [pensando, setPensando] = useState<string | null>(null);
+  // Ditado: gravando (microfone aberto) ou transcrevendo a gravação.
+  const [ditado, setDitado] = useState<"parado" | "gravando" | "transcrevendo">(
+    "parado",
+  );
+  const gravador = useRef<MediaRecorder | null>(null);
   const [texto, setTexto] = useState("");
   const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [enviando, setEnviando] = useState(false);
@@ -118,6 +136,7 @@ export const Chat: React.FC = () => {
         enviados.push(midia);
         anexosEnviados.add(anexo.id);
         adicionarMidia(midia);
+        if (podeAnalisar(midia)) iniciarAnalise(midia, atualizarAnalise);
       } catch (e) {
         // Para no primeiro erro; os anexos que faltam continuam na caixa.
         setErro(e instanceof Error ? e.message : String(e));
@@ -169,9 +188,19 @@ export const Chat: React.FC = () => {
       return;
     }
 
-    // Pedido em texto: o Claude edita a timeline no servidor.
-    setPensando(true);
+    // Pedido em texto: a IA edita a timeline no servidor. Antes, espera a
+    // análise dos arquivos (fala/visual) que ainda estiver em andamento.
+    setPensando("Analisando os arquivos…");
     try {
+      const analises = await aguardarAnalises();
+      setPensando("Editando…");
+      const atual = obterBiblioteca();
+      const biblioteca = [
+        ...atual,
+        ...enviados.filter((e) => !atual.some((m) => m.id === e.id)),
+      ].map((m) =>
+        analises.has(m.id) ? { ...m, analise: analises.get(m.id) } : m,
+      );
       const resposta = await fetch("/api/ia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -180,12 +209,7 @@ export const Chat: React.FC = () => {
           anexos: enviados.map((m) => m.nome),
           historico,
           timeline: obterTimeline(),
-          biblioteca: [
-            ...projeto.biblioteca.filter(
-              (m) => !enviados.some((e) => e.id === m.id),
-            ),
-            ...enviados,
-          ],
+          biblioteca,
         }),
       });
       const dados = (await resposta.json().catch(() => ({}))) as Partial<
@@ -204,9 +228,47 @@ export const Chat: React.FC = () => {
     } catch (e) {
       partes.push(`⚠️ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setPensando(false);
+      setPensando(null);
     }
     adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
+  };
+
+  // Microfone: 1º clique grava, 2º clique para e transcreve para a caixa.
+  const alternarDitado = async () => {
+    if (ditado === "gravando") {
+      gravador.current?.stop();
+      return;
+    }
+    if (ditado !== "parado") return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const pedacos: Blob[] = [];
+      const rec = new MediaRecorder(stream);
+      rec.ondataavailable = (e) => pedacos.push(e.data);
+      rec.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setDitado("transcrevendo");
+        try {
+          const falado = await transcreverGravacao(
+            new Blob(pedacos, { type: rec.mimeType }),
+          );
+          if (falado)
+            setTexto((t) => (t.trim() ? `${t.trim()} ${falado}` : falado));
+        } catch (e) {
+          setErro(e instanceof Error ? e.message : String(e));
+        } finally {
+          setDitado("parado");
+        }
+      };
+      gravador.current = rec;
+      rec.start();
+      setDitado("gravando");
+      setErro(null);
+    } catch {
+      setErro(
+        "Não consegui acessar o microfone (verifique a permissão do navegador).",
+      );
+    }
   };
 
   const nomeDaMidia = (id: string) =>
@@ -282,7 +344,7 @@ export const Chat: React.FC = () => {
         {pensando ? (
           <div className="flex justify-start">
             <div className="rounded-2xl bg-zinc-800 px-4 py-2.5 text-sm text-zinc-400">
-              Editando<span className="animate-pulse">…</span>
+              <span className="animate-pulse">{pensando}</span>
             </div>
           </div>
         ) : null}
@@ -363,6 +425,28 @@ export const Chat: React.FC = () => {
               e.target.value = "";
             }}
           />
+          <button
+            onClick={() => void alternarDitado()}
+            disabled={enviando || ditado === "transcrevendo"}
+            className={`rounded-lg px-2 py-1.5 text-lg hover:bg-zinc-800 ${
+              ditado === "gravando"
+                ? "animate-pulse text-red-400"
+                : "text-zinc-400 hover:text-white"
+            }`}
+            title={
+              ditado === "gravando"
+                ? "Parar e transcrever"
+                : ditado === "transcrevendo"
+                  ? "Transcrevendo…"
+                  : "Falar (ditado)"
+            }
+          >
+            {ditado === "transcrevendo"
+              ? "…"
+              : ditado === "gravando"
+                ? "⏹"
+                : "🎤"}
+          </button>
           <textarea
             value={texto}
             onChange={(e) => setTexto(e.target.value)}

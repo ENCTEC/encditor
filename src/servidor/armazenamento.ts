@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
-import { mkdir, stat, unlink } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -88,3 +88,28 @@ export const lerArquivo = (
       },
     ),
   ) as ReadableStream<Uint8Array>;
+
+// Caminho em disco de um arquivo enviado (para ffmpeg e análise).
+export const caminhoDoArquivo = (nome: string) => caminhoSeguro(nome);
+
+// Nome do arquivo a partir da URL pública ("/api/midia/<nome>").
+export const nomeDaUrl = (url: string) => {
+  const nome = url.split("?")[0].split("/").pop() ?? "";
+  caminhoSeguro(nome);
+  return nome;
+};
+
+// A análise de cada arquivo fica salva ao lado dele, para não pagar duas
+// vezes pela mesma transcrição/descrição.
+export const lerAnaliseSalva = async (nome: string): Promise<unknown> => {
+  try {
+    return JSON.parse(
+      await readFile(`${caminhoSeguro(nome)}.analise.json`, "utf8"),
+    );
+  } catch {
+    return null;
+  }
+};
+
+export const salvarAnalise = (nome: string, analise: unknown) =>
+  writeFile(`${caminhoSeguro(nome)}.analise.json`, JSON.stringify(analise));

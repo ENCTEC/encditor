@@ -20,12 +20,16 @@ src/
     api/midia/          Upload e entrega dos arquivos enviados
   componentes/          Interface (chat, player, timeline, inspetor, biblioteca)
   projeto/              Estado do projeto no navegador (biblioteca, mensagens, desfazer)
-  servidor/             Código que só roda no servidor (armazenamento em disco)
+  servidor/             Só no servidor: armazenamento em disco, ffmpeg, OpenAI e análise dos arquivos
   timeline/             Formato do JSON de timeline, cálculos e operações de edição
-  ia/                   Ferramentas, instruções e resumo do projeto usados pelo Claude
+  ia/                   Ferramentas de edição da IA, instruções e adaptadores (OpenAI e Claude)
   remotion/             Composição "EditorTimeline" que transforma o JSON em vídeo
 midia/                  Arquivos enviados (fora do git)
 ```
+
+## Requisitos
+
+- Node.js e **ffmpeg** (no Windows: `winget install Gyan.FFmpeg`; na VPS: `apt install ffmpeg`). Sem ffmpeg do sistema, o app tenta usar o que vem com o Remotion.
 
 ## Variáveis de ambiente
 
@@ -33,7 +37,10 @@ Copie `.env.example` para `.env.local` e preencha. Depois de mudar o `.env.local
 
 | Variável | Padrão | Uso |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | — | **Obrigatória para o chat editar sozinho.** Chave da API do Claude |
+| `OPENAI_API_KEY` | — | **Obrigatória para a IA**: chat que edita, ditado por voz, legendas automáticas e análise dos vídeos |
+| `OPENAI_MODELO` / `OPENAI_MODELO_VISAO` / `OPENAI_MODELO_DITADO` | `gpt-6.1-sol` / `gpt-6.1-sol` / `gpt-transcribe` | Modelos usados |
+| `FFMPEG_PATH` | ffmpeg do sistema | Usado para extrair áudio e quadros dos vídeos |
+| `ANTHROPIC_API_KEY` | — | Alternativa: editor com Claude (só se não houver chave da OpenAI) |
 | `MIDIA_DIR` | `./midia` | Pasta onde os arquivos enviados são gravados |
 | `MIDIA_LIMITE_MB` | `1024` | Tamanho máximo por arquivo |
 

@@ -13,6 +13,7 @@ import React, {
 import { validarTimeline } from "@/timeline/calculos";
 import { adicionarItem, timelineVazia } from "@/timeline/operacoes";
 import { Timeline } from "@/timeline/schema";
+import { Analise } from "./analise";
 import { Mensagem, Midia, Projeto } from "./tipos";
 
 // Estado do projeto aberto, compartilhado pelas abas Criar e Timeline.
@@ -33,6 +34,7 @@ type Acao =
   | { tipo: "desfazer" }
   | { tipo: "refazer" }
   | { tipo: "midia"; midia: Midia }
+  | { tipo: "analise"; id: string; analise: Analise }
   | { tipo: "mensagem"; mensagem: Mensagem }
   | { tipo: "substituir"; projeto: Projeto };
 
@@ -73,6 +75,16 @@ const reducer = (estado: Estado, acao: Acao): Estado => {
           biblioteca: [...projeto.biblioteca, acao.midia],
         },
       };
+    case "analise":
+      return {
+        ...estado,
+        projeto: {
+          ...projeto,
+          biblioteca: projeto.biblioteca.map((m) =>
+            m.id === acao.id ? { ...m, analise: acao.analise } : m,
+          ),
+        },
+      };
     case "mensagem":
       return {
         ...estado,
@@ -99,6 +111,9 @@ type ContextoProjeto = {
   // Timeline mais recente, inclusive mudanças feitas neste mesmo clique
   // (o "projeto" só atualiza na próxima renderização).
   obterTimeline: () => Timeline;
+  // Biblioteca mais recente (mesma ideia do obterTimeline).
+  obterBiblioteca: () => Midia[];
+  atualizarAnalise: (id: string, analise: Analise) => void;
   desfazer: () => void;
   refazer: () => void;
   // Coloca a mídia na biblioteca; se for cena, também no fim da trilha.
@@ -126,6 +141,8 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   // Sempre aponta para a timeline mais recente (usado dentro de callbacks).
   const timelineAtual = useRef(estado.projeto.timeline);
   timelineAtual.current = estado.projeto.timeline;
+  const bibliotecaAtual = useRef(estado.projeto.biblioteca);
+  bibliotecaAtual.current = estado.projeto.biblioteca;
 
   // Carrega o projeto salvo (só no navegador, depois da 1ª renderização).
   useEffect(() => {
@@ -196,6 +213,9 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       limparErro: () => setErro(null),
       aplicar,
       obterTimeline: () => timelineAtual.current,
+      obterBiblioteca: () => bibliotecaAtual.current,
+      atualizarAnalise: (id, analise) =>
+        dispatch({ tipo: "analise", id, analise }),
       desfazer: () => dispatch({ tipo: "desfazer" }),
       refazer: () => dispatch({ tipo: "refazer" }),
       adicionarMidia,

@@ -11,10 +11,11 @@ Fluxo em 2 etapas separadas: (1) geração no Higgsfield, fora do app; (2) ediç
 Ambas leem/alteram o MESMO JSON de timeline.
 
 ## Decisões de arquitetura
-- O Claude não reescreve o JSON inteiro: devolve comandos via tool use (cortar, adicionarInsert, adicionarAudio, zoom, gerarLegendas…) que o app aplica no JSON → permite desfazer/refazer e preserva ajustes manuais.
+- A IA não reescreve o JSON inteiro: devolve comandos via tool use / function calling (cortar, adicionarInsert, adicionarAudio, zoom, gerarLegendas…) que o app aplica no JSON → permite desfazer/refazer e preserva ajustes manuais.
 - JSON de timeline com faixas: trilha principal (clipes, cortes, transições), inserts/B-roll sobrepostos, áudio (início, volume, fade), efeitos por trecho (zoom), legendas.
 - Cada arquivo enviado vira item da biblioteca com nome/número ("insert 2", "áudio 1") para a IA entender referências como "esse insert".
-- A API do Claude NÃO transcreve áudio. Legendas exigem transcrição separada (Whisper local via @remotion/install-whisper-cpp, ou API paga: OpenAI/Deepgram/AssemblyAI). Claude entra depois: quebrar legendas, analisar jeito de falar, copy.
+- **IA = OpenAI (decisão do usuário, 2026-10-13):** uma chave (`OPENAI_API_KEY`) para tudo. Editor do chat: `gpt-6.1-sol` (Responses API + function calling, `src/ia/openai.ts`). Transcrição com tempo por palavra (legendas e "quando eu falo X"): `whisper-1` (único da OpenAI com timestamps de palavra). Ditado do chat: `gpt-transcribe`. Análise visual: quadros extraídos com ffmpeg (OpenAI não aceita vídeo) descritos pelo `gpt-6.1-sol`, com texto na tela e minutagem. Claude (`src/ia/claude.ts`) ficou como alternativa, usado só se não houver chave da OpenAI.
+- Cada arquivo enviado é analisado automaticamente (`/api/analisar`); resultado salvo em `midia/<arquivo>.analise.json` e na biblioteca. `src/ia/conteudo.ts` converte tempos do arquivo para o vídeo final (cortes, transições, posição).
 
 ## Stack e infraestrutura
 - **VPS Contabo (Europa):** Ubuntu, 6 vCPU, 12 GB RAM, 100 GB NVMe. Hospeda tudo, provavelmente via Docker:
@@ -30,7 +31,7 @@ Ambas leem/alteram o MESMO JSON de timeline.
 
 ## Etapa atual
 App Next.js 16 funcionando localmente com as duas abas:
-- **Criar:** chat com anexos (cena/insert/áudio), upload para o disco (`/api/midia`, com Range), preview e biblioteca. Cenas entram sozinhas na trilha principal. Pedidos em texto vão para `/api/ia`: Claude Opus 5.5 (tool runner do SDK, `src/ia/ferramentas.ts`) edita uma cópia da timeline e o app aplica tudo como um único passo de desfazer. Precisa de `ANTHROPIC_API_KEY` no `.env.local` (ainda não configurada).
+- **Criar:** chat com anexos (cena/insert/áudio) e ditado por voz (🎤), upload para o disco (`/api/midia`, com Range), preview e biblioteca (mostra estado da análise). Cenas entram sozinhas na trilha principal. Pedidos vão para `/api/ia`: a IA edita uma cópia da timeline com as ferramentas de `src/ia/ferramentas.ts` (inclui buscar_fala, ver_conteudo, legendar_automaticamente) e o app aplica tudo como um único passo de desfazer. Falta configurar `OPENAI_API_KEY` no `.env.local`.
 - Transições: corte, fade, slide, cortina (wipe), virar (flip), relogio (clock-wipe), iris, impacto (push-cut); direção e duração por cena. Transições "shader" do Remotion ficaram de fora (dependem de recurso experimental do navegador).
 - **Timeline:** player + faixas (cenas, inserts, áudio, zoom, legendas), arrastar para mover/aparar, inspetor com campos, desfazer/refazer (Ctrl+Z/Ctrl+Y), Delete remove.
 - Estado salvo no localStorage (depois: Supabase). Edições passam por `src/timeline/operacoes.ts` (serão as ferramentas da IA).
@@ -42,10 +43,10 @@ Estrutura: Next.js na raiz; composição Remotion em `src/remotion/` (Studio: `n
 - Remotion: gratuito só para empresas de até 3 pessoas. Acima disso, licença "Remotion for Automators" (US$ 0,01 por render, mínimo US$ 100/mês).
 - VPS Contabo: custo fixo mensal; sem cobrança por tráfego de vídeo como em storage na nuvem.
 - Higgsfield: o plano do site NÃO dá acesso à API. A API é produto separado, saldo pré-pago em dólar, chave gerada em console.higgsfield.ai.
-- Claude API e serviço de transcrição: pagos por uso.
+- OpenAI (por uso): gpt-6.1-sol US$ 2/US$ 10 por 1M tokens (entrada/saída); whisper-1 US$ 0,006/min; gpt-transcribe US$ 0,0045/min (preços consultados em 2026-10-13).
 
 ## Ambiente
-- Windows, VS Code, terminal PowerShell.
+- Windows, VS Code, terminal PowerShell. ffmpeg 8.1 instalado via winget (na VPS: apt install ffmpeg).
 - Conectores do claude.ai desativados no Claude Code (disableClaudeAiConnectors). Supabase será adicionado localmente só quando necessário.
 
 ## Como trabalhar comigo

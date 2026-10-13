@@ -1,4 +1,3 @@
-import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 import { Midia } from "@/projeto/tipos";
 import {
@@ -22,11 +21,29 @@ import {
   Timeline,
   tipoTransicaoSchema,
 } from "@/timeline/schema";
+import {
+  buscarFala,
+  gerarLegendas,
+  momentosNoVideoFinal,
+  palavrasNoVideoFinal,
+} from "./conteudo";
 import { resumoDoProjeto } from "./estado";
 
-// Ferramentas que o Claude usa para editar. Todas trabalham numa cópia da
-// timeline ("sessao"); o app só recebe o resultado no final, e a edição
-// inteira vira um único passo de desfazer.
+// Ferramentas que a IA (GPT ou Claude) usa para editar. Todas trabalham
+// numa cópia da timeline ("sessao"); o app só recebe o resultado no final,
+// e a edição inteira vira um único passo de desfazer.
+
+// Formato neutro: cada fornecedor de IA converte para o seu (veja
+// openai.ts e claude.ts nesta pasta).
+export type Ferramenta<S extends z.ZodType = z.ZodType> = {
+  name: string;
+  description: string;
+  inputSchema: S;
+  run: (entrada: z.infer<S>) => string;
+};
+
+const ferramenta = <S extends z.ZodType>(f: Ferramenta<S>) =>
+  f as unknown as Ferramenta;
 
 export type SessaoEdicao = {
   timeline: Timeline;
@@ -102,7 +119,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
   };
 
   return [
-    betaZodTool({
+    ferramenta({
       name: "ver_projeto",
       description:
         "Mostra o estado atual do projeto: cenas (com onde começam e terminam no vídeo final), inserts, áudios, zooms, legendas e a biblioteca de arquivos. Use depois de mudanças que deslocam tempos (aparar, dividir, mover ou adicionar cenas) antes de posicionar algo por tempo.",
@@ -111,7 +128,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         JSON.stringify(resumoDoProjeto(sessao.timeline, sessao.biblioteca)),
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "colocar_insert",
       description:
         "Coloca um vídeo ou imagem da biblioteca POR CIMA da trilha principal, num intervalo do vídeo final (B-roll / insert). Ex.: 'bote o Insert 2 a partir dos 2 segundos'.",
@@ -171,7 +188,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "colocar_audio",
       description:
         "Coloca um áudio da biblioteca (música, narração, efeito) a partir de um segundo do vídeo final.",
@@ -237,7 +254,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "definir_transicao",
       description:
         "Define a transição de ENTRADA de uma cena (entre ela e a anterior). Tipos: corte (seco), fade (dissolve), slide (empurra), cortina (revela passando por cima), virar (gira como carta), relogio (revela em círculo como ponteiro), iris (círculo abrindo do centro), impacto (zoom rápido com flash). A cena 1 não tem transição de entrada.",
@@ -294,7 +311,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "aparar_cena",
       description:
         "Corta o começo e/ou o final de uma cena. Use cortar_do_comeco_s / cortar_do_final_s para pedidos como 'corte 2 segundos do começo', ou de/ate para escolher o trecho exato do ARQUIVO.",
@@ -334,7 +351,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "dividir_cena",
       description:
         "Corta (divide) o vídeo em dois num ponto do vídeo final, criando duas cenas. Útil para depois remover um pedaço ou colocar algo entre as partes.",
@@ -373,7 +390,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "adicionar_cena",
       description:
         "Põe um vídeo da biblioteca na trilha principal numa posição. Também serve para repetir uma cena.",
@@ -422,7 +439,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "mover_cena",
       description: "Muda a ordem: a cena X passa a ser a cena Y.",
       inputSchema: z.object({
@@ -439,7 +456,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "adicionar_zoom",
       description:
         "Dá zoom (aproxima) na cena durante um intervalo do vídeo final.",
@@ -478,7 +495,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         ),
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "adicionar_legenda",
       description:
         "Adiciona uma legenda com texto escrito pelo usuário (ou combinado com ele) num intervalo do vídeo final.",
@@ -499,7 +516,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         ),
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "editar_item",
       description:
         "Altera um insert, áudio, zoom ou legenda existente (pelo número). Para cenas, só o volume; trechos e transições de cena têm ferramentas próprias. Campos null não mudam.",
@@ -555,7 +572,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       },
     }),
 
-    betaZodTool({
+    ferramenta({
       name: "remover_item",
       description:
         "Remove uma cena, insert, áudio, zoom ou legenda pelo número.",
@@ -570,7 +587,122 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         ),
     }),
 
-    betaZodTool({
+    ferramenta({
+      name: "buscar_fala",
+      description:
+        'Procura um trecho FALADO no vídeo final (pela transcrição) e devolve em que segundo ele é dito. Use quando o usuário citar uma frase: "coloque o insert quando eu falo X".',
+      inputSchema: z.object({
+        trecho: z.string().min(1).describe("Palavras faladas a procurar."),
+      }),
+      run: (e) => {
+        const palavras = palavrasNoVideoFinal(
+          sessao.timeline,
+          sessao.biblioteca,
+        );
+        if (!palavras.length) {
+          throw new Error(
+            "Não há fala transcrita no vídeo (os arquivos ainda não foram analisados ou não têm fala).",
+          );
+        }
+        const achados = buscarFala(palavras, e.trecho);
+        return achados.length
+          ? JSON.stringify(achados)
+          : `Não encontrei "${e.trecho}" na fala do vídeo.`;
+      },
+    }),
+
+    ferramenta({
+      name: "ver_conteudo",
+      description:
+        'Mostra o que é FALADO e o que APARECE na tela (inclusive textos escritos) em cada momento do vídeo final, com os segundos. Use para achar momentos pelo conteúdo ("quando aparece o carro", "onde está escrito promoção").',
+      inputSchema: z.object({
+        cena: z
+          .number()
+          .int()
+          .min(1)
+          .nullable()
+          .describe("Só esta cena; null = vídeo todo."),
+      }),
+      run: (e) => {
+        let de = 0;
+        let ate = Infinity;
+        if (e.cena !== null) {
+          const i = conferirCena(e.cena);
+          const clipes = calcularClipes(sessao.timeline);
+          const inicio = inicioDosClipes(clipes)[i];
+          de = inicio / sessao.timeline.fps;
+          ate = (inicio + clipes[i].duracaoFrames) / sessao.timeline.fps;
+        }
+        const dentro = (x: { de: number; ate: number }) =>
+          x.ate > de && x.de < ate;
+        const palavras = palavrasNoVideoFinal(
+          sessao.timeline,
+          sessao.biblioteca,
+        ).filter(dentro);
+        // Junta palavras em frases de até 12 palavras, para ficar legível.
+        const falas = gerarLegendas(palavras, 12).map((l) => ({
+          de: l.inicio,
+          ate: l.fim,
+          fala: l.texto,
+        }));
+        const visual = momentosNoVideoFinal(
+          sessao.timeline,
+          sessao.biblioteca,
+        ).filter(dentro);
+        const pendentes = sessao.biblioteca
+          .filter((m) => m.analise?.status !== "pronta")
+          .map((m) => m.nome);
+        return JSON.stringify({
+          falas,
+          visual,
+          ...(pendentes.length ? { sem_analise: pendentes } : {}),
+        });
+      },
+    }),
+
+    ferramenta({
+      name: "legendar_automaticamente",
+      description:
+        "Cria as legendas do vídeo inteiro a partir da fala transcrita, sincronizadas palavra por palavra.",
+      inputSchema: z.object({
+        palavras_por_legenda: z
+          .number()
+          .int()
+          .min(1)
+          .max(15)
+          .nullable()
+          .describe(
+            "Máximo de palavras por legenda. null = 6 (bom para redes sociais).",
+          ),
+        substituir_existentes: z
+          .boolean()
+          .describe("true = apaga as legendas atuais antes."),
+      }),
+      run: (e) => {
+        const palavras = palavrasNoVideoFinal(
+          sessao.timeline,
+          sessao.biblioteca,
+        );
+        if (!palavras.length) {
+          throw new Error(
+            "Não há fala transcrita no vídeo (os arquivos ainda não foram analisados ou não têm fala).",
+          );
+        }
+        const novas = gerarLegendas(palavras, e.palavras_por_legenda ?? 6);
+        return aplicar(
+          (t) => ({
+            ...t,
+            legendas: [
+              ...(e.substituir_existentes ? [] : t.legendas),
+              ...novas,
+            ],
+          }),
+          `${novas.length} legendas automáticas criadas`,
+        );
+      },
+    }),
+
+    ferramenta({
       name: "configurar_projeto",
       description:
         "Muda o formato do vídeo final, o fps ou a duração padrão das transições. Campos null não mudam.",

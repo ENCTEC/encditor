@@ -78,6 +78,15 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       formato: m.formato,
       duracao_s: m.duracao !== null ? s(m.duracao) : null,
       arquivo_original: m.nomeArquivo,
+      analise:
+        m.analise?.status === "pronta"
+          ? {
+              tem_fala: Boolean(m.analise.transcricao),
+              ...(m.analise.visual
+                ? { conteudo: m.analise.visual.resumo }
+                : {}),
+            }
+          : (m.analise?.status ?? "nao_analisado"),
     })),
   };
 };
