@@ -21,6 +21,16 @@ export const formatarTempo = (segundos: number) => {
 const EstadoAnalise: React.FC<{ midia: Midia }> = ({ midia }) => {
   const { atualizarAnalise } = useProjeto();
   const analise = midia.analise;
+  if (midia.usarIA === false) {
+    return (
+      <span
+        className="text-xs text-sky-300"
+        title="Arquivo frio: a IA não lê o conteúdo. Mude na aba Arquivos."
+      >
+        ❄ frio
+      </span>
+    );
+  }
   if (!podeAnalisar(midia) || !analise) return null;
 
   if (analise.status === "analisando") {

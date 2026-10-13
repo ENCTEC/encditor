@@ -9,6 +9,7 @@ import { useProjeto } from "@/projeto/ProjetoProvider";
 const ABAS = [
   { href: "/", rotulo: "Criar" },
   { href: "/timeline", rotulo: "Timeline" },
+  { href: "/arquivos", rotulo: "Arquivos" },
 ];
 
 const botao =

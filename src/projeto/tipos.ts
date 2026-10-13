@@ -7,8 +7,12 @@ export type PapelMidia = "cena" | "insert" | "audio";
 
 export type Midia = {
   id: string;
-  // Nome curto para citar no chat: "Cena 1", "Insert 2", "Áudio 1".
+  // Nome curto automático: "Cena 1", "Insert 2", "Áudio 1".
   nome: string;
+  // Apelido para citar no chat com @ (ex.: "videolael" -> @videolael).
+  apelido: string;
+  // false = arquivo "frio": não é analisado pela IA (sem custo).
+  usarIA: boolean;
   papel: PapelMidia;
   formato: "video" | "imagem" | "audio";
   url: string;

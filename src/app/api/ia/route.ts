@@ -30,6 +30,8 @@ const corpoSchema = z.object({
       formato: z.enum(["video", "imagem", "audio"]),
       url: z.string(),
       nomeArquivo: z.string(),
+      apelido: z.string().default(""),
+      usarIA: z.boolean().default(true),
       duracao: z.number().nullable(),
       largura: z.number().nullable(),
       altura: z.number().nullable(),

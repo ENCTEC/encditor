@@ -92,6 +92,26 @@ const PREFIXO: Record<PapelMidia, string> = {
   audio: "Áudio",
 };
 
+// Apelido a partir do nome do arquivo: sem acento, extensão nem espaços.
+// "Vídeo Lael.mp4" -> "videolael". Se já existir, numera: "videolael2".
+export const normalizarApelido = (texto: string) =>
+  texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "")
+    .slice(0, 30);
+
+export const gerarApelido = (nomeArquivo: string, biblioteca: Midia[]) => {
+  const base =
+    normalizarApelido(nomeArquivo.replace(/\.[^.]+$/, "")) || "arquivo";
+  const usados = new Set(biblioteca.map((m) => m.apelido));
+  if (!usados.has(base)) return base;
+  let n = 2;
+  while (usados.has(`${base}${n}`)) n++;
+  return `${base}${n}`;
+};
+
 // "Cena 3", "Insert 1"... numerado por papel, para citar no chat.
 export const proximoNome = (biblioteca: Midia[], papel: PapelMidia) =>
   `${PREFIXO[papel]} ${biblioteca.filter((m) => m.papel === papel).length + 1}`;
@@ -101,8 +121,9 @@ export const proximoNome = (biblioteca: Midia[], papel: PapelMidia) =>
 // mandar um pedido à IA.
 const analisesEmAndamento = new Map<string, Promise<Analise>>();
 
+// Só arquivos enviados ao Encditor (não links externos) e não "frios".
 export const podeAnalisar = (midia: Midia) =>
-  midia.url.startsWith("/api/midia/");
+  midia.url.startsWith("/api/midia/") && midia.usarIA !== false;
 
 export const analisarMidia = (midia: Midia): Promise<Analise> => {
   const existente = analisesEmAndamento.get(midia.id);

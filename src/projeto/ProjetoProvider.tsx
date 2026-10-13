@@ -14,6 +14,7 @@ import { validarTimeline } from "@/timeline/calculos";
 import { adicionarItem, timelineVazia } from "@/timeline/operacoes";
 import { Timeline } from "@/timeline/schema";
 import { Analise } from "./analise";
+import { gerarApelido } from "./midia-cliente";
 import { Mensagem, Midia, Projeto } from "./tipos";
 
 // Estado do projeto aberto, compartilhado pelas abas Criar e Timeline.
@@ -35,6 +36,7 @@ type Acao =
   | { tipo: "refazer" }
   | { tipo: "midia"; midia: Midia }
   | { tipo: "analise"; id: string; analise: Analise }
+  | { tipo: "editarMidia"; id: string; mudancas: Partial<Midia> }
   | { tipo: "mensagem"; mensagem: Mensagem }
   | { tipo: "substituir"; projeto: Projeto };
 
@@ -43,6 +45,19 @@ const projetoVazio = (): Projeto => ({
   biblioteca: [],
   mensagens: [],
 });
+
+// Projetos salvos antes dos apelidos/IA opcional ganham valores padrão.
+const migrarProjeto = (projeto: Projeto): Projeto => {
+  const biblioteca: Midia[] = [];
+  for (const m of projeto.biblioteca) {
+    biblioteca.push({
+      ...m,
+      apelido: m.apelido ?? gerarApelido(m.nomeArquivo, biblioteca),
+      usarIA: m.usarIA ?? true,
+    });
+  }
+  return { ...projeto, biblioteca };
+};
 
 const reducer = (estado: Estado, acao: Acao): Estado => {
   const { projeto, passado, futuro } = estado;
@@ -73,6 +88,16 @@ const reducer = (estado: Estado, acao: Acao): Estado => {
         projeto: {
           ...projeto,
           biblioteca: [...projeto.biblioteca, acao.midia],
+        },
+      };
+    case "editarMidia":
+      return {
+        ...estado,
+        projeto: {
+          ...projeto,
+          biblioteca: projeto.biblioteca.map((m) =>
+            m.id === acao.id ? { ...m, ...acao.mudancas } : m,
+          ),
         },
       };
     case "analise":
@@ -114,6 +139,8 @@ type ContextoProjeto = {
   // Biblioteca mais recente (mesma ideia do obterTimeline).
   obterBiblioteca: () => Midia[];
   atualizarAnalise: (id: string, analise: Analise) => void;
+  // Muda apelido / escolha de IA. Retorna false se o apelido já existir.
+  editarMidia: (id: string, mudancas: Partial<Midia>) => boolean;
   desfazer: () => void;
   refazer: () => void;
   // Coloca a mídia na biblioteca; se for cena, também no fim da trilha.
@@ -149,7 +176,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const salvo = localStorage.getItem(CHAVE_STORAGE);
       if (salvo) {
-        const projeto = JSON.parse(salvo) as Projeto;
+        const projeto = migrarProjeto(JSON.parse(salvo) as Projeto);
         validarTimeline(projeto.timeline);
         dispatch({ tipo: "substituir", projeto });
       }
@@ -214,6 +241,20 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       aplicar,
       obterTimeline: () => timelineAtual.current,
       obterBiblioteca: () => bibliotecaAtual.current,
+      editarMidia: (id, mudancas) => {
+        if (
+          mudancas.apelido !== undefined &&
+          (!mudancas.apelido ||
+            bibliotecaAtual.current.some(
+              (m) => m.id !== id && m.apelido === mudancas.apelido,
+            ))
+        ) {
+          setErro(`O apelido "@${mudancas.apelido}" já existe ou está vazio.`);
+          return false;
+        }
+        dispatch({ tipo: "editarMidia", id, mudancas });
+        return true;
+      },
       atualizarAnalise: (id, analise) =>
         dispatch({ tipo: "analise", id, analise }),
       desfazer: () => dispatch({ tipo: "desfazer" }),

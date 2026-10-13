@@ -74,6 +74,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     })),
     biblioteca: biblioteca.map((m) => ({
       nome: m.nome,
+      apelido: `@${m.apelido}`,
       papel: m.papel,
       formato: m.formato,
       duracao_s: m.duracao !== null ? s(m.duracao) : null,
@@ -86,7 +87,9 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
                 ? { conteudo: m.analise.visual.resumo }
                 : {}),
             }
-          : (m.analise?.status ?? "nao_analisado"),
+          : m.usarIA === false
+            ? "sem_analise (arquivo frio)"
+            : (m.analise?.status ?? "nao_analisado"),
     })),
   };
 };

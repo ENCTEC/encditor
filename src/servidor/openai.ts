@@ -33,9 +33,16 @@ export const mensagemDeErroOpenAI = (e: unknown) => {
     };
   }
   if (e instanceof OpenAI.RateLimitError) {
+    // O mesmo código 429 serve para "sem créditos" e "pedidos demais".
+    if (e.type === "insufficient_quota") {
+      return {
+        status: 402,
+        erro: "A conta da OpenAI está sem créditos. Adicione em platform.openai.com/settings/organization/billing e tente de novo.",
+      };
+    }
     return {
       status: 429,
-      erro: "Limite da OpenAI atingido (pedidos demais ou créditos acabaram).",
+      erro: "Muitos pedidos seguidos à OpenAI. Espere alguns segundos.",
     };
   }
   if (e instanceof OpenAI.APIConnectionError) {

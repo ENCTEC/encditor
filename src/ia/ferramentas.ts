@@ -84,13 +84,20 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         sessao.timeline.fps,
     );
 
+  // Aceita o nome ("Insert 2"), o apelido ("@videolael" ou "videolael")
+  // ou o nome original do arquivo.
   const acharMidia = (nome: string) => {
-    const alvo = normalizar(nome);
+    const alvo = normalizar(nome.replace(/^@/, ""));
     const midia = sessao.biblioteca.find(
-      (m) => normalizar(m.nome) === alvo || normalizar(m.nomeArquivo) === alvo,
+      (m) =>
+        normalizar(m.apelido ?? "") === alvo ||
+        normalizar(m.nome) === alvo ||
+        normalizar(m.nomeArquivo) === alvo,
     );
     if (!midia) {
-      const nomes = sessao.biblioteca.map((m) => m.nome).join(", ") || "nenhum";
+      const nomes =
+        sessao.biblioteca.map((m) => `${m.nome} (@${m.apelido})`).join(", ") ||
+        "nenhum";
       throw new Error(
         `Não existe "${nome}" na biblioteca. Disponíveis: ${nomes}.`,
       );

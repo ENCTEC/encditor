@@ -1,5 +1,6 @@
 import exemploTimeline from "@/timeline/exemplo-timeline.json";
 import { Timeline } from "@/timeline/schema";
+import { normalizarApelido } from "./midia-cliente";
 import { Midia, Projeto } from "./tipos";
 
 // Projeto de demonstração: a timeline de exemplo + uma biblioteca com
@@ -20,6 +21,8 @@ export const projetoExemplo = (): Projeto => {
     formato,
     url,
     nomeArquivo: url.split("/").pop() ?? url,
+    apelido: normalizarApelido(nome),
+    usarIA: false,
     duracao,
     largura: null,
     altura: null,

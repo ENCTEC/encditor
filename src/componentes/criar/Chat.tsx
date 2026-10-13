@@ -1,28 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
-import {
-  aguardarAnalises,
-  enviarArquivo,
-  formatoDoArquivo,
-  lerMetadados,
-  papelSugerido,
-  podeAnalisar,
-  proximoNome,
-  transcreverGravacao,
-} from "@/projeto/midia-cliente";
-import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
-import { Midia, PapelMidia } from "@/projeto/tipos";
 import type { RespostaIA } from "@/app/api/ia/route";
-
-type Anexo = {
-  id: string;
-  arquivo: File;
-  formato: Midia["formato"];
-  papel: PapelMidia;
-  progresso: number | null;
-};
+import { ListaDeAnexos } from "@/componentes/ListaDeAnexos";
+import {
+  filtrarMencoes,
+  inserirMencao,
+  SugestoesMencao,
+  termoDeMencao,
+  TextoComMencoes,
+} from "@/componentes/Mencoes";
+import { aguardarAnalises, transcreverGravacao } from "@/projeto/midia-cliente";
+import { useProjeto } from "@/projeto/ProjetoProvider";
+import { Midia } from "@/projeto/tipos";
+import { useEnvio } from "@/projeto/useEnvio";
 
 const EXEMPLOS = [
   "Bote o Insert 1 a partir dos 2 segundos",
@@ -30,131 +21,52 @@ const EXEMPLOS = [
   "Adicione o Áudio 1 como música de fundo",
   "Corte 2 segundos do começo da cena 2",
   "Legende o vídeo",
-  "Coloque o Insert 2 quando eu falo “promoção”",
+  "Coloque o @meuinsert quando eu falo “promoção”",
 ];
-
-// Papéis possíveis por formato: vídeo pode ser cena ou insert; imagem só
-// insert; áudio só áudio.
-const PAPEIS: Record<Midia["formato"], PapelMidia[]> = {
-  video: ["cena", "insert"],
-  imagem: ["insert"],
-  audio: ["audio"],
-};
-
-const ROTULO_PAPEL: Record<PapelMidia, string> = {
-  cena: "Cena",
-  insert: "Insert",
-  audio: "Áudio",
-};
 
 export const Chat: React.FC = () => {
   const {
     projeto,
-    adicionarMidia,
     adicionarMensagem,
     aplicar,
     obterTimeline,
     obterBiblioteca,
-    atualizarAnalise,
   } = useProjeto();
+  const envio = useEnvio();
+  const [texto, setTexto] = useState("");
   // Texto do indicador enquanto a IA trabalha ("Editando…").
   const [pensando, setPensando] = useState<string | null>(null);
+  const [arrastando, setArrastando] = useState(false);
   // Ditado: gravando (microfone aberto) ou transcrevendo a gravação.
   const [ditado, setDitado] = useState<"parado" | "gravando" | "transcrevendo">(
     "parado",
   );
+  // Sugestões de @apelido enquanto digita.
+  const [mencao, setMencao] = useState<{ termo: string; ativa: number } | null>(
+    null,
+  );
   const gravador = useRef<MediaRecorder | null>(null);
-  const [texto, setTexto] = useState("");
-  const [anexos, setAnexos] = useState<Anexo[]>([]);
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
-  const [arrastando, setArrastando] = useState(false);
+  const caixa = useRef<HTMLTextAreaElement>(null);
   const inputArquivo = useRef<HTMLInputElement>(null);
   const fimDaLista = useRef<HTMLDivElement>(null);
+
+  const ocupado = envio.enviando || pensando !== null;
+  const opcoesMencao = mencao
+    ? filtrarMencoes(projeto.biblioteca, mencao.termo)
+    : [];
 
   useEffect(() => {
     fimDaLista.current?.scrollIntoView({ behavior: "smooth" });
   }, [projeto.mensagens.length, pensando]);
 
-  const anexar = (arquivos: FileList | File[]) => {
-    const novos: Anexo[] = [];
-    const recusados: string[] = [];
-    for (const arquivo of Array.from(arquivos)) {
-      const formato = formatoDoArquivo(arquivo);
-      if (!formato) {
-        recusados.push(arquivo.name);
-        continue;
-      }
-      novos.push({
-        id: novoId(),
-        arquivo,
-        formato,
-        papel: papelSugerido(formato),
-        progresso: null,
-      });
-    }
-    setAnexos((atuais) => [...atuais, ...novos]);
-    setErro(
-      recusados.length
-        ? `Formato não suportado: ${recusados.join(", ")}`
-        : null,
-    );
-  };
-
-  const atualizarAnexo = (id: string, mudancas: Partial<Anexo>) =>
-    setAnexos((atuais) =>
-      atuais.map((a) => (a.id === id ? { ...a, ...mudancas } : a)),
-    );
-
   const enviar = async () => {
-    if (enviando || (!texto.trim() && anexos.length === 0)) return;
-    setEnviando(true);
-    setErro(null);
-
-    // Biblioteca local para numerar certo vários arquivos do mesmo envio.
-    const biblioteca = [...projeto.biblioteca];
-    const enviados: Midia[] = [];
-    const anexosEnviados = new Set<string>();
-
-    for (const anexo of anexos) {
-      try {
-        const meta = await lerMetadados(anexo.arquivo, anexo.formato);
-        atualizarAnexo(anexo.id, { progresso: 0 });
-        const url = await enviarArquivo(anexo.arquivo, (p) =>
-          atualizarAnexo(anexo.id, { progresso: p }),
-        );
-        const midia: Midia = {
-          id: novoId(),
-          nome: proximoNome(biblioteca, anexo.papel),
-          papel: anexo.papel,
-          formato: anexo.formato,
-          url,
-          nomeArquivo: anexo.arquivo.name,
-          ...meta,
-        };
-        biblioteca.push(midia);
-        enviados.push(midia);
-        anexosEnviados.add(anexo.id);
-        adicionarMidia(midia);
-        if (podeAnalisar(midia)) iniciarAnalise(midia, atualizarAnalise);
-      } catch (e) {
-        // Para no primeiro erro; os anexos que faltam continuam na caixa.
-        setErro(e instanceof Error ? e.message : String(e));
-        setAnexos((atuais) =>
-          atuais
-            .filter((a) => !anexosEnviados.has(a.id))
-            .map((a) => ({ ...a, progresso: null })),
-        );
-        if (enviados.length) await registrarMensagens(enviados, "");
-        setEnviando(false);
-        return;
-      }
-    }
-
+    const pedido = texto.trim();
+    if (ocupado || (!pedido && envio.anexos.length === 0)) return;
+    const { enviados, ok } = await envio.enviarTodos();
+    if (!ok && !enviados.length) return;
     setTexto("");
-    setAnexos([]);
-    await registrarMensagens(enviados, texto.trim());
-    setEnviando(false);
+    await registrarMensagens(enviados, ok ? pedido : "");
+    if (!ok) setTexto(pedido);
   };
 
   const registrarMensagens = async (enviados: Midia[], pedido: string) => {
@@ -181,7 +93,7 @@ export const Chat: React.FC = () => {
     if (!pedido) {
       if (outros.length) {
         partes.push(
-          `Guardei ${outros.map((m) => m.nome).join(", ")} na biblioteca — me diga onde usar.`,
+          `Guardei ${outros.map((m) => `${m.nome} (@${m.apelido})`).join(", ")} na biblioteca — me diga onde usar.`,
         );
       }
       adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
@@ -252,10 +164,11 @@ export const Chat: React.FC = () => {
           const falado = await transcreverGravacao(
             new Blob(pedacos, { type: rec.mimeType }),
           );
-          if (falado)
+          if (falado) {
             setTexto((t) => (t.trim() ? `${t.trim()} ${falado}` : falado));
+          }
         } catch (e) {
-          setErro(e instanceof Error ? e.message : String(e));
+          envio.setErro(e instanceof Error ? e.message : String(e));
         } finally {
           setDitado("parado");
         }
@@ -263,16 +176,35 @@ export const Chat: React.FC = () => {
       gravador.current = rec;
       rec.start();
       setDitado("gravando");
-      setErro(null);
+      envio.setErro(null);
     } catch {
-      setErro(
+      envio.setErro(
         "Não consegui acessar o microfone (verifique a permissão do navegador).",
       );
     }
   };
 
-  const nomeDaMidia = (id: string) =>
-    projeto.biblioteca.find((m) => m.id === id)?.nome ?? "arquivo";
+  const atualizarMencao = (valor: string, cursor: number) => {
+    const termo = termoDeMencao(valor, cursor);
+    setMencao(termo === null ? null : { termo, ativa: 0 });
+  };
+
+  const escolherMencao = (midia: Midia) => {
+    const el = caixa.current;
+    const cursor = el?.selectionStart ?? texto.length;
+    const novo = inserirMencao(texto, cursor, midia.apelido);
+    setTexto(novo.texto);
+    setMencao(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(novo.cursor, novo.cursor);
+    });
+  };
+
+  const nomeDaMidia = (id: string) => {
+    const m = projeto.biblioteca.find((x) => x.id === id);
+    return m ? `${m.nome} · @${m.apelido}` : "arquivo";
+  };
 
   return (
     <div
@@ -285,7 +217,7 @@ export const Chat: React.FC = () => {
       onDrop={(e) => {
         e.preventDefault();
         setArrastando(false);
-        anexar(e.dataTransfer.files);
+        envio.anexar(e.dataTransfer.files);
       }}
     >
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
@@ -294,7 +226,8 @@ export const Chat: React.FC = () => {
             <h1 className="text-xl font-semibold">O que vamos editar hoje?</h1>
             <p className="mt-2 text-sm text-zinc-400">
               Anexe as cenas geradas no Higgsfield (entram em ordem na trilha
-              principal), inserts e áudios. Depois peça a edição em texto, como:
+              principal), inserts e áudios — ou suba tudo pela aba Arquivos.
+              Cite um arquivo com @apelido. Depois peça a edição, como:
             </p>
             <ul className="mt-4 space-y-2 text-sm">
               {EXEMPLOS.map((exemplo) => (
@@ -336,7 +269,12 @@ export const Chat: React.FC = () => {
                 </div>
               ) : null}
               {m.texto ? (
-                <p className="whitespace-pre-wrap">{m.texto}</p>
+                <p className="whitespace-pre-wrap">
+                  <TextoComMencoes
+                    texto={m.texto}
+                    biblioteca={projeto.biblioteca}
+                  />
+                </p>
               ) : null}
             </div>
           </div>
@@ -352,63 +290,27 @@ export const Chat: React.FC = () => {
       </div>
 
       <div className="border-t border-zinc-800 p-4">
-        {anexos.length ? (
-          <div className="mb-3 flex flex-wrap gap-2">
-            {anexos.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs"
-              >
-                <span className="max-w-40 truncate" title={a.arquivo.name}>
-                  {a.arquivo.name}
-                </span>
-                {PAPEIS[a.formato].length > 1 ? (
-                  <select
-                    value={a.papel}
-                    disabled={enviando}
-                    onChange={(e) =>
-                      atualizarAnexo(a.id, {
-                        papel: e.target.value as PapelMidia,
-                      })
-                    }
-                    className="rounded bg-zinc-800 px-1 py-0.5"
-                  >
-                    {PAPEIS[a.formato].map((p) => (
-                      <option key={p} value={p}>
-                        {ROTULO_PAPEL[p]}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="text-zinc-400">{ROTULO_PAPEL[a.papel]}</span>
-                )}
-                {a.progresso !== null ? (
-                  <span className="tabular-nums text-violet-300">
-                    {Math.round(a.progresso * 100)}%
-                  </span>
-                ) : (
-                  <button
-                    disabled={enviando}
-                    onClick={() =>
-                      setAnexos((atuais) => atuais.filter((x) => x.id !== a.id))
-                    }
-                    className="text-zinc-500 hover:text-white"
-                    aria-label={`Remover ${a.arquivo.name}`}
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            ))}
+        {envio.anexos.length ? (
+          <div className="mb-3">
+            <ListaDeAnexos envio={envio} variante="compacta" />
           </div>
         ) : null}
 
-        {erro ? <p className="mb-2 text-sm text-red-400">{erro}</p> : null}
+        {envio.erro ? (
+          <p className="mb-2 text-sm text-red-400">{envio.erro}</p>
+        ) : null}
 
-        <div className="flex items-end gap-2 rounded-xl border border-zinc-700 bg-zinc-900 p-2 focus-within:border-violet-500">
+        <div className="relative flex items-end gap-2 rounded-xl border border-zinc-700 bg-zinc-900 p-2 focus-within:border-violet-500">
+          {opcoesMencao.length ? (
+            <SugestoesMencao
+              opcoes={opcoesMencao}
+              ativa={mencao?.ativa ?? 0}
+              aoEscolher={escolherMencao}
+            />
+          ) : null}
           <button
             onClick={() => inputArquivo.current?.click()}
-            disabled={enviando}
+            disabled={ocupado}
             className="rounded-lg px-2 py-1.5 text-lg text-zinc-400 hover:bg-zinc-800 hover:text-white"
             title="Anexar arquivos"
           >
@@ -421,13 +323,13 @@ export const Chat: React.FC = () => {
             accept="video/*,image/*,audio/*"
             className="hidden"
             onChange={(e) => {
-              if (e.target.files) anexar(e.target.files);
+              if (e.target.files) envio.anexar(e.target.files);
               e.target.value = "";
             }}
           />
           <button
             onClick={() => void alternarDitado()}
-            disabled={enviando || ditado === "transcrevendo"}
+            disabled={ocupado || ditado === "transcrevendo"}
             className={`rounded-lg px-2 py-1.5 text-lg hover:bg-zinc-800 ${
               ditado === "gravando"
                 ? "animate-pulse text-red-400"
@@ -448,24 +350,54 @@ export const Chat: React.FC = () => {
                 : "🎤"}
           </button>
           <textarea
+            ref={caixa}
             value={texto}
-            onChange={(e) => setTexto(e.target.value)}
+            onChange={(e) => {
+              setTexto(e.target.value);
+              atualizarMencao(e.target.value, e.target.selectionStart);
+            }}
+            onClick={(e) =>
+              atualizarMencao(texto, e.currentTarget.selectionStart)
+            }
+            onBlur={() => setMencao(null)}
             onKeyDown={(e) => {
+              if (opcoesMencao.length && mencao) {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  const passo = e.key === "ArrowDown" ? 1 : -1;
+                  setMencao({
+                    ...mencao,
+                    ativa:
+                      (mencao.ativa + passo + opcoesMencao.length) %
+                      opcoesMencao.length,
+                  });
+                  return;
+                }
+                if (e.key === "Enter" || e.key === "Tab") {
+                  e.preventDefault();
+                  escolherMencao(opcoesMencao[mencao.ativa]);
+                  return;
+                }
+                if (e.key === "Escape") {
+                  setMencao(null);
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 void enviar();
               }
             }}
             rows={2}
-            placeholder="Peça uma edição ou arraste arquivos para cá…"
+            placeholder="Peça uma edição, cite arquivos com @ ou arraste arquivos para cá…"
             className="min-h-0 flex-1 resize-none bg-transparent px-1 py-1.5 text-sm outline-none placeholder:text-zinc-500"
           />
           <button
             onClick={() => void enviar()}
-            disabled={enviando || (!texto.trim() && anexos.length === 0)}
+            disabled={ocupado || (!texto.trim() && envio.anexos.length === 0)}
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-500 disabled:opacity-40"
           >
-            {enviando ? "Enviando…" : "Enviar"}
+            {envio.enviando ? "Enviando…" : pensando ? "Editando…" : "Enviar"}
           </button>
         </div>
       </div>
