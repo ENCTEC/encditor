@@ -15,7 +15,7 @@ import {
   salvarAnalise,
 } from "./armazenamento";
 import { extrairAudio, extrairQuadros } from "./ffmpeg";
-import { clienteOpenAI, MODELOS } from "./openai";
+import { clienteOpenAI, comNovaTentativa, MODELOS } from "./openai";
 
 // Analisa um arquivo enviado: transcreve a fala (com o tempo de cada
 // palavra) e descreve o que aparece na tela, com minutagem.
@@ -23,28 +23,86 @@ import { clienteOpenAI, MODELOS } from "./openai";
 const LIMITE_QUADROS = 24;
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+// Muda quando o formato da análise melhora: análises salvas com versão
+// anterior são refeitas.
+const VERSAO_ANALISE = 3;
+
+// Acima disso, o trecho é tratado como "não é fala" (ruído, música).
+const LIMITE_SEM_FALA = 0.5;
+
+const soLetrasENumeros = (t: string) =>
+  t
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
+type PalavraBruta = { start: number; end: number; word: string };
+
+// O whisper devolve as palavras com tempo, mas sem pontuação e às vezes
+// vazias ("50%" vira "50" + ""). O texto completo tem a forma certa.
+// Aqui cada palavra com tempo é trocada pela palavra do texto ("50%",
+// "pessoal,"), e o tempo das vazias vai para a palavra anterior.
+export const alinharPalavras = (palavras: PalavraBruta[], texto: string) => {
+  const tokens = texto.split(/\s+/).filter(Boolean);
+  const resultado: Transcricao["palavras"] = [];
+  let t = 0;
+  for (const p of palavras) {
+    const chave = soLetrasENumeros(p.word);
+    if (!chave) {
+      const anterior = resultado[resultado.length - 1];
+      if (anterior) anterior.ate = r2(Math.max(anterior.ate, p.end));
+      continue;
+    }
+    // Procura o token correspondente logo adiante no texto.
+    let achado = -1;
+    for (let k = t; k < Math.min(tokens.length, t + 4); k++) {
+      if (soLetrasENumeros(tokens[k]).startsWith(chave)) {
+        achado = k;
+        break;
+      }
+    }
+    if (achado >= 0) t = achado + 1;
+    resultado.push({
+      de: r2(p.start),
+      ate: r2(p.end),
+      palavra: achado >= 0 ? tokens[achado] : p.word.trim(),
+    });
+  }
+  return resultado;
+};
+
 const transcrever = async (audio: string): Promise<Transcricao | null> => {
-  const resposta = await clienteOpenAI().audio.transcriptions.create({
-    file: createReadStream(audio),
-    model: MODELOS.transcricaoComTempos,
-    response_format: "verbose_json",
-    timestamp_granularities: ["word", "segment"],
-  });
-  const texto = resposta.text.trim();
+  const resposta = await comNovaTentativa(() =>
+    clienteOpenAI().audio.transcriptions.create({
+      file: createReadStream(audio),
+      model: MODELOS.transcricaoComTempos,
+      response_format: "verbose_json",
+      timestamp_granularities: ["word", "segment"],
+    }),
+  );
+  // Em trechos sem voz (só música/ruído) o whisper às vezes "inventa" frases
+  // (ex.: texto em chinês num vídeo mudo). Esses trechos vêm com alta
+  // probabilidade de "não é fala": são descartados junto com suas palavras.
+  const segmentos = (resposta.segments ?? []).filter(
+    (s) => s.no_speech_prob <= LIMITE_SEM_FALA && s.text.trim(),
+  );
+  const texto = segmentos.map((s) => s.text.trim()).join(" ");
   if (!texto) return null;
+  const dentroDeUmSegmento = (p: PalavraBruta) =>
+    segmentos.some((s) => p.start >= s.start - 0.2 && p.start <= s.end + 0.2);
   return {
     idioma: resposta.language ?? null,
     texto,
-    segmentos: (resposta.segments ?? []).map((s) => ({
+    segmentos: segmentos.map((s) => ({
       de: r2(s.start),
       ate: r2(s.end),
       texto: s.text.trim(),
     })),
-    palavras: (resposta.words ?? []).map((w) => ({
-      de: r2(w.start),
-      ate: r2(w.end),
-      palavra: w.word.trim(),
-    })),
+    palavras: alinharPalavras(
+      (resposta.words ?? []).filter(dentroDeUmSegmento),
+      texto,
+    ),
   };
 };
 
@@ -97,34 +155,42 @@ const descreverQuadros = async (
     .filter(Boolean)
     .join("\n");
 
-  const resposta = await clienteOpenAI().responses.create({
-    model: MODELOS.visao,
-    input: [
-      {
-        role: "user",
-        content: [
-          { type: "input_text", text: instrucao },
-          ...imagens.flatMap((img) => [
-            { type: "input_text" as const, text: `Quadro em ${img.segundo}s:` },
-            {
-              type: "input_image" as const,
-              image_url: `data:image/jpeg;base64,${img.base64}`,
-              detail: "low" as const,
-            },
-          ]),
-        ],
+  const resposta = await comNovaTentativa(() =>
+    clienteOpenAI().responses.create({
+      model: MODELOS.visao,
+      input: [
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: instrucao },
+            ...imagens.flatMap((img) => [
+              {
+                type: "input_text" as const,
+                text: `Quadro em ${img.segundo}s:`,
+              },
+              {
+                type: "input_image" as const,
+                image_url: `data:image/jpeg;base64,${img.base64}`,
+                detail: "low" as const,
+              },
+            ]),
+          ],
+        },
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "analise_visual",
+          strict: true,
+          schema: ESQUEMA_VISUAL,
+        },
       },
-    ],
-    text: {
-      format: {
-        type: "json_schema",
-        name: "analise_visual",
-        strict: true,
-        schema: ESQUEMA_VISUAL,
-      },
-    },
-  });
+    }),
+  );
 
+  console.log(
+    `[ia] visão ${MODELOS.visao}: ${imagens.length} quadro(s), ${resposta.usage?.input_tokens ?? 0} tokens de entrada, ${resposta.usage?.output_tokens ?? 0} de saída`,
+  );
   const visual = visualSchema.parse(JSON.parse(resposta.output_text));
   const limite = duracao ?? 0;
   return {
@@ -142,8 +208,15 @@ export const analisarArquivo = async (
   formato: "video" | "imagem" | "audio",
   duracao: number | null,
 ): Promise<Analise> => {
-  const salva = analiseSchema.safeParse(await lerAnaliseSalva(nome));
-  if (salva.success && salva.data.status === "pronta") return salva.data;
+  const bruta = (await lerAnaliseSalva(nome)) as { versao?: number } | null;
+  const salva = analiseSchema.safeParse(bruta);
+  if (
+    salva.success &&
+    salva.data.status === "pronta" &&
+    bruta?.versao === VERSAO_ANALISE
+  ) {
+    return salva.data;
+  }
 
   const arquivo = caminhoDoArquivo(nome);
   const temporaria = await mkdtemp(path.join(os.tmpdir(), "encditor-"));
@@ -180,7 +253,7 @@ export const analisarArquivo = async (
       transcricao,
       visual,
     };
-    await salvarAnalise(nome, analise);
+    await salvarAnalise(nome, { ...analise, versao: VERSAO_ANALISE });
     return analise;
   } finally {
     await rm(temporaria, { recursive: true, force: true });

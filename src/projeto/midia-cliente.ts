@@ -120,6 +120,7 @@ export const proximoNome = (biblioteca: Midia[], papel: PapelMidia) =>
 // Guarda as que estão em andamento, para o chat esperar por elas antes de
 // mandar um pedido à IA.
 const analisesEmAndamento = new Map<string, Promise<Analise>>();
+let filaDeAnalises: Promise<void> = Promise.resolve();
 
 // Só arquivos enviados ao Encditor (não links externos) e não "frios".
 export const podeAnalisar = (midia: Midia) =>
@@ -128,15 +129,20 @@ export const podeAnalisar = (midia: Midia) =>
 export const analisarMidia = (midia: Midia): Promise<Analise> => {
   const existente = analisesEmAndamento.get(midia.id);
   if (existente) return existente;
-  const promessa = fetch("/api/analisar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      url: midia.url,
-      formato: midia.formato,
-      duracao: midia.duracao,
-    }),
-  })
+  // Uma análise por vez: chamadas simultâneas à OpenAI falham com saldo
+  // baixo e ainda disputam o ffmpeg do servidor.
+  const promessa = filaDeAnalises
+    .then(() =>
+      fetch("/api/analisar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: midia.url,
+          formato: midia.formato,
+          duracao: midia.duracao,
+        }),
+      }),
+    )
     .then(async (r) => (await r.json()) as Analise)
     .catch(
       (e): Analise => ({
@@ -148,6 +154,7 @@ export const analisarMidia = (midia: Midia): Promise<Analise> => {
     )
     .finally(() => analisesEmAndamento.delete(midia.id));
   analisesEmAndamento.set(midia.id, promessa);
+  filaDeAnalises = promessa.then(() => undefined);
   return promessa;
 };
 

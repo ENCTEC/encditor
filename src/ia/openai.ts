@@ -62,6 +62,12 @@ export const editarComOpenAI = async ({
     { role: "user", content: pedido },
   ];
 
+  const uso = { entrada: 0, saida: 0, etapas: 0 };
+  const registrarUso = () =>
+    console.log(
+      `[ia] editor ${MODELOS.editor}: ${uso.etapas} etapa(s), ${uso.entrada} tokens de entrada, ${uso.saida} de saída`,
+    );
+
   for (let etapa = 0; etapa < LIMITE_ETAPAS; etapa++) {
     const resposta = await clienteOpenAI().responses.create({
       model: MODELOS.editor,
@@ -69,13 +75,19 @@ export const editarComOpenAI = async ({
       tools,
       input,
     });
+    uso.etapas++;
+    uso.entrada += resposta.usage?.input_tokens ?? 0;
+    uso.saida += resposta.usage?.output_tokens ?? 0;
 
     input.push(...toResponseInputItems(resposta.output));
     const chamadas = resposta.output.filter(
       (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
         item.type === "function_call",
     );
-    if (chamadas.length === 0) return resposta.output_text.trim();
+    if (chamadas.length === 0) {
+      registrarUso();
+      return resposta.output_text.trim();
+    }
 
     for (const chamada of chamadas) {
       input.push({
@@ -85,5 +97,6 @@ export const editarComOpenAI = async ({
       });
     }
   }
+  registrarUso();
   return "Parei depois de muitas etapas; confira o resultado e peça o que faltar.";
 };

@@ -53,3 +53,19 @@ export const mensagemDeErroOpenAI = (e: unknown) => {
   }
   return null;
 };
+
+// Com saldo baixo, a OpenAI às vezes recusa chamadas simultâneas como "sem
+// créditos" (insufficient_quota) e aceita a mesma chamada segundos depois.
+// Tenta de novo até 2 vezes antes de desistir.
+export const comNovaTentativa = async <T>(chamada: () => Promise<T>) => {
+  for (let tentativa = 0; ; tentativa++) {
+    try {
+      return await chamada();
+    } catch (e) {
+      const semCredito =
+        e instanceof OpenAI.RateLimitError && e.type === "insufficient_quota";
+      if (!semCredito || tentativa >= 2) throw e;
+      await new Promise((r) => setTimeout(r, 4000 * (tentativa + 1)));
+    }
+  }
+};
