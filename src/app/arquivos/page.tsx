@@ -132,7 +132,7 @@ const SituacaoIA: React.FC<{ midia: Midia }> = ({ midia }) => {
 // Aba "Arquivos": subir inserts/cenas/áudios escolhendo se a IA analisa
 // cada um, e gerenciar os apelidos (@) usados para citar no chat.
 export default function PaginaArquivos() {
-  const { projeto, carregado } = useProjeto();
+  const { projeto, carregado, meta } = useProjeto();
   const envio = useEnvio();
   const [arrastando, setArrastando] = useState(false);
   const inputArquivo = useRef<HTMLInputElement>(null);
@@ -154,6 +154,12 @@ export default function PaginaArquivos() {
             analisar (ler a fala e o que aparece) ou se é um arquivo <b>frio</b>
             , usado sem leitura e sem custo. Cite no chat com o @apelido.
           </p>
+          {meta ? (
+            <p className="mt-3 inline-block border-2 border-tinta px-3 py-1.5 font-mono text-xs">
+              📁 Banco de mídia de <b>{meta.cliente.nome}</b> — compartilhado
+              por todos os vídeos desse cliente.
+            </p>
+          ) : null}
 
           <div
             onDragOver={(e) => {

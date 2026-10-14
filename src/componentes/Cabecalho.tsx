@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
-import { abrirProjeto, useProjeto } from "@/projeto/ProjetoProvider";
+import { useEffect, useState } from "react";
+import { ModalNovoVideo } from "@/componentes/clientes/ModalNovoVideo";
+import { useProjeto } from "@/projeto/ProjetoProvider";
 import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
 
 const ABAS = [
@@ -19,6 +20,7 @@ const botao =
 
 export const Cabecalho: React.FC = () => {
   const caminho = usePathname();
+  const [novoVideo, setNovoVideo] = useState(false);
   const { desfazer, refazer, podeDesfazer, podeRefazer, salvamento, meta } =
     useProjeto();
 
@@ -116,28 +118,18 @@ export const Cabecalho: React.FC = () => {
         <span className="mx-2 h-5 w-0.5 bg-tinta" />
         <button
           className={botao}
-          onClick={async () => {
-            if (!meta) return;
-            const nome = prompt(
-              `Nome do novo vídeo (em ${meta.cliente.nome}):`,
-            )?.trim();
-            if (!nome) return;
-            const resposta = await fetch(
-              `/api/clientes/${meta.cliente.id}/projetos`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ nome }),
-              },
-            );
-            const dados = (await resposta.json()) as { id?: string };
-            if (dados.id) abrirProjeto(dados.id);
-          }}
-          title="Cria um vídeo novo no mesmo cliente (usa o mesmo banco de mídia)"
+          onClick={() => setNovoVideo(true)}
+          title="Cria um vídeo novo, escolhendo o cliente (pasta)"
         >
-          Novo projeto
+          Novo vídeo
         </button>
       </div>
+      {novoVideo ? (
+        <ModalNovoVideo
+          clienteAtual={meta?.cliente.id ?? null}
+          aoFechar={() => setNovoVideo(false)}
+        />
+      ) : null}
     </header>
   );
 };
