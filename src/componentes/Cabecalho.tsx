@@ -52,11 +52,11 @@ export const Cabecalho: React.FC = () => {
     <header className="flex h-14 shrink-0 items-center gap-6 border-b-[3px] border-tinta px-4">
       {/* Logo: letras condensadas pretas + assinatura em spray vermelho. */}
       <span className="relative flex items-baseline gap-1.5 pr-2">
-        <span className="font-display text-3xl leading-none tracking-tight text-tinta uppercase">
-          Encditor
+        <span className="font-display text-3xl leading-none tracking-tight text-tinta">
+          ENCeditor
         </span>
         <span className="-rotate-6 font-marca text-sm text-spray">edit!</span>
-        <SublinhadoSpray className="-bottom-2 left-0 h-3 w-28" />
+        <SublinhadoSpray className="-bottom-2 left-0 h-3 w-32" />
       </span>
 
       <nav className="flex gap-1">

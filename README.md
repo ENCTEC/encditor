@@ -1,4 +1,4 @@
-# Encditor
+# ENCeditor
 
 Editor de vídeo com IA. Você sobe as cenas (geradas no Higgsfield), inserts e áudios, pede a edição em texto na aba **Criar** e faz os ajustes finais na aba **Timeline**. O vídeo é montado com [Remotion](https://www.remotion.dev).
 

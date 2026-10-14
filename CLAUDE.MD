@@ -1,9 +1,11 @@
-# Encditor — App editor de vídeos com IA
+# ENCeditor — App editor de vídeos com IA
+
+Nome do produto: **ENCeditor** (renomeado de "Encditor" em 2026-10-14). Nomes internos continuam "encditor" (pasta, repositório, pacote npm, domínio encditor.enctec.com.br, banco dados/encditor.db, chaves do navegador) para não perder dados nem quebrar links.
 
 ## Objetivo
 App de EDIÇÃO (não de geração). O usuário sobe os vídeos de cada cena — gerados fora do app, no Higgsfield com Seedance 2.0 — além de inserts, imagens e áudios, e pede a edição em linguagem natural ("coloque esse insert enquanto esse vídeo passa", "adicione esse áudio no minuto X", "corte 2 segundos", "dê zoom", "legende o vídeo"). A IA aplica as edições; o usuário faz os ajustes finais numa timeline.
 
-Fluxo em 2 etapas separadas: (1) geração no Higgsfield, fora do app; (2) edição no Encditor. Integração com a API do Higgsfield é opcional e futura.
+Fluxo em 2 etapas separadas: (1) geração no Higgsfield, fora do app; (2) edição no ENCeditor. Integração com a API do Higgsfield é opcional e futura.
 
 ## Telas
 1. **Criar (principal, estilo chat):** upload de arquivos + pedidos em texto; a IA aplica e o preview (Remotion Player) atualiza.

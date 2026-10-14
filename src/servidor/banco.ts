@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-// Banco de dados do Encditor: um arquivo SQLite (padrão dados/encditor.db),
+// Banco de dados do ENCeditor: um arquivo SQLite (padrão dados/encditor.db),
 // usando o SQLite que já vem no Node — sem serviço externo nem custo.
 // Guarda os projetos (timeline, biblioteca, conversa) e as análises de IA
 // de cada arquivo, para nunca analisar o mesmo arquivo duas vezes.
