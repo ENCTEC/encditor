@@ -201,7 +201,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         posicao: posicaoSchema
           .nullable()
           .describe(
-            "Onde fica: tela-cheia, metades (tela dividida), ou um ponto da grade 3×3 (canto-sup-esq, topo, canto-sup-dir, esquerda, centro, direita, canto-inf-esq, base, canto-inf-dir). 'janela' = canto superior direito. null = o usuário NÃO disse onde: o app abre um popup para ele escolher posição e tamanho (use null nesse caso, não invente).",
+            "Onde fica: tela-cheia, metades (tela dividida), ou um ponto da grade 3×3 (canto-sup-esq, topo, canto-sup-dir, esquerda, centro, direita, canto-inf-esq, base, canto-inf-dir). 'janela' = canto superior direito. null = o usuário não disse onde. Depois de colocar, o app SEMPRE abre um popup para o usuário confirmar/ajustar a posição e o tamanho, já preenchido com o que você escolheu.",
           ),
         tamanho: tamanhoSchema
           .nullable()
@@ -233,12 +233,12 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
             ? e.inicio + 3
             : e.inicio + Math.max(0.5, (midia.duracao ?? 3) - origem));
         const caixa = caixaPara(e.posicao ?? "tela-cheia", e.tamanho, midia);
-        if (e.posicao === null) {
-          sessao.insertsParaPosicionar = [
-            ...(sessao.insertsParaPosicionar ?? []),
-            sessao.timeline.inserts.length,
-          ];
-        }
+        // O app sempre abre o popup de posição/tamanho para o usuário
+        // confirmar ou ajustar (já preenchido com o que foi entendido).
+        sessao.insertsParaPosicionar = [
+          ...(sessao.insertsParaPosicionar ?? []),
+          sessao.timeline.inserts.length,
+        ];
         return aplicar(
           (t) =>
             adicionarItem(t, "inserts", {
