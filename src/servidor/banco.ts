@@ -95,6 +95,18 @@ const banco = () => {
       atualizado_em INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_midias_cliente ON midias_cliente (cliente_id);
+    CREATE TABLE IF NOT EXISTS exportacoes (
+      id TEXT PRIMARY KEY,
+      projeto_id TEXT NOT NULL,
+      cliente_id TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      arquivo TEXT NOT NULL,
+      duracao REAL NOT NULL,
+      edicao TEXT NOT NULL,
+      criado_em INTEGER NOT NULL,
+      resultado TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_exportacoes_projeto ON exportacoes (projeto_id);
     CREATE TABLE IF NOT EXISTS efeitos (
       chave TEXT PRIMARY KEY,
       arquivo TEXT NOT NULL
@@ -276,12 +288,6 @@ export const renomearProjeto = (id: string, nome: string) => {
   banco().prepare("UPDATE projetos SET nome = ? WHERE id = ?").run(nome, id);
 };
 
-export const salvarResultado = (id: string, resultado: unknown) => {
-  banco()
-    .prepare("UPDATE projetos SET resultado = ? WHERE id = ?")
-    .run(resultado === null ? null : JSON.stringify(resultado), id);
-};
-
 // ---------- Banco de mídia do cliente ----------
 
 export const lerMidiasDoCliente = (clienteId: string): unknown[] =>
@@ -350,7 +356,172 @@ export const salvarEfeitoProcessado = (chave: string, arquivo: string) => {
     .run(chave, arquivo);
 };
 
-// Remove um projeto (usado para limpar projetos de teste).
-export const apagarProjeto = (id: string) => {
-  banco().prepare("DELETE FROM projetos WHERE id = ?").run(id);
+// ---------- Apagar ----------
+// Cada função apaga as linhas do banco e devolve os nomes dos arquivos em
+// disco que ficaram sem uso (quem chama remove-os do armazenamento).
+
+const arquivosExportados = (onde: string, valor: string) =>
+  (
+    banco()
+      .prepare(`SELECT arquivo FROM exportacoes WHERE ${onde} = ?`)
+      .all(valor) as { arquivo: string }[]
+  ).map((l) => l.arquivo);
+
+const emTransacao = <T>(fazer: () => T): T => {
+  const db = banco();
+  db.exec("BEGIN");
+  try {
+    const r = fazer();
+    db.exec("COMMIT");
+    return r;
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+};
+
+export const apagarExportacao = (id: string) =>
+  emTransacao(() => {
+    const arquivos = arquivosExportados("id", id);
+    banco().prepare("DELETE FROM exportacoes WHERE id = ?").run(id);
+    return arquivos;
+  });
+
+// Projeto + os vídeos exportados dele. O banco de mídia é do cliente e fica.
+export const apagarProjeto = (id: string) =>
+  emTransacao(() => {
+    const arquivos = arquivosExportados("projeto_id", id);
+    banco().prepare("DELETE FROM exportacoes WHERE projeto_id = ?").run(id);
+    banco().prepare("DELETE FROM projetos WHERE id = ?").run(id);
+    return arquivos;
+  });
+
+// Cliente inteiro: projetos, vídeos exportados e banco de mídia (com as
+// análises dos arquivos).
+export const apagarCliente = (id: string) =>
+  emTransacao(() => {
+    const db = banco();
+    const midias = lerMidiasDoCliente(id) as { url?: string }[];
+    const daMidia = midias
+      .map((m) => m.url?.split("?")[0].split("/").pop() ?? "")
+      .filter(Boolean);
+    const arquivos = [...arquivosExportados("cliente_id", id), ...daMidia];
+    const apagarAnalise = db.prepare("DELETE FROM analises WHERE arquivo = ?");
+    for (const nome of daMidia) apagarAnalise.run(nome);
+    db.prepare("DELETE FROM exportacoes WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM projetos WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM midias_cliente WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM clientes WHERE id = ?").run(id);
+    return arquivos;
+  });
+
+// ---------- Vídeos exportados (versões finais de um projeto) ----------
+// Cada exportação guarda o MP4, uma "foto" da edição (timeline + quais
+// arquivos foram usados) e o resultado no tráfego — base para a IA
+// aprender o que funciona com cada cliente.
+
+export type Exportacao = {
+  id: string;
+  projetoId: string;
+  clienteId: string;
+  nome: string;
+  arquivo: string;
+  duracao: number;
+  criadoEm: number;
+  resultado: unknown;
+};
+
+type LinhaExportacao = {
+  id: string;
+  projeto_id: string;
+  cliente_id: string;
+  nome: string;
+  arquivo: string;
+  duracao: number;
+  criado_em: number;
+  resultado: string | null;
+};
+
+const paraExportacao = (l: LinhaExportacao): Exportacao => ({
+  id: l.id,
+  projetoId: l.projeto_id,
+  clienteId: l.cliente_id,
+  nome: l.nome,
+  arquivo: l.arquivo,
+  duracao: l.duracao,
+  criadoEm: l.criado_em,
+  resultado: l.resultado ? JSON.parse(l.resultado) : null,
+});
+
+export const registrarExportacao = (e: {
+  projetoId: string;
+  clienteId: string;
+  nome: string;
+  arquivo: string;
+  duracao: number;
+  edicao: unknown;
+}) => {
+  const id = randomUUID();
+  banco()
+    .prepare(
+      `INSERT INTO exportacoes (id, projeto_id, cliente_id, nome, arquivo, duracao, edicao, criado_em)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      id,
+      e.projetoId,
+      e.clienteId,
+      e.nome,
+      e.arquivo,
+      e.duracao,
+      JSON.stringify(e.edicao),
+      Date.now(),
+    );
+  return id;
+};
+
+export const listarExportacoesDoCliente = (clienteId: string) =>
+  (
+    banco()
+      .prepare(
+        `SELECT id, projeto_id, cliente_id, nome, arquivo, duracao, criado_em, resultado
+         FROM exportacoes WHERE cliente_id = ? ORDER BY criado_em DESC`,
+      )
+      .all(clienteId) as LinhaExportacao[]
+  ).map(paraExportacao);
+
+export const contarExportacoes = (projetoId: string) =>
+  (
+    banco()
+      .prepare("SELECT COUNT(*) AS n FROM exportacoes WHERE projeto_id = ?")
+      .get(projetoId) as { n: number }
+  ).n;
+
+export const lerExportacao = (id: string) => {
+  const l = banco()
+    .prepare(
+      `SELECT id, projeto_id, cliente_id, nome, arquivo, duracao, criado_em, resultado
+       FROM exportacoes WHERE id = ?`,
+    )
+    .get(id) as LinhaExportacao | undefined;
+  return l ? paraExportacao(l) : null;
+};
+
+export const atualizarExportacao = (
+  id: string,
+  mudancas: { nome?: string; resultado?: unknown },
+) => {
+  if (mudancas.nome !== undefined) {
+    banco()
+      .prepare("UPDATE exportacoes SET nome = ? WHERE id = ?")
+      .run(mudancas.nome, id);
+  }
+  if (mudancas.resultado !== undefined) {
+    banco()
+      .prepare("UPDATE exportacoes SET resultado = ? WHERE id = ?")
+      .run(
+        mudancas.resultado === null ? null : JSON.stringify(mudancas.resultado),
+        id,
+      );
+  }
 };

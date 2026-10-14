@@ -130,3 +130,14 @@ export const reservarArquivo = async (extensao: string) => {
   const nome = `${randomUUID()}${extensao}`;
   return { nome, caminho: caminhoSeguro(nome) };
 };
+
+// Remove arquivos do armazenamento (ex.: ao apagar um cliente ou um vídeo
+// exportado). Arquivo que já não existe é ignorado.
+export const apagarArquivos = async (nomes: string[]) => {
+  for (const nome of nomes) {
+    if (!NOME_VALIDO.test(nome)) continue;
+    const caminho = caminhoSeguro(nome);
+    await unlink(caminho).catch(() => undefined);
+    await unlink(`${caminho}.analise.json`).catch(() => undefined);
+  }
+};

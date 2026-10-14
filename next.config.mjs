@@ -6,6 +6,14 @@ const nextConfig = {
   // vezes, e o <Img> do Remotion cancela o carregamento da 1ª montagem,
   // gerando o aviso "EncodingError" no console. Não afeta produção.
   reactStrictMode: false,
+  // Pacotes de renderização do Remotion rodam direto no Node (não podem
+  // ser empacotados pelo Next).
+  serverExternalPackages: [
+    "@remotion/bundler",
+    "@remotion/renderer",
+    "@remotion/compositor-win32-x64-msvc",
+    "@remotion/compositor-linux-x64-gnu",
+  ],
   // Sem o indicador "N" do Next (só aparece em desenvolvimento e cobria o
   // botão Enviar do chat e os nomes das faixas da timeline).
   devIndicators: false,

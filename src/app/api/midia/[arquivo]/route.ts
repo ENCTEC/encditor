@@ -21,7 +21,14 @@ export async function GET(
     );
   }
 
-  const cabecalhos = {
+  // ?baixar=Nome.mp4 → o navegador salva o arquivo com esse nome.
+  const baixar = req.nextUrl.searchParams.get("baixar");
+  const cabecalhos: Record<string, string> = {
+    ...(baixar
+      ? {
+          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(baixar)}`,
+        }
+      : {}),
     "Content-Type": tipoDoArquivo(arquivo),
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, max-age=31536000, immutable",

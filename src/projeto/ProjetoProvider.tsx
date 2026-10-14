@@ -44,6 +44,22 @@ export const abrirProjeto = (id: string) => {
 
 const chaveLocal = (id: string) =>
   id === "principal" ? "encditor:projeto:v1" : `encditor:projeto:v1:${id}`;
+
+// Projeto aberto nesta aba.
+export const projetoAberto = () =>
+  sessionStorage.getItem("encditor:projeto-id") ?? "principal";
+
+// Depois de apagar projetos: some com a cópia local deles e, se um deles
+// estava aberto, recarrega a página para o app não salvar (recriar) o
+// projeto apagado.
+export const esquecerProjetos = (ids: string[]) => {
+  for (const id of ids) localStorage.removeItem(chaveLocal(id));
+  if (ids.includes(projetoAberto())) {
+    sessionStorage.removeItem("encditor:projeto-id");
+    window.location.reload();
+  }
+};
+
 const LIMITE_HISTORICO = 100;
 
 type Estado = {
@@ -264,6 +280,10 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
         try {
           const migrado = migrarProjeto(projeto);
           validarTimeline(migrado.timeline);
+          salvoAoCarregar.current = JSON.stringify({
+            timeline: migrado.timeline,
+            mensagens: migrado.mensagens,
+          });
           dispatch({ tipo: "substituir", projeto: migrado });
         } catch {
           setErro("O projeto salvo estava corrompido e foi descartado.");
@@ -282,6 +302,9 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
     banco: null,
   });
   const clienteAtual = useRef("geral");
+  // O que veio do servidor ao abrir: não precisa salvar de novo (e um
+  // projeto que não existe só é criado quando algo for editado).
+  const salvoAoCarregar = useRef<string | null>(null);
   const salvarNoServidor = useCallback(
     async (url: string, corpo: string, chave: "projeto" | "banco") => {
       setSalvamento("salvando");
@@ -307,6 +330,8 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (!carregado) return;
     const corpo = JSON.stringify({ timeline, mensagens });
+    if (corpo === salvoAoCarregar.current) return;
+    salvoAoCarregar.current = null;
     try {
       localStorage.setItem(
         chaveLocal(idDoProjeto()),

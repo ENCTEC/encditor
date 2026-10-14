@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { apagarArquivos } from "@/servidor/armazenamento";
 import {
+  apagarProjeto,
   CLIENTE_PADRAO,
   lerProjeto,
   salvarMidiasDoCliente,
@@ -56,3 +58,12 @@ export const PUT = salvar;
 // POST também salva: é o método que o navegador usa ao fechar a página
 // (navigator.sendBeacon).
 export const POST = salvar;
+
+// Apaga o projeto e os vídeos exportados dele (o banco de mídia é do
+// cliente e continua).
+export async function DELETE(req: NextRequest) {
+  const id = idDoProjeto(req);
+  if (!id) return NextResponse.json({ erro: "Id inválido." }, { status: 400 });
+  await apagarArquivos(apagarProjeto(id));
+  return NextResponse.json({ ok: true });
+}

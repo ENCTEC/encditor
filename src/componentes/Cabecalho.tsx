@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ModalExportar } from "@/componentes/clientes/ModalExportar";
 import { ModalNovoVideo } from "@/componentes/clientes/ModalNovoVideo";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
@@ -21,6 +22,7 @@ const botao =
 export const Cabecalho: React.FC = () => {
   const caminho = usePathname();
   const [novoVideo, setNovoVideo] = useState(false);
+  const [exportar, setExportar] = useState(false);
   const { desfazer, refazer, podeDesfazer, podeRefazer, salvamento, meta } =
     useProjeto();
 
@@ -123,7 +125,18 @@ export const Cabecalho: React.FC = () => {
         >
           Novo vídeo
         </button>
+        <button
+          className="botao-spray ml-2 !px-3 !py-1 !text-sm"
+          onClick={() => setExportar(true)}
+          disabled={!meta}
+          title="Gera o MP4 final e guarda como uma versão do projeto"
+        >
+          Exportar
+        </button>
       </div>
+      {exportar && meta ? (
+        <ModalExportar meta={meta} aoFechar={() => setExportar(false)} />
+      ) : null}
       {novoVideo ? (
         <ModalNovoVideo
           clienteAtual={meta?.cliente.id ?? null}
