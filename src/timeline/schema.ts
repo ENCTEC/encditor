@@ -52,8 +52,22 @@ export const insertSchema = z.object({
   // Só para vídeo: de que segundo do arquivo começar.
   origemInicio: z.number().min(0),
   // Tela cheia cobre o vídeo principal; janela fica no canto (picture-in-picture).
+  // Usado só se não houver "caixa".
   posicao: z.enum(["tela-cheia", "janela"]),
   volume: z.number().min(0),
+  // Posição e tamanho exatos, em % do vídeo (ver timeline/caixas.ts).
+  caixa: z
+    .object({
+      x: z.number().min(0).max(100),
+      y: z.number().min(0).max(100),
+      largura: z.number().min(1).max(100),
+      altura: z.number().min(1).max(100),
+    })
+    .optional(),
+  // Acabamento da janela (quando não é tela cheia).
+  acabamento: z
+    .object({ borda: z.boolean(), cantos: z.boolean(), sombra: z.boolean() })
+    .optional(),
 });
 
 // Música, narração ou efeito sonoro.

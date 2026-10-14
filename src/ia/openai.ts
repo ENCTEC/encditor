@@ -27,7 +27,7 @@ const paraOpenAI = (f: Ferramenta): OpenAI.Responses.FunctionTool => {
   };
 };
 
-const executar = (
+const executar = async (
   ferramentas: Ferramenta[],
   nome: string,
   argumentos: string,
@@ -45,7 +45,7 @@ const executar = (
     return `Erro: argumentos inválidos: ${z.prettifyError(entrada.error)}`;
   }
   try {
-    return f.run(entrada.data);
+    return await f.run(entrada.data);
   } catch (e) {
     return `Erro: ${e instanceof Error ? e.message : String(e)}`;
   }
@@ -93,7 +93,7 @@ export const editarComOpenAI = async ({
       input.push({
         type: "function_call_output",
         call_id: chamada.call_id,
-        output: executar(ferramentas, chamada.name, chamada.arguments),
+        output: await executar(ferramentas, chamada.name, chamada.arguments),
       });
     }
   }

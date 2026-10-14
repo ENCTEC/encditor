@@ -145,4 +145,77 @@ export const catalogoParaIA = () =>
     ...ESTILOS_LEGENDA.map(
       (e) => `- ${e.tag} = ${e.nome}: ${e.descricao} Uso: ${e.quandoUsar}`,
     ),
+    "Efeitos de áudio (cite com #; use a ferramenta efeitos_de_audio):",
+    ...EFEITOS_AUDIO.map(
+      (e) => `- ${e.tag} = ${e.nome}: ${e.descricao} Uso: ${e.quandoUsar}`,
+    ),
   ].join("\n");
+
+// Efeitos de áudio (processados no servidor com ffmpeg; ver
+// src/servidor/efeitos.ts). Valem para áudios e para o som de vídeos.
+export const EFEITOS_AUDIO = [
+  {
+    id: "normalizar",
+    tag: "#normalizar",
+    nome: "Normalizar volume",
+    descricao:
+      "Deixa o volume no nível padrão das redes, sem partes baixas demais.",
+    quandoUsar: "Sempre que juntar arquivos gravados em volumes diferentes.",
+  },
+  {
+    id: "sem-ruido",
+    tag: "#sem-ruido",
+    nome: "Sem ruído",
+    descricao: "Reduz chiado, vento e barulho de fundo constante.",
+    quandoUsar:
+      "Gravações de celular, ambientes com ventilador ou ar-condicionado.",
+  },
+  {
+    id: "voz-clara",
+    tag: "#voz-clara",
+    nome: "Voz clara",
+    descricao: "Realça a voz, tira o 'embolado' e equilibra o volume da fala.",
+    quandoUsar: "Narração, falas para câmera, podcasts.",
+  },
+  {
+    id: "radio",
+    tag: "#radio",
+    nome: "Rádio",
+    descricao: "Som de rádio antigo: médio, comprimido e sem graves.",
+    quandoUsar: "Efeito retrô, flashback, narração estilizada.",
+  },
+  {
+    id: "telefone",
+    tag: "#telefone",
+    nome: "Telefone",
+    descricao: "Voz fina, como numa ligação.",
+    quandoUsar: "Simular ligação, mensagem de voz, voz 'de fora'.",
+  },
+  {
+    id: "eco",
+    tag: "#eco",
+    nome: "Eco",
+    descricao: "Repetição da voz, como num vale.",
+    quandoUsar: "Momentos dramáticos, sonho, ênfase numa frase.",
+  },
+  {
+    id: "reverb",
+    tag: "#reverb",
+    nome: "Reverb",
+    descricao: "Ambiência de sala grande ou igreja.",
+    quandoUsar: "Dar profundidade, clima épico ou intimista.",
+  },
+  {
+    id: "grave",
+    tag: "#grave",
+    nome: "Mais grave",
+    descricao: "Reforça os graves (voz mais encorpada, batida mais forte).",
+    quandoUsar: "Voz de locutor, músicas com batida, trailer.",
+  },
+] as const satisfies readonly ItemCatalogo<string>[];
+
+export type EfeitoAudio = (typeof EFEITOS_AUDIO)[number]["id"];
+export const IDS_EFEITOS_AUDIO = EFEITOS_AUDIO.map((e) => e.id) as [
+  EfeitoAudio,
+  ...EfeitoAudio[],
+];

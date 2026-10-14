@@ -176,3 +176,16 @@ export const colocarCena = (
     opcoes.posicao,
   );
 };
+
+// Troca um arquivo por outro em toda a timeline (ex.: versão com efeitos
+// de áudio no lugar da original).
+export const trocarUrl = (t: Timeline, de: string, para: string): Timeline => {
+  const troca = <T extends { url: string }>(itens: T[]) =>
+    itens.map((i) => (i.url === de ? { ...i, url: para } : i));
+  return {
+    ...t,
+    clipes: troca(t.clipes),
+    inserts: troca(t.inserts),
+    audios: troca(t.audios),
+  };
+};

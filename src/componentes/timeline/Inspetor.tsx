@@ -69,15 +69,6 @@ const CAMPOS: Record<Faixa, Campo[]> = {
   inserts: [
     { chave: "inicio", rotulo: "Aparece em (s)", tipo: "numero" },
     { chave: "fim", rotulo: "Some em (s)", tipo: "numero" },
-    {
-      chave: "posicao",
-      rotulo: "Posição",
-      tipo: "opcoes",
-      opcoes: [
-        { valor: "tela-cheia", rotulo: "Tela cheia" },
-        { valor: "janela", rotulo: "Janela no canto" },
-      ],
-    },
     { chave: "origemInicio", rotulo: "Começar do segundo", tipo: "numero" },
     { chave: "volume", rotulo: "Volume (0 = mudo)", tipo: "numero" },
   ],
@@ -183,7 +174,8 @@ const FORMATOS = [
 export const Inspetor: React.FC<{
   selecao: Selecao;
   aoSelecionar: (s: Selecao) => void;
-}> = ({ selecao, aoSelecionar }) => {
+  aoPosicionarInsert: (indice: number) => void;
+}> = ({ selecao, aoSelecionar, aoPosicionarInsert }) => {
   const { projeto, aplicar } = useProjeto();
   const { timeline } = projeto;
 
@@ -336,6 +328,15 @@ export const Inspetor: React.FC<{
           )}
         </label>
       ))}
+
+      {faixa === "inserts" ? (
+        <button
+          onClick={() => aoPosicionarInsert(indice)}
+          className="botao-spray w-full"
+        >
+          Posição e tamanho…
+        </button>
+      ) : null}
 
       {faixa === "clipes" ? (
         <div className="flex gap-2">

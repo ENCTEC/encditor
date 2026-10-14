@@ -6,6 +6,7 @@ import { criarFerramentas, SessaoEdicao } from "@/ia/ferramentas";
 import { editarComOpenAI } from "@/ia/openai";
 import { analiseSchema } from "@/projeto/analise";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
+import { Midia } from "@/projeto/tipos";
 import { timelineSchema } from "@/timeline/schema";
 
 // Recebe um pedido do chat, deixa a IA editar a timeline com as
@@ -32,6 +33,8 @@ const corpoSchema = z.object({
       nomeArquivo: z.string(),
       apelido: z.string().default(""),
       usarIA: z.boolean().default(true),
+      efeitosAudio: z.array(z.string()).optional(),
+      urlOriginal: z.string().optional(),
       duracao: z.number().nullable(),
       largura: z.number().nullable(),
       altura: z.number().nullable(),
@@ -42,6 +45,8 @@ const corpoSchema = z.object({
 
 export type RespostaIA = {
   resposta: string;
+  // Arquivos alterados pela IA (ex.: efeitos de áudio aplicados).
+  midiasAlteradas?: Midia[];
   timeline: z.infer<typeof timelineSchema> | null;
   acoes: string[];
 };
@@ -101,6 +106,7 @@ export async function POST(req: NextRequest) {
           : "Não entendi o que mudar. Pode detalhar?"),
       timeline: sessao.acoes.length ? sessao.timeline : null,
       acoes: sessao.acoes,
+      midiasAlteradas: sessao.midiasAlteradas,
     });
   } catch (e) {
     const conhecido = usarOpenAI

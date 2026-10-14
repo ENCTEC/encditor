@@ -28,3 +28,6 @@ out
 
 # Banco de dados local (projetos e análises).
 /dados
+
+# Voz de exemplo dos efeitos de áudio (gerada para o app).
+!public/exemplos/*.mp3

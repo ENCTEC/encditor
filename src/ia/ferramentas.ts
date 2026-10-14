@@ -15,7 +15,11 @@ import {
   Faixa,
   moverClipe,
   removerItem,
+  trocarUrl,
 } from "@/timeline/operacoes";
+import { EfeitoAudio, IDS_EFEITOS_AUDIO } from "@/catalogo/estilos";
+import { nomeDaUrl } from "@/servidor/armazenamento";
+import { aplicarEfeitos } from "@/servidor/efeitos";
 import {
   direcaoSchema,
   estiloLegendaSchema,
@@ -29,6 +33,20 @@ import {
   palavrasNoVideoFinal,
 } from "./conteudo";
 import { resumoDoProjeto } from "./estado";
+import {
+  caixaDoLayout,
+  caixaNaGrade,
+  ehTelaCheia,
+  Layout,
+  LAYOUTS,
+  POSICOES,
+  PosicaoGrade,
+  Tamanho,
+  TAMANHOS,
+} from "@/timeline/caixas";
+
+const posicaoSchema = z.enum([...LAYOUTS, ...POSICOES, "janela"]);
+const tamanhoSchema = z.enum(["P", "M", "G"]);
 
 // Ferramentas que a IA (GPT ou Claude) usa para editar. Todas trabalham
 // numa cópia da timeline ("sessao"); o app só recebe o resultado no final,
@@ -40,7 +58,7 @@ export type Ferramenta<S extends z.ZodType = z.ZodType> = {
   name: string;
   description: string;
   inputSchema: S;
-  run: (entrada: z.infer<S>) => string;
+  run: (entrada: z.infer<S>) => string | Promise<string>;
 };
 
 const ferramenta = <S extends z.ZodType>(f: Ferramenta<S>) =>
@@ -49,6 +67,8 @@ const ferramenta = <S extends z.ZodType>(f: Ferramenta<S>) =>
 export type SessaoEdicao = {
   timeline: Timeline;
   biblioteca: Midia[];
+  // Mídias que a IA alterou (ex.: efeitos de áudio), para o app atualizar.
+  midiasAlteradas?: Midia[];
   // Frases curtas do que foi feito, para mostrar no chat.
   acoes: string[];
 };
@@ -87,6 +107,29 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
 
   // Aceita o nome ("Insert 2"), o apelido ("@videolael" ou "videolael")
   // ou o nome original do arquivo.
+  // Caixa (posição/tamanho em %) a partir de um atalho de posição.
+  const caixaPara = (
+    posicao: z.infer<typeof posicaoSchema>,
+    tamanho: Tamanho | null,
+    midia?: Pick<Midia, "largura" | "altura">,
+    largura?: number | null,
+  ) => {
+    if ((LAYOUTS as readonly string[]).includes(posicao)) {
+      return caixaDoLayout(posicao as Layout);
+    }
+    const proporcaoMidia =
+      midia?.largura && midia.altura ? midia.largura / midia.altura : 16 / 9;
+    const proporcaoVideo = sessao.timeline.largura / sessao.timeline.altura;
+    const ponto =
+      posicao === "janela" ? "canto-sup-dir" : (posicao as PosicaoGrade);
+    return caixaNaGrade(
+      ponto,
+      largura ?? TAMANHOS[tamanho ?? "M"],
+      proporcaoMidia,
+      proporcaoVideo,
+    );
+  };
+
   const acharMidia = (nome: string) => {
     const alvo = normalizar(nome.replace(/^@/, ""));
     const midia = sessao.biblioteca.find(
@@ -152,10 +195,16 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .describe(
             "Segundo do vídeo final em que some. null = imagem dura 3s; vídeo dura o resto do arquivo.",
           ),
-        posicao: z
-          .enum(["tela-cheia", "janela"])
+        posicao: posicaoSchema
           .nullable()
-          .describe("tela-cheia (padrão) cobre a cena; janela fica no canto."),
+          .describe(
+            "Onde fica: tela-cheia (padrão), metades (tela dividida), ou um ponto da grade 3×3 (canto-sup-esq, topo, canto-sup-dir, esquerda, centro, direita, canto-inf-esq, base, canto-inf-dir). 'janela' = canto superior direito.",
+          ),
+        tamanho: tamanhoSchema
+          .nullable()
+          .describe(
+            "Para pontos da grade: P (25%), M (40%, padrão) ou G (60%).",
+          ),
         comeca_no_segundo_do_arquivo: z
           .number()
           .min(0)
@@ -180,6 +229,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           (midia.formato === "imagem"
             ? e.inicio + 3
             : e.inicio + Math.max(0.5, (midia.duracao ?? 3) - origem));
+        const caixa = caixaPara(e.posicao ?? "tela-cheia", e.tamanho, midia);
         return aplicar(
           (t) =>
             adicionarItem(t, "inserts", {
@@ -188,10 +238,45 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
               inicio: s(e.inicio),
               fim: s(fim),
               origemInicio: origem,
-              posicao: e.posicao ?? "tela-cheia",
+              posicao: ehTelaCheia(caixa) ? "tela-cheia" : "janela",
               volume: e.volume ?? 0,
+              caixa,
             }),
-          `${midia.nome} de ${s(e.inicio)}s a ${s(fim)}s (${e.posicao ?? "tela-cheia"})`,
+          `${midia.nome} de ${s(e.inicio)}s a ${s(fim)}s (${e.posicao ?? "tela-cheia"}${e.tamanho ? ` ${e.tamanho}` : ""})`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "posicionar_insert",
+      description:
+        "Muda onde um insert existente fica na tela e o tamanho dele (canto, centro, tela dividida, tela cheia; tamanho P/M/G ou largura exata).",
+      inputSchema: z.object({
+        numero: z.number().int().min(1),
+        posicao: posicaoSchema,
+        tamanho: tamanhoSchema.nullable(),
+        largura_percent: z
+          .number()
+          .min(5)
+          .max(100)
+          .nullable()
+          .describe("Largura exata em % da tela (sobrepõe o tamanho)."),
+      }),
+      run: (e) => {
+        const indice = e.numero - 1;
+        const insert = sessao.timeline.inserts[indice];
+        if (!insert) {
+          throw new Error(`Insert ${e.numero} não existe.`);
+        }
+        const midia = sessao.biblioteca.find((m) => m.url === insert.url);
+        const caixa = caixaPara(e.posicao, e.tamanho, midia, e.largura_percent);
+        return aplicar(
+          (t) =>
+            atualizarItem(t, "inserts", indice, {
+              caixa,
+              posicao: ehTelaCheia(caixa) ? "tela-cheia" : "janela",
+            }),
+          `insert ${e.numero} em ${e.posicao}${e.tamanho ? ` (${e.tamanho})` : ""}: ${caixa.largura}% × ${caixa.altura}% da tela`,
         );
       },
     }),
@@ -792,6 +877,54 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         return aplicar(
           (t) => atualizarItem(t, "legendas", indice, { estilo: e.estilo }),
           `legenda ${e.legenda} agora no estilo #${e.estilo}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "efeitos_de_audio",
+      description:
+        "Aplica efeitos de áudio num arquivo (áudio ou som de um vídeo): #normalizar, #sem-ruido, #voz-clara, #radio, #telefone, #eco, #reverb, #grave. Vale para todos os usos do arquivo no projeto. Lista vazia = volta ao som original.",
+      inputSchema: z.object({
+        midia: z.string(),
+        efeitos: z.array(z.enum(IDS_EFEITOS_AUDIO)),
+        substituir: z
+          .boolean()
+          .describe(
+            "true = só os efeitos da lista; false = soma aos efeitos que o arquivo já tem.",
+          ),
+      }),
+      run: async (e) => {
+        const midia = acharMidia(e.midia);
+        if (midia.formato === "imagem") {
+          throw new Error(`"${midia.nome}" é imagem; não tem som.`);
+        }
+        const atuais = (midia.efeitosAudio ?? []) as EfeitoAudio[];
+        const efeitos = [
+          ...new Set(e.substituir ? e.efeitos : [...atuais, ...e.efeitos]),
+        ];
+        const original = midia.urlOriginal ?? midia.url;
+        const nova = efeitos.length
+          ? `/api/midia/${await aplicarEfeitos(nomeDaUrl(original), efeitos)}`
+          : original;
+        const atualizada: Midia = {
+          ...midia,
+          url: nova,
+          urlOriginal: efeitos.length ? original : undefined,
+          efeitosAudio: efeitos.length ? efeitos : undefined,
+        };
+        sessao.biblioteca = sessao.biblioteca.map((m) =>
+          m.id === midia.id ? atualizada : m,
+        );
+        sessao.midiasAlteradas = [
+          ...(sessao.midiasAlteradas ?? []).filter((m) => m.id !== midia.id),
+          atualizada,
+        ];
+        return aplicar(
+          (t) => trocarUrl(t, midia.url, nova),
+          efeitos.length
+            ? `${midia.nome} agora com ${efeitos.map((x) => "#" + x).join(" ")}`
+            : `${midia.nome} voltou ao som original`,
         );
       },
     }),

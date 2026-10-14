@@ -2,6 +2,7 @@
 
 import { Player } from "@remotion/player";
 import { ESTILOS_LEGENDA, ItemCatalogo, TRANSICOES } from "@/catalogo/estilos";
+import { EfeitosAudio } from "@/componentes/estilos/EfeitosAudio";
 import { citarNoChat } from "@/componentes/Mencoes";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import {
@@ -122,7 +123,8 @@ export default function PaginaEstilos() {
             Veja cada efeito funcionando. Para usar, cite a{" "}
             <b className="font-mono">#tag</b> no chat — por exemplo{" "}
             <i>“coloque #cortina entre as cenas”</i> ou{" "}
-            <i>“legende o vídeo com #karaoke”</i> — ou aplique direto aqui.
+            <i>“legende o vídeo com #karaoke”</i> ou{" "}
+            <i>“aplique #sem-ruido no @principal”</i> — ou aplique direto aqui.
           </p>
         </header>
 
@@ -180,6 +182,8 @@ export default function PaginaEstilos() {
             ))}
           </div>
         </section>
+
+        <EfeitosAudio />
       </div>
     </div>
   );

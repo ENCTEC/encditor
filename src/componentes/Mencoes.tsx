@@ -1,6 +1,6 @@
 "use client";
 
-import { ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
+import { EFEITOS_AUDIO, ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
 import { Midia } from "@/projeto/tipos";
 
 // Menções no chat: @apelido cita um arquivo; #tag cita uma transição ou um
@@ -21,6 +21,7 @@ export type Sugestao = {
 const CATALOGO = [
   ...TRANSICOES.map((t) => ({ ...t, grupo: "transição" })),
   ...ESTILOS_LEGENDA.map((e) => ({ ...e, grupo: "legenda" })),
+  ...EFEITOS_AUDIO.map((e) => ({ ...e, grupo: "áudio" })),
 ];
 
 const PADRAO = /([@#][a-z0-9_-]+)/gi;

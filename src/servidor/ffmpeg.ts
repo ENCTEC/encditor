@@ -38,7 +38,7 @@ const executar = (exe: string, args: string[]) =>
   });
 
 // Tenta cada ffmpeg disponível até um funcionar.
-const ffmpeg = async (args: string[]) => {
+export const rodarFfmpeg = async (args: string[]) => {
   const candidatos = [
     process.env.FFMPEG_PATH,
     "ffmpeg",
@@ -69,7 +69,7 @@ const ffmpeg = async (args: string[]) => {
 // Retorna false se o arquivo não tiver faixa de áudio.
 export const extrairAudio = async (entrada: string, saida: string) => {
   try {
-    await ffmpeg([
+    await rodarFfmpeg([
       "-i",
       entrada,
       "-vn",
@@ -102,7 +102,7 @@ export const extrairQuadros = async (
     intervalo === null
       ? ["-vf", "scale=512:-2", "-frames:v", "1"]
       : ["-vf", `fps=1/${intervalo},scale=512:-2`];
-  await ffmpeg([
+  await rodarFfmpeg([
     "-i",
     entrada,
     ...filtro,

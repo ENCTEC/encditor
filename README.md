@@ -30,7 +30,7 @@ dados/                  Banco SQLite com projetos e análises (fora do git)
 
 ## Requisitos
 
-- Node.js e **ffmpeg** (no Windows: `winget install Gyan.FFmpeg`; na VPS: `apt install ffmpeg`). Sem ffmpeg do sistema, o app tenta usar o que vem com o Remotion.
+- Node.js e **ffmpeg** (no Windows: `winget install Gyan.FFmpeg`; na VPS: `apt install ffmpeg`). Sem ffmpeg do sistema, o app tenta usar o que vem com o Remotion — mas os efeitos de áudio precisam do ffmpeg completo (filtros como loudnorm, afftdn e aecho).
 
 ## Variáveis de ambiente
 

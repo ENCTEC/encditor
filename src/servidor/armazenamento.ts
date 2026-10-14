@@ -122,3 +122,11 @@ export const salvarAnalise = async (nome: string, analise: unknown) => {
   caminhoSeguro(nome);
   salvarAnaliseNoBanco(nome, analise);
 };
+
+// Nome e caminho para um arquivo novo gerado no servidor (ex.: áudio com
+// efeitos), no mesmo formato dos enviados.
+export const reservarArquivo = async (extensao: string) => {
+  await mkdir(PASTA, { recursive: true });
+  const nome = `${randomUUID()}${extensao}`;
+  return { nome, caminho: caminhoSeguro(nome) };
+};

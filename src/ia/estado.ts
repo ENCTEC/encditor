@@ -47,6 +47,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       de: x.inicio,
       ate: x.fim,
       posicao: x.posicao,
+      ...(x.caixa ? { caixa_percent: x.caixa } : {}),
       comeca_no_segundo_do_arquivo: x.origemInicio,
       volume: x.volume,
     })),
@@ -83,6 +84,9 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       formato: m.formato,
       duracao_s: m.duracao !== null ? s(m.duracao) : null,
       arquivo_original: m.nomeArquivo,
+      ...(m.efeitosAudio?.length
+        ? { efeitos_de_audio: m.efeitosAudio.map((x) => "#" + x) }
+        : {}),
       analise:
         m.analise?.status === "pronta"
           ? {

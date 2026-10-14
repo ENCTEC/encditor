@@ -23,6 +23,10 @@ export type Midia = {
   altura: number | null;
   // Transcrição e descrição visual (feitas pela IA depois do envio).
   analise?: Analise;
+  // Efeitos de áudio aplicados (ex.: ["sem-ruido"]). Com efeitos, "url"
+  // aponta para a versão processada e "urlOriginal" guarda a original.
+  efeitosAudio?: string[];
+  urlOriginal?: string;
 };
 
 export type Mensagem = {

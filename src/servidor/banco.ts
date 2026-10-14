@@ -24,6 +24,10 @@ const banco = () => {
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS efeitos (
+      chave TEXT PRIMARY KEY,
+      arquivo TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS analises (
       arquivo TEXT PRIMARY KEY,
       dados TEXT NOT NULL,
@@ -71,4 +75,21 @@ export const salvarAnaliseNoBanco = (arquivo: string, analise: unknown) => {
        ON CONFLICT(arquivo) DO UPDATE SET dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
     )
     .run(arquivo, JSON.stringify(analise), Date.now());
+};
+
+// Arquivo já processado com uma combinação de efeitos (para não refazer).
+export const lerEfeitoProcessado = (chave: string) =>
+  (
+    banco()
+      .prepare("SELECT arquivo FROM efeitos WHERE chave = ?")
+      .get(chave) as { arquivo: string } | undefined
+  )?.arquivo ?? null;
+
+export const salvarEfeitoProcessado = (chave: string, arquivo: string) => {
+  banco()
+    .prepare(
+      `INSERT INTO efeitos (chave, arquivo) VALUES (?, ?)
+       ON CONFLICT(chave) DO UPDATE SET arquivo = excluded.arquivo`,
+    )
+    .run(chave, arquivo);
 };

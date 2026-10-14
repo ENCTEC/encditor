@@ -10,6 +10,7 @@ import {
 } from "remotion";
 import { Insert } from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
+import { caixaPadrao, ehTelaCheia } from "../../timeline/caixas";
 
 const FADE_FRAMES = 6;
 
@@ -49,7 +50,8 @@ const ConteudoInsert: React.FC<{ insert: Insert; duracao: number }> = ({
         })
       : 1;
 
-  if (insert.posicao === "tela-cheia") {
+  const caixa = insert.caixa ?? caixaPadrao(insert.posicao);
+  if (ehTelaCheia(caixa)) {
     return (
       <AbsoluteFill style={{ opacity: opacidade }}>
         <Midia insert={insert} />
@@ -57,20 +59,28 @@ const ConteudoInsert: React.FC<{ insert: Insert; duracao: number }> = ({
     );
   }
 
-  // Janela no canto superior direito (longe das legendas, que ficam embaixo).
+  // Janela: posição/tamanho da caixa. Sem acabamento definido, usa borda
+  // branca, cantos arredondados e sombra (o visual "picture-in-picture").
+  const acabamento = insert.acabamento ?? {
+    borda: true,
+    cantos: true,
+    sombra: true,
+  };
   return (
     <AbsoluteFill>
       <div
         style={{
           position: "absolute",
-          top: "5%",
-          right: "4%",
-          width: "34%",
-          aspectRatio: "16 / 9",
-          borderRadius: 16,
+          left: `${caixa.x}%`,
+          top: `${caixa.y}%`,
+          width: `${caixa.largura}%`,
+          height: `${caixa.altura}%`,
           overflow: "hidden",
-          border: "4px solid white",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
+          borderRadius: acabamento.cantos ? 16 : 0,
+          border: acabamento.borda ? "4px solid white" : "none",
+          boxShadow: acabamento.sombra
+            ? "0 10px 30px rgba(0, 0, 0, 0.5)"
+            : "none",
           opacity: opacidade,
         }}
       >

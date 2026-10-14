@@ -40,6 +40,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     obterTimeline,
     obterBiblioteca,
     limparChat,
+    editarMidia,
   } = useProjeto();
   const envio = useEnvio();
   const [texto, setTexto] = useState("");
@@ -147,6 +148,9 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
       >;
       if (!resposta.ok || dados.erro) {
         throw new Error(dados.erro ?? `Falha na IA (${resposta.status}).`);
+      }
+      for (const m of dados.midiasAlteradas ?? []) {
+        editarMidia(m.id, m);
       }
       if (dados.timeline) {
         const nova = dados.timeline;
