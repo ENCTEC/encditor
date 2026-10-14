@@ -8,7 +8,8 @@ import { DatabaseSync } from "node:sqlite";
 //
 // Organização: CLIENTES (pastas) → PROJETOS (vídeos) + BANCO DE MÍDIA do
 // cliente (arquivos compartilhados por todos os projetos dele). Também
-// guarda as análises de IA de cada arquivo e os arquivos com efeitos.
+// guarda as análises de IA de cada arquivo, os arquivos com efeitos e os
+// proxies (cópias leves para o preview).
 
 const ARQUIVO = path.resolve(process.env.BANCO_ARQUIVO ?? "dados/encditor.db");
 
@@ -110,6 +111,10 @@ const banco = () => {
     CREATE TABLE IF NOT EXISTS efeitos (
       chave TEXT PRIMARY KEY,
       arquivo TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS proxies (
+      original TEXT PRIMARY KEY,
+      proxy TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS analises (
       arquivo TEXT PRIMARY KEY,
@@ -356,6 +361,23 @@ export const salvarEfeitoProcessado = (chave: string, arquivo: string) => {
     .run(chave, arquivo);
 };
 
+// Cópia leve (proxy) de um vídeo, usada só no preview.
+export const lerProxy = (original: string) =>
+  (
+    banco()
+      .prepare("SELECT proxy FROM proxies WHERE original = ?")
+      .get(original) as { proxy: string } | undefined
+  )?.proxy ?? null;
+
+export const salvarProxy = (original: string, proxy: string) => {
+  banco()
+    .prepare(
+      `INSERT INTO proxies (original, proxy) VALUES (?, ?)
+       ON CONFLICT(original) DO UPDATE SET proxy = excluded.proxy`,
+    )
+    .run(original, proxy);
+};
+
 // ---------- Apagar ----------
 // Cada função apaga as linhas do banco e devolve os nomes dos arquivos em
 // disco que ficaram sem uso (quem chama remove-os do armazenamento).
@@ -401,13 +423,27 @@ export const apagarProjeto = (id: string) =>
 export const apagarCliente = (id: string) =>
   emTransacao(() => {
     const db = banco();
-    const midias = lerMidiasDoCliente(id) as { url?: string }[];
+    const midias = lerMidiasDoCliente(id) as {
+      url?: string;
+      urlOriginal?: string;
+      preview?: { url?: string };
+    }[];
+    // Arquivo enviado, original (antes dos efeitos de áudio) e proxy.
     const daMidia = midias
-      .map((m) => m.url?.split("?")[0].split("/").pop() ?? "")
+      .flatMap((m) => [m.url, m.urlOriginal, m.preview?.url])
+      .map((u) => u?.split("?")[0].split("/").pop() ?? "")
       .filter(Boolean);
-    const arquivos = [...arquivosExportados("cliente_id", id), ...daMidia];
+    const arquivos = [
+      ...new Set([...arquivosExportados("cliente_id", id), ...daMidia]),
+    ];
     const apagarAnalise = db.prepare("DELETE FROM analises WHERE arquivo = ?");
-    for (const nome of daMidia) apagarAnalise.run(nome);
+    const apagarProxy = db.prepare(
+      "DELETE FROM proxies WHERE original = ? OR proxy = ?",
+    );
+    for (const nome of daMidia) {
+      apagarAnalise.run(nome);
+      apagarProxy.run(nome, nome);
+    }
     db.prepare("DELETE FROM exportacoes WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM projetos WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM midias_cliente WHERE cliente_id = ?").run(id);

@@ -2,6 +2,7 @@ import React from "react";
 import { Html5Audio, interpolate, Sequence, useVideoConfig } from "remotion";
 import { AudioFaixa } from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
+import { PREMONTAR_S } from "./premontar";
 
 // Volume ao longo do tempo: sobe no fade de entrada, desce no de saída.
 const curvaVolume = (
@@ -52,7 +53,7 @@ export const Audios: React.FC<{ audios: AudioFaixa[] }> = ({ audios }) => {
             from={de}
             durationInFrames={duracao}
             name={`Áudio ${i + 1}`}
-            layout="none"
+            premountFor={PREMONTAR_S * fps}
           >
             <Html5Audio
               src={audio.url}

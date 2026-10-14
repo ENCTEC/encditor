@@ -192,6 +192,43 @@ export const extrairAudioDoVideo = async (
   return corpo.url;
 };
 
+// Proxies (cópias leves para o preview), um por vez. Os que falharam não
+// são tentados de novo nesta aba (o preview usa o original).
+const proxiesEmAndamento = new Set<string>();
+const proxiesComErro = new Set<string>();
+let filaDeProxies: Promise<unknown> = Promise.resolve();
+
+export const precisaDeProxy = (midia: Midia) =>
+  midia.formato === "video" &&
+  midia.url.startsWith("/api/midia/") &&
+  midia.preview?.de !== midia.url &&
+  !proxiesEmAndamento.has(midia.url) &&
+  !proxiesComErro.has(midia.url);
+
+export const gerarProxy = (url: string): Promise<string | null> => {
+  proxiesEmAndamento.add(url);
+  const vez = filaDeProxies
+    .then(() =>
+      fetch("/api/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      }),
+    )
+    .then(async (r) => {
+      const corpo = (await r.json().catch(() => ({}))) as { url?: string };
+      if (!r.ok || !corpo.url) throw new Error();
+      return corpo.url;
+    })
+    .catch(() => {
+      proxiesComErro.add(url);
+      return null;
+    })
+    .finally(() => proxiesEmAndamento.delete(url));
+  filaDeProxies = vez;
+  return vez;
+};
+
 // Duração (s) de um áudio já enviado, lida pelo navegador.
 export const lerDuracaoDaUrl = (url: string): Promise<number | null> =>
   new Promise((resolve) => {

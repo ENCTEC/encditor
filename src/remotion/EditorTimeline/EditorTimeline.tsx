@@ -2,6 +2,7 @@ import React from "react";
 import {
   AbsoluteFill,
   CalculateMetadataFunction,
+  Easing,
   Img,
   OffthreadVideo,
   useVideoConfig,
@@ -16,6 +17,7 @@ import {
 import { Audios } from "./Audios";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
+import { PREMONTAR_S } from "./premontar";
 import { criarTransicao } from "./transicoes";
 import { Zoom } from "./Zoom";
 
@@ -55,12 +57,16 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
                   )}
                   timing={linearTiming({
                     durationInFrames: clipe.transicaoFrames,
+                    // Acelera e desacelera: a mistura fica mais natural
+                    // que a linear (que "anda" e para de repente).
+                    easing: Easing.inOut(Easing.cubic),
                   })}
                 />
               ) : null}
               <TransitionSeries.Sequence
                 durationInFrames={clipe.duracaoFrames}
                 name={`Clipe ${i + 1}`}
+                premountFor={PREMONTAR_S * timeline.fps}
               >
                 {clipe.tipo === "imagem" ? (
                   <Img

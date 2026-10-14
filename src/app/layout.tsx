@@ -5,6 +5,7 @@ import { AreaDeTrabalho } from "@/componentes/AreaDeTrabalho";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { AvisoNavegador } from "@/componentes/AvisoNavegador";
 import { PosicionadorDeInserts } from "@/componentes/PosicionadorDeInserts";
+import { ProxyAutomatico } from "@/componentes/ProxyAutomatico";
 import { Cabecalho } from "@/componentes/Cabecalho";
 import { ProjetoProvider } from "@/projeto/ProjetoProvider";
 import "./globals.css";
@@ -52,6 +53,7 @@ export default function RootLayout({
           </main>
           <AvisoErro />
           <AnaliseAutomatica />
+          <ProxyAutomatico />
           <PosicionadorDeInserts />
         </ProjetoProvider>
       </body>

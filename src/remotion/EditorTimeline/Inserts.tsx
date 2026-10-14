@@ -10,6 +10,7 @@ import {
 } from "remotion";
 import { Insert } from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
+import { PREMONTAR_S } from "./premontar";
 import { caixaPadrao, ehTelaCheia } from "../../timeline/caixas";
 
 const FADE_FRAMES = 6;
@@ -107,7 +108,7 @@ export const Inserts: React.FC<{ inserts: Insert[] }> = ({ inserts }) => {
             from={de}
             durationInFrames={duracao}
             name={`Insert ${i + 1}`}
-            layout="none"
+            premountFor={PREMONTAR_S * fps}
           >
             <ConteudoInsert insert={insert} duracao={duracao} />
           </Sequence>

@@ -27,6 +27,9 @@ export type Midia = {
   // aponta para a versão processada e "urlOriginal" guarda a original.
   efeitosAudio?: string[];
   urlOriginal?: string;
+  // Cópia leve do vídeo (proxy) usada só no preview. "de" = a URL a partir
+  // da qual foi feita: se o arquivo mudar (ex.: efeitos), é refeita.
+  preview?: { de: string; url: string };
 };
 
 export type Mensagem = {
