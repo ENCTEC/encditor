@@ -13,7 +13,10 @@ import { useProjeto } from "@/projeto/ProjetoProvider";
 export const AreaDeTrabalho: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const naCriar = usePathname() === "/";
+  const caminho = usePathname();
+  const naCriar = caminho === "/";
+  // Telas de clientes não têm chat (não são de um projeto específico).
+  const semChat = caminho.startsWith("/clientes");
   const { carregado } = useProjeto();
   const [chatAberto, setChatAberto] = useState(true);
 
@@ -24,12 +27,14 @@ export const AreaDeTrabalho: React.FC<{ children: React.ReactNode }> = ({
     return () => window.removeEventListener(EVENTO_CITAR, abrir);
   }, []);
 
-  const classeChat = naCriar
-    ? "order-1 min-w-0 flex-1 border-r-[3px] border-tinta"
-    : chatAberto
-      ? "order-2 w-[400px] shrink-0 border-l-[3px] border-tinta"
-      : // Escondido com CSS (não desmonta): a conversa continua viva.
-        "hidden";
+  const classeChat = semChat
+    ? "hidden"
+    : naCriar
+      ? "order-1 min-w-0 flex-1 border-r-[3px] border-tinta"
+      : chatAberto
+        ? "order-2 w-[400px] shrink-0 border-l-[3px] border-tinta"
+        : // Escondido com CSS (não desmonta): a conversa continua viva.
+          "hidden";
 
   return (
     <div className="flex h-full">
@@ -52,7 +57,7 @@ export const AreaDeTrabalho: React.FC<{ children: React.ReactNode }> = ({
         {children}
       </div>
 
-      {!naCriar && !chatAberto ? (
+      {!naCriar && !semChat && !chatAberto ? (
         <button
           onClick={() => setChatAberto(true)}
           className="order-3 flex w-9 shrink-0 items-center justify-center border-l-[3px] border-tinta bg-spray font-display text-sm tracking-widest text-papel uppercase [writing-mode:vertical-rl] hover:bg-tinta"

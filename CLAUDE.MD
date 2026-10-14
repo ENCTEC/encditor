@@ -7,6 +7,12 @@ App de EDIÇÃO (não de geração). O usuário sobe os vídeos de cada cena —
 
 Fluxo em 2 etapas separadas: (1) geração no Higgsfield, fora do app; (2) edição no ENCeditor. Integração com a API do Higgsfield é opcional e futura.
 
+## Clientes, projetos e aprendizado (pedido de 2026-10-14)
+Objetivo de longo prazo: cada CLIENTE (pasta) tem um banco de mídia (ex.: 90 vídeos da Linda Cosméticos) com transcrição e análise visual; o usuário manda a narração e a IA monta o vídeo escolhendo trechos/inserts do banco que combinam com cada frase, priorizando o que deu resultado no tráfego pago.
+- **Fase 1 (feita):** tabelas `clientes`, `midias_cliente` (banco por cliente) e projetos com `cliente_id`, `nome`, `resultado` (avaliação bom/ruim/neutro + investimento, CTR, CPA, ROAS, nota — `src/projeto/resultado.ts`). Telas /clientes e /clientes/[id]; cabeçalho mostra Cliente › Projeto; "Novo projeto" cria no mesmo cliente. O projeto guarda timeline+conversa; a biblioteca vem do banco do cliente. Migração: projeto antigo → cliente "geral" ("Meus projetos"). Backup pré-migração em dados/backups/.
+- **Fase 2 (próxima):** montagem automática a partir de uma narração, buscando no banco inteiro do cliente.
+- **Fase 3:** usar os resultados (vídeos bons/ruins × trechos, inserts e frases usados) para priorizar na montagem.
+
 ## Telas
 1. **Criar (principal, estilo chat):** upload de arquivos + pedidos em texto; a IA aplica e o preview (Remotion Player) atualiza.
 2. **Timeline:** visão de edição com faixas para os ajustes finais manuais.

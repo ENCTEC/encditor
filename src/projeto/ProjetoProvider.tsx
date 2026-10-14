@@ -30,6 +30,18 @@ const idDoProjeto = () => {
   }
   return sessionStorage.getItem("encditor:projeto-id") ?? "principal";
 };
+export type MetaProjeto = {
+  id: string;
+  nome: string;
+  cliente: { id: string; nome: string };
+};
+
+// Abre outro projeto (recarrega o app nele).
+export const abrirProjeto = (id: string) => {
+  sessionStorage.setItem("encditor:projeto-id", id);
+  window.location.assign(`/?projeto=${id}`);
+};
+
 const chaveLocal = (id: string) =>
   id === "principal" ? "encditor:projeto:v1" : `encditor:projeto:v1:${id}`;
 const LIMITE_HISTORICO = 100;
@@ -139,6 +151,8 @@ const reducer = (estado: Estado, acao: Acao): Estado => {
 type ContextoProjeto = {
   projeto: Projeto;
   carregado: boolean;
+  // Projeto e cliente abertos.
+  meta: MetaProjeto | null;
   // Situação do salvamento no banco do servidor.
   salvamento: "salvo" | "salvando" | "erro";
   podeDesfazer: boolean;
@@ -181,6 +195,8 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   }));
   const [carregado, setCarregado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // Projeto e cliente abertos (nome, para o cabeçalho).
+  const [meta, setMeta] = useState<MetaProjeto | null>(null);
   const [salvamento, setSalvamento] = useState<"salvo" | "salvando" | "erro">(
     "salvo",
   );
@@ -191,8 +207,8 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   const bibliotecaAtual = useRef(estado.projeto.biblioteca);
   bibliotecaAtual.current = estado.projeto.biblioteca;
 
-  // Carrega o projeto: do banco do servidor; se não houver (1ª vez, ou
-  // servidor fora do ar), da cópia guardada no navegador.
+  // Carrega o projeto (timeline + conversa) e o banco de mídia do cliente
+  // dele. Sem servidor, usa a cópia guardada no navegador.
   useEffect(() => {
     const carregar = async () => {
       let projeto: Projeto | null = null;
@@ -201,8 +217,37 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
           cache: "no-store",
         });
         if (resposta.ok) {
-          projeto = ((await resposta.json()) as { projeto: Projeto | null })
-            .projeto;
+          const dados = (await resposta.json()) as {
+            projeto: Partial<Projeto> | null;
+            nome?: string;
+            cliente?: { id: string; nome: string };
+          };
+          const cliente = dados.cliente ?? {
+            id: "geral",
+            nome: "Meus projetos",
+          };
+          setMeta({
+            id: idDoProjeto(),
+            nome: dados.nome ?? idDoProjeto(),
+            cliente,
+          });
+          clienteAtual.current = cliente.id;
+          let biblioteca: Midia[] = [];
+          const banco = await fetch(`/api/clientes/${cliente.id}/banco`, {
+            cache: "no-store",
+          });
+          if (banco.ok) {
+            biblioteca = ((await banco.json()) as { midias: Midia[] }).midias;
+          }
+          if (dados.projeto) {
+            projeto = {
+              timeline: dados.projeto.timeline ?? timelineVazia(),
+              mensagens: dados.projeto.mensagens ?? [],
+              biblioteca,
+            };
+          } else {
+            projeto = { ...projetoVazio(), biblioteca };
+          }
         }
       } catch {
         // sem servidor: usa a cópia local abaixo
@@ -229,44 +274,91 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
     void carregar();
   }, []);
 
-  // Salva no banco ~0,8s depois da última mudança (e uma cópia no
-  // navegador). Ao fechar a página, envia o que estiver pendente.
-  const pendente = useRef<string | null>(null);
-  useEffect(() => {
-    if (!carregado) return;
-    const json = JSON.stringify(estado.projeto);
-    try {
-      localStorage.setItem(chaveLocal(idDoProjeto()), json);
-    } catch {
-      // cópia local é só reserva; o banco do servidor é o principal
-    }
-    pendente.current = json;
-    setSalvamento("salvando");
-    const timer = setTimeout(async () => {
+  // Salva ~0,8s depois da última mudança: a timeline e a conversa no
+  // projeto; os arquivos no banco do cliente (só quando mudam). Guarda uma
+  // cópia no navegador. Ao fechar a página, envia o que estiver pendente.
+  const pendente = useRef<{ projeto: string | null; banco: string | null }>({
+    projeto: null,
+    banco: null,
+  });
+  const clienteAtual = useRef("geral");
+  const salvarNoServidor = useCallback(
+    async (url: string, corpo: string, chave: "projeto" | "banco") => {
+      setSalvamento("salvando");
       try {
-        const resposta = await fetch(`/api/projeto?id=${idDoProjeto()}`, {
+        const resposta = await fetch(url, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: json,
+          body: corpo,
         });
         if (!resposta.ok) throw new Error(String(resposta.status));
-        if (pendente.current === json) {
-          pendente.current = null;
+        if (pendente.current[chave] === corpo) pendente.current[chave] = null;
+        if (!pendente.current.projeto && !pendente.current.banco) {
           setSalvamento("salvo");
         }
       } catch {
         setSalvamento("erro");
       }
-    }, 800);
+    },
+    [],
+  );
+
+  const { timeline, mensagens, biblioteca } = estado.projeto;
+  useEffect(() => {
+    if (!carregado) return;
+    const corpo = JSON.stringify({ timeline, mensagens });
+    try {
+      localStorage.setItem(
+        chaveLocal(idDoProjeto()),
+        JSON.stringify(estado.projeto),
+      );
+    } catch {
+      // cópia local é só reserva; o banco do servidor é o principal
+    }
+    pendente.current.projeto = corpo;
+    setSalvamento("salvando");
+    const timer = setTimeout(
+      () =>
+        void salvarNoServidor(
+          `/api/projeto?id=${idDoProjeto()}`,
+          corpo,
+          "projeto",
+        ),
+      800,
+    );
     return () => clearTimeout(timer);
-  }, [estado.projeto, carregado]);
+  }, [timeline, mensagens, carregado, salvarNoServidor]);
+
+  useEffect(() => {
+    if (!carregado) return;
+    const corpo = JSON.stringify({ midias: biblioteca });
+    pendente.current.banco = corpo;
+    setSalvamento("salvando");
+    const timer = setTimeout(
+      () =>
+        void salvarNoServidor(
+          `/api/clientes/${clienteAtual.current}/banco`,
+          corpo,
+          "banco",
+        ),
+      800,
+    );
+    return () => clearTimeout(timer);
+  }, [biblioteca, carregado, salvarNoServidor]);
 
   useEffect(() => {
     const aoSair = () => {
-      if (pendente.current) {
+      const { projeto, banco } = pendente.current;
+      if (projeto) {
         navigator.sendBeacon(
           `/api/projeto?id=${idDoProjeto()}`,
-          new Blob([pendente.current], { type: "application/json" }),
+          new Blob([projeto], { type: "application/json" }),
+        );
+      }
+      if (banco) {
+        navigator.sendBeacon(
+          `/api/clientes/${clienteAtual.current}/banco`,
+          new Blob([banco], { type: "application/json" }),
         );
       }
     };
@@ -297,6 +389,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
     () => ({
       projeto: estado.projeto,
       carregado,
+      meta,
       salvamento,
       podeDesfazer: estado.passado.length > 0,
       podeRefazer: estado.futuro.length > 0,
@@ -334,7 +427,7 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       novoProjeto: () =>
         dispatch({ tipo: "substituir", projeto: projetoVazio() }),
     }),
-    [estado, carregado, salvamento, erro, aplicar, adicionarMidia],
+    [estado, carregado, meta, salvamento, erro, aplicar, adicionarMidia],
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;

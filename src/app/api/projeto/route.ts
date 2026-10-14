@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { lerProjeto, salvarProjeto } from "@/servidor/banco";
+import {
+  CLIENTE_PADRAO,
+  lerProjeto,
+  salvarMidiasDoCliente,
+  salvarProjeto,
+} from "@/servidor/banco";
 import { timelineSchema } from "@/timeline/schema";
 
-// Projeto salvo no banco do servidor. Por enquanto o app usa o projeto
-// "principal"; outro id (?id=...) serve para testes e, no futuro, para
-// vários projetos por usuário.
+// Projeto (vídeo) salvo no banco: timeline e conversa. Os arquivos ficam
+// no banco de mídia do CLIENTE do projeto (compartilhado entre projetos).
+// ?id=<projeto> escolhe o projeto (padrão "principal").
 
 const idDoProjeto = (req: NextRequest) => {
   const id = req.nextUrl.searchParams.get("id") ?? "principal";
@@ -14,8 +19,12 @@ const idDoProjeto = (req: NextRequest) => {
 
 const projetoSchema = z.object({
   timeline: timelineSchema,
-  biblioteca: z.array(z.looseObject({ id: z.string(), url: z.string() })),
   mensagens: z.array(z.looseObject({ id: z.string(), texto: z.string() })),
+  // Versões antigas do app mandavam a biblioteca junto: vai para o banco
+  // do cliente.
+  biblioteca: z
+    .array(z.looseObject({ id: z.string(), url: z.string() }))
+    .optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -32,7 +41,14 @@ const salvar = async (req: NextRequest) => {
   if (!corpo.success) {
     return NextResponse.json({ erro: "Projeto inválido." }, { status: 400 });
   }
-  const atualizadoEm = salvarProjeto(id, corpo.data);
+  const { timeline, mensagens, biblioteca } = corpo.data;
+  const atualizadoEm = salvarProjeto(id, { timeline, mensagens });
+  if (biblioteca?.length) {
+    salvarMidiasDoCliente(
+      lerProjeto(id)?.cliente.id ?? CLIENTE_PADRAO,
+      biblioteca,
+    );
+  }
   return NextResponse.json({ atualizadoEm });
 };
 

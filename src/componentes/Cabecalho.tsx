@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { projetoExemplo } from "@/projeto/exemplo";
-import { useProjeto } from "@/projeto/ProjetoProvider";
+import { abrirProjeto, useProjeto } from "@/projeto/ProjetoProvider";
 import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
 
 const ABAS = [
+  { href: "/clientes", rotulo: "Clientes" },
   { href: "/", rotulo: "Criar" },
   { href: "/timeline", rotulo: "Timeline" },
   { href: "/arquivos", rotulo: "Arquivos" },
@@ -19,15 +19,8 @@ const botao =
 
 export const Cabecalho: React.FC = () => {
   const caminho = usePathname();
-  const {
-    desfazer,
-    refazer,
-    podeDesfazer,
-    podeRefazer,
-    substituirProjeto,
-    novoProjeto,
-    salvamento,
-  } = useProjeto();
+  const { desfazer, refazer, podeDesfazer, podeRefazer, salvamento, meta } =
+    useProjeto();
 
   // Ctrl+Z desfaz; Ctrl+Y ou Ctrl+Shift+Z refaz (fora de campos de texto).
   useEffect(() => {
@@ -61,7 +54,8 @@ export const Cabecalho: React.FC = () => {
 
       <nav className="flex gap-1">
         {ABAS.map((aba) => {
-          const ativa = caminho === aba.href;
+          const ativa =
+            aba.href === "/" ? caminho === "/" : caminho.startsWith(aba.href);
           return (
             <Link
               key={aba.href}
@@ -79,7 +73,18 @@ export const Cabecalho: React.FC = () => {
         })}
       </nav>
 
-      <div className="ml-auto flex items-center gap-1">
+      {meta ? (
+        <Link
+          href={`/clientes/${meta.cliente.id}`}
+          className="min-w-0 truncate border-l-2 border-tinta pl-4 font-mono text-[11px] tracking-wider uppercase hover:text-spray"
+          title="Ver os projetos e o banco de mídia deste cliente"
+        >
+          📁 {meta.cliente.nome} <span className="text-zinc-500">›</span>{" "}
+          <b>{meta.nome}</b>
+        </Link>
+      ) : null}
+
+      <div className="ml-auto flex shrink-0 items-center gap-1">
         <span
           className={`mr-3 font-mono text-[11px] tracking-[0.12em] uppercase ${
             salvamento === "erro" ? "text-spray" : "text-zinc-500"
@@ -111,17 +116,24 @@ export const Cabecalho: React.FC = () => {
         <span className="mx-2 h-5 w-0.5 bg-tinta" />
         <button
           className={botao}
-          onClick={() => substituirProjeto(projetoExemplo())}
-        >
-          Carregar exemplo
-        </button>
-        <button
-          className={botao}
-          onClick={() => {
-            if (confirm("Começar um projeto novo? O atual será apagado.")) {
-              novoProjeto();
-            }
+          onClick={async () => {
+            if (!meta) return;
+            const nome = prompt(
+              `Nome do novo vídeo (em ${meta.cliente.nome}):`,
+            )?.trim();
+            if (!nome) return;
+            const resposta = await fetch(
+              `/api/clientes/${meta.cliente.id}/projetos`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nome }),
+              },
+            );
+            const dados = (await resposta.json()) as { id?: string };
+            if (dados.id) abrirProjeto(dados.id);
           }}
+          title="Cria um vídeo novo no mesmo cliente (usa o mesmo banco de mídia)"
         >
           Novo projeto
         </button>
