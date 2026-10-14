@@ -57,6 +57,22 @@ export const CURVA_TRANSICAO = Easing.inOut(Easing.cubic);
 
 const nada = () => undefined;
 
+// Em repouso, anula o que os efeitos aplicam mesmo parados (translate(0),
+// rotate(0), scale(1), perspectiva, recorte cheio): sem isso o navegador
+// desenha a cena numa camada própria e o quadro sai levemente diferente
+// do vídeo sem efeito.
+const SEM_EFEITO: Record<string, React.CSSProperties> = {
+  exitStyle: { transform: "none" },
+  innerExitStyle: {
+    transform: "none",
+    willChange: "auto",
+    clipPath: "none",
+    backfaceVisibility: "visible",
+    WebkitBackfaceVisibility: "visible",
+  },
+  outerExitStyle: { perspective: "none", transformStyle: "flat" },
+};
+
 // Envolve o conteúdo com o efeito. Fora da transição fica em repouso
 // ("saindo" com progresso 0), que em todos os efeitos usados é o quadro
 // normal, sem alteração.
@@ -69,12 +85,15 @@ const Envoltorio: React.FC<{
 }> = ({ apresentacao, direcao, progresso, duracaoFrames, children }) => {
   if (!apresentacao) return <AbsoluteFill>{children}</AbsoluteFill>;
   const Efeito = apresentacao.component;
+  const repouso = direcao === "exiting" && progresso === 0;
   return (
     <Efeito
       presentationDirection={direcao}
       presentationProgress={progresso}
       presentationDurationInFrames={duracaoFrames}
-      passedProps={apresentacao.props}
+      passedProps={
+        repouso ? { ...apresentacao.props, ...SEM_EFEITO } : apresentacao.props
+      }
       onElementImage={nada}
       onUnmount={nada}
       bothEnteringAndExiting={false}

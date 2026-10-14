@@ -40,6 +40,7 @@ export const calcularMetadata: CalculateMetadataFunction<Timeline> = ({
 export const EditorTimeline: React.FC<Timeline> = (timeline) => {
   const clipes = calcularClipes(timeline);
   const inicios = inicioDosClipes(clipes);
+  const duracaoTotal = calcularDuracaoTotal(clipes);
   const { width, height } = useVideoConfig();
 
   return (
@@ -52,6 +53,9 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
             durationInFrames={clipe.duracaoFrames}
             name={`Clipe ${i + 1}`}
             premountFor={PREMONTAR_S * timeline.fps}
+            // A 1ª cena continua montada até o fim: ao repetir o vídeo
+            // (ou voltar ao início) ela já está carregada, sem piscar.
+            postmountFor={i === 0 ? duracaoTotal : undefined}
           >
             <ClipeComTransicoes
               clipe={clipe}
