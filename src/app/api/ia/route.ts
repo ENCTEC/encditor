@@ -47,6 +47,8 @@ export type RespostaIA = {
   resposta: string;
   // Arquivos alterados pela IA (ex.: efeitos de áudio aplicados).
   midiasAlteradas?: Midia[];
+  // Inserts que o usuário deve posicionar no popup.
+  insertsParaPosicionar?: number[];
   timeline: z.infer<typeof timelineSchema> | null;
   acoes: string[];
 };
@@ -107,6 +109,7 @@ export async function POST(req: NextRequest) {
       timeline: sessao.acoes.length ? sessao.timeline : null,
       acoes: sessao.acoes,
       midiasAlteradas: sessao.midiasAlteradas,
+      insertsParaPosicionar: sessao.insertsParaPosicionar,
     });
   } catch (e) {
     const conhecido = usarOpenAI

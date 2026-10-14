@@ -9,20 +9,15 @@ import { Selecao, Trilhas } from "@/componentes/timeline/Trilhas";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 import { PopupPosicao } from "@/componentes/timeline/PopupPosicao";
+import { posicionarInserts } from "@/componentes/PosicionadorDeInserts";
 import {
   AcabamentoCaixa,
   Caixa,
   caixaNaGrade,
-  caixaPadrao,
   ehTelaCheia,
   TAMANHOS,
 } from "@/timeline/caixas";
-import {
-  adicionarItem,
-  atualizarItem,
-  colocarCena,
-  removerItem,
-} from "@/timeline/operacoes";
+import { adicionarItem, colocarCena, removerItem } from "@/timeline/operacoes";
 
 const arredondar = (n: number) => Math.round(n * 100) / 100;
 
@@ -34,12 +29,11 @@ export default function PaginaTimeline() {
   const player = useRef<PlayerRef>(null);
   const [frame, setFrame] = useState(0);
   const [selecao, setSelecao] = useState<Selecao>(null);
-  // Popup de posição/tamanho: insert novo (da biblioteca) ou existente.
-  const [popup, setPopup] = useState<
-    | { modo: "novo"; midia: Midia; inicio: number }
-    | { modo: "editar"; indice: number }
-    | null
-  >(null);
+  // Popup de posição/tamanho de um insert NOVO (da biblioteca). Inserts
+  // que já estão na timeline usam o popup global (PosicionadorDeInserts).
+  const [popup, setPopup] = useState<{ midia: Midia; inicio: number } | null>(
+    null,
+  );
 
   const segundoAtual = frame / timeline.fps;
   const temClipes = timeline.clipes.length > 0;
@@ -128,89 +122,51 @@ export default function PaginaTimeline() {
       return;
     }
     // Insert: primeiro escolhe onde fica e o tamanho (popup).
-    setPopup({ modo: "novo", midia, inicio });
+    setPopup({ midia, inicio });
   };
 
   const confirmarPopup = (caixa: Caixa, acabamento: AcabamentoCaixa) => {
     if (!popup) return;
     const posicao = ehTelaCheia(caixa) ? "tela-cheia" : "janela";
-    if (popup.modo === "novo") {
-      const { midia, inicio: de } = popup;
-      const novoIndice = timeline.inserts.length;
-      const ok = aplicar((t) =>
-        adicionarItem(t, "inserts", {
-          url: midia.url,
-          tipo: midia.formato === "imagem" ? "imagem" : "video",
-          inicio: de,
-          fim: arredondar(de + Math.min(3, midia.duracao ?? 3)),
-          origemInicio: 0,
-          posicao,
-          volume: 0,
-          caixa,
-          acabamento,
-        }),
-      );
-      if (ok) setSelecao({ faixa: "inserts", indice: novoIndice });
-    } else {
-      aplicar((t) =>
-        atualizarItem(t, "inserts", popup.indice, {
-          caixa,
-          acabamento,
-          posicao,
-        }),
-      );
-    }
+    const { midia, inicio: de } = popup;
+    const novoIndice = timeline.inserts.length;
+    const ok = aplicar((t) =>
+      adicionarItem(t, "inserts", {
+        url: midia.url,
+        tipo: midia.formato === "imagem" ? "imagem" : "video",
+        inicio: de,
+        fim: arredondar(de + Math.min(3, midia.duracao ?? 3)),
+        origemInicio: 0,
+        posicao,
+        volume: 0,
+        caixa,
+        acabamento,
+      }),
+    );
+    if (ok) setSelecao({ faixa: "inserts", indice: novoIndice });
     setPopup(null);
   };
 
-  // Dados do popup aberto: mídia, quadro de fundo e valores iniciais.
-  const dadosPopup = (() => {
-    if (!popup) return null;
-    if (popup.modo === "novo") {
-      const { midia } = popup;
-      const proporcaoMidia =
-        midia.largura && midia.altura ? midia.largura / midia.altura : 16 / 9;
-      return {
-        titulo: `Posicionar ${midia.nome}`,
-        midia,
+  // Dados do popup do insert novo: mídia, quadro de fundo e valores iniciais.
+  const dadosPopup = popup
+    ? {
+        titulo: `Posicionar ${popup.midia.nome}`,
+        midia: popup.midia,
         fundo: timeline,
         segundo: popup.inicio,
         inicial: {
           caixa: caixaNaGrade(
             "canto-sup-dir",
             TAMANHOS.M,
-            proporcaoMidia,
+            popup.midia.largura && popup.midia.altura
+              ? popup.midia.largura / popup.midia.altura
+              : 16 / 9,
             timeline.largura / timeline.altura,
           ),
           acabamento: { borda: true, cantos: true, sombra: true },
         },
-      };
-    }
-    const insert = timeline.inserts[popup.indice];
-    if (!insert) return null;
-    const midia = projeto.biblioteca.find((m) => m.url === insert.url) ?? {
-      url: insert.url,
-      formato: insert.tipo,
-      largura: null,
-      altura: null,
-      nome: `Insert ${popup.indice + 1}`,
-    };
-    return {
-      titulo: `Posição e tamanho — ${midia.nome}`,
-      midia,
-      // Fundo sem este insert, para ver o que fica atrás.
-      fundo: removerItem(timeline, "inserts", popup.indice),
-      segundo: insert.inicio + Math.min(0.5, (insert.fim - insert.inicio) / 2),
-      inicial: {
-        caixa: insert.caixa ?? caixaPadrao(insert.posicao),
-        acabamento: insert.acabamento ?? {
-          borda: true,
-          cantos: true,
-          sombra: true,
-        },
-      },
-    };
-  })();
+      }
+    : null;
 
   return (
     <div className="flex h-full flex-col">
@@ -243,9 +199,7 @@ export default function PaginaTimeline() {
           <Inspetor
             selecao={selecao}
             aoSelecionar={setSelecao}
-            aoPosicionarInsert={(indice) =>
-              setPopup({ modo: "editar", indice })
-            }
+            aoPosicionarInsert={(indice) => posicionarInserts([indice])}
           />
           <div>
             <h2 className="rotulo-zine mb-2">Biblioteca</h2>

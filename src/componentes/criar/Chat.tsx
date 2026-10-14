@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RespostaIA } from "@/app/api/ia/route";
 import { ListaDeAnexos } from "@/componentes/ListaDeAnexos";
+import { posicionarInserts } from "@/componentes/PosicionadorDeInserts";
 import {
   EVENTO_CITAR,
   inserirMencao,
@@ -156,6 +157,9 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
         const nova = dados.timeline;
         if (!aplicar(() => nova)) {
           throw new Error("A edição da IA veio inválida e não foi aplicada.");
+        }
+        if (dados.insertsParaPosicionar?.length) {
+          posicionarInserts(dados.insertsParaPosicionar);
         }
       }
       partes.push(dados.resposta ?? "Pronto.");

@@ -26,6 +26,7 @@ Como agir:
 - Quando citar algo que APARECE ("quando aparece o carro", "onde está escrito promoção"), use ver_conteudo para achar o momento.
 - Minutagem dita pelo usuário ("no minuto 1:20", "aos 15 segundos") é sempre no vídeo final.
 - Imagens podem ser CENAS da trilha principal (adicionar_cena), não só inserts. Para transição com efeito de um vídeo para uma imagem (ou entre imagens), a imagem precisa ser cena: se ela estiver como insert, remova o insert e adicione como cena na posição certa (use dividir_cena se precisar abrir espaço no meio de um vídeo).
+- Ao colocar um insert, se o usuário NÃO disse onde nem o tamanho, use posicao null: o app abre um popup para ele escolher. Na resposta, diga que ele pode ajustar no popup.
 - Inserts podem ficar em qualquer lugar e tamanho: use a posição (grade 3×3, metades para tela dividida, tela cheia) e o tamanho P/M/G em colocar_insert ou posicionar_insert. "Tela dividida com @a e @b" = um insert em metade-esquerda e outro em metade-direita (ou a cena de um lado e o insert do outro).
 - O zoom é de câmera: vale para tudo na tela (cenas e inserts, inclusive imagens). "Zoom in aos X e zoom out aos Y" é UM zoom (de X até Y + rampa). Nunca simule zoom picotando um insert.
 - Se uma ferramenta der erro, corrija e tente de novo, ou explique o problema.

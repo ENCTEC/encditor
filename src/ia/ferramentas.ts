@@ -69,6 +69,9 @@ export type SessaoEdicao = {
   biblioteca: Midia[];
   // Mídias que a IA alterou (ex.: efeitos de áudio), para o app atualizar.
   midiasAlteradas?: Midia[];
+  // Inserts colocados sem posição definida: o app abre o popup para o
+  // usuário escolher onde ficam e o tamanho.
+  insertsParaPosicionar?: number[];
   // Frases curtas do que foi feito, para mostrar no chat.
   acoes: string[];
 };
@@ -198,7 +201,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         posicao: posicaoSchema
           .nullable()
           .describe(
-            "Onde fica: tela-cheia (padrão), metades (tela dividida), ou um ponto da grade 3×3 (canto-sup-esq, topo, canto-sup-dir, esquerda, centro, direita, canto-inf-esq, base, canto-inf-dir). 'janela' = canto superior direito.",
+            "Onde fica: tela-cheia, metades (tela dividida), ou um ponto da grade 3×3 (canto-sup-esq, topo, canto-sup-dir, esquerda, centro, direita, canto-inf-esq, base, canto-inf-dir). 'janela' = canto superior direito. null = o usuário NÃO disse onde: o app abre um popup para ele escolher posição e tamanho (use null nesse caso, não invente).",
           ),
         tamanho: tamanhoSchema
           .nullable()
@@ -230,6 +233,12 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
             ? e.inicio + 3
             : e.inicio + Math.max(0.5, (midia.duracao ?? 3) - origem));
         const caixa = caixaPara(e.posicao ?? "tela-cheia", e.tamanho, midia);
+        if (e.posicao === null) {
+          sessao.insertsParaPosicionar = [
+            ...(sessao.insertsParaPosicionar ?? []),
+            sessao.timeline.inserts.length,
+          ];
+        }
         return aplicar(
           (t) =>
             adicionarItem(t, "inserts", {

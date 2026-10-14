@@ -4,6 +4,7 @@ import { AnaliseAutomatica } from "@/componentes/AnaliseAutomatica";
 import { AreaDeTrabalho } from "@/componentes/AreaDeTrabalho";
 import { AvisoErro } from "@/componentes/AvisoErro";
 import { AvisoNavegador } from "@/componentes/AvisoNavegador";
+import { PosicionadorDeInserts } from "@/componentes/PosicionadorDeInserts";
 import { Cabecalho } from "@/componentes/Cabecalho";
 import { ProjetoProvider } from "@/projeto/ProjetoProvider";
 import "./globals.css";
@@ -51,6 +52,7 @@ export default function RootLayout({
           </main>
           <AvisoErro />
           <AnaliseAutomatica />
+          <PosicionadorDeInserts />
         </ProjetoProvider>
       </body>
     </html>
