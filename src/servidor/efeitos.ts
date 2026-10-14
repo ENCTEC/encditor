@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { EfeitoAudio } from "@/catalogo/estilos";
 import {
@@ -88,20 +88,33 @@ export const aplicarEfeitos = async (nome: string, efeitos: EfeitoAudio[]) => {
   return destino.nome;
 };
 
-// Exemplo de cada efeito (aba Estilos), aplicado na voz de exemplo do app.
+// Exemplo de cada efeito (aba Estilos), aplicado no áudio de exemplo: a
+// gravação do usuário (voz-usuario.mp3, fora do git) se existir; senão, a
+// voz sintética que vem com o app (voz-exemplo.mp3).
 const PASTA_EXEMPLOS = path.resolve(
   path.dirname(process.env.BANCO_ARQUIVO ?? "dados/encditor.db"),
   "exemplos-audio",
 );
-export const VOZ_EXEMPLO = path.resolve("public/exemplos/voz-exemplo.mp3");
+const VOZ_USUARIO = path.resolve("public/exemplos/voz-usuario.mp3");
+const VOZ_PADRAO = path.resolve("public/exemplos/voz-exemplo.mp3");
+
+export const audioDeExemplo = () =>
+  existsSync(VOZ_USUARIO) ? VOZ_USUARIO : VOZ_PADRAO;
 
 export const exemploDoEfeito = async (efeito: EfeitoAudio) => {
   mkdirSync(PASTA_EXEMPLOS, { recursive: true });
-  const saida = path.join(PASTA_EXEMPLOS, `${efeito}.mp3`);
+  const origem = audioDeExemplo();
+  // O nome do cache muda se o áudio de exemplo mudar (troca de gravação).
+  const info = statSync(origem);
+  const versao = createHash("sha1")
+    .update(`${origem}|${info.size}|${info.mtimeMs}`)
+    .digest("hex")
+    .slice(0, 10);
+  const saida = path.join(PASTA_EXEMPLOS, `${efeito}-${versao}.mp3`);
   if (!existsSync(saida)) {
     await rodarFfmpeg([
       "-i",
-      VOZ_EXEMPLO,
+      origem,
       "-af",
       cadeia([efeito]),
       "-c:a",

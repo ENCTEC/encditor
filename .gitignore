@@ -31,3 +31,5 @@ out
 
 # Voz de exemplo dos efeitos de áudio (gerada para o app).
 !public/exemplos/*.mp3
+# Gravação do usuário para os exemplos (fica fora do git: repositório público).
+/public/exemplos/voz-usuario.mp3

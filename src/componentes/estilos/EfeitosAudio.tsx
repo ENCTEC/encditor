@@ -74,7 +74,10 @@ export const EfeitosAudio: React.FC = () => {
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() =>
-                    tocar(`original-${ef.id}`, "/exemplos/voz-exemplo.mp3")
+                    tocar(
+                      `original-${ef.id}`,
+                      "/api/efeitos/exemplo?efeito=original",
+                    )
                   }
                   className={`${botao} flex-1 ${tocando === `original-${ef.id}` ? "bg-tinta text-papel" : ""}`}
                 >
