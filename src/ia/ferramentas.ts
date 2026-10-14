@@ -30,6 +30,7 @@ import {
   buscarFala,
   gerarLegendas,
   momentosNoVideoFinal,
+  palavrasDaMidia,
   palavrasNoVideoFinal,
 } from "./conteudo";
 import { resumoDoProjeto } from "./estado";
@@ -810,8 +811,21 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "legendar_automaticamente",
       description:
-        "Cria as legendas do vídeo inteiro a partir da fala transcrita, sincronizadas palavra por palavra.",
+        'Cria as legendas do vídeo inteiro a partir da fala transcrita, sincronizadas palavra por palavra. Com "midia", usa só a fala daquele arquivo (ex.: narração extraída de um vídeo), mesmo que esteja mudo ou fora da timeline.',
       inputSchema: z.object({
+        midia: z
+          .string()
+          .nullable()
+          .describe(
+            "Arquivo cuja fala vira legenda (@apelido ou nome). null = toda a fala audível do vídeo.",
+          ),
+        inicio: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe(
+            "Só com midia FORA da timeline: segundo do vídeo em que a fala começa. null = 0.",
+          ),
         palavras_por_legenda: z
           .number()
           .int()
@@ -831,13 +845,25 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           ),
       }),
       run: (e) => {
-        const palavras = palavrasNoVideoFinal(
-          sessao.timeline,
-          sessao.biblioteca,
-        );
+        const fonte = e.midia ? acharMidia(e.midia) : null;
+        if (fonte && !fonte.analise?.transcricao) {
+          throw new Error(
+            `"${fonte.nome}" não tem fala transcrita (arquivo frio, análise pendente ou sem fala).`,
+          );
+        }
+        const palavras = fonte
+          ? palavrasDaMidia(
+              sessao.timeline,
+              sessao.biblioteca,
+              fonte,
+              e.inicio ?? 0,
+            )
+          : palavrasNoVideoFinal(sessao.timeline, sessao.biblioteca);
         if (!palavras.length) {
           throw new Error(
-            "Não há fala transcrita no vídeo (os arquivos ainda não foram analisados ou não têm fala).",
+            fonte
+              ? `A fala de "${fonte.nome}" não aparece no trecho usado na timeline.`
+              : "Não há fala transcrita no vídeo (os arquivos ainda não foram analisados ou não têm fala).",
           );
         }
         const novas = gerarLegendas(palavras, e.palavras_por_legenda ?? 6);

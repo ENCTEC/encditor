@@ -90,6 +90,32 @@ export const extrairAudio = async (entrada: string, saida: string) => {
   }
 };
 
+// Áudio de um vídeo como arquivo próprio (mp3 estéreo de boa qualidade),
+// para usar como faixa de áudio e base das legendas.
+// Retorna false se o vídeo não tiver faixa de áudio.
+export const extrairAudioParaUso = async (entrada: string, saida: string) => {
+  try {
+    await rodarFfmpeg([
+      "-i",
+      entrada,
+      "-vn",
+      "-ac",
+      "2",
+      "-ar",
+      "44100",
+      "-b:a",
+      "192k",
+      saida,
+    ]);
+    return true;
+  } catch (e) {
+    if (/does not contain any stream|matches no streams/i.test(String(e))) {
+      return false;
+    }
+    throw e;
+  }
+};
+
 // Um quadro a cada "intervalo" segundos, com 512 px de largura.
 // intervalo null = imagem parada (um único quadro).
 // Retorna os arquivos com o segundo (aproximado) de cada quadro.

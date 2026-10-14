@@ -4,8 +4,16 @@ import { useRef, useState } from "react";
 import { formatarTempo } from "@/componentes/Biblioteca";
 import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
 import { ListaDeAnexos } from "@/componentes/ListaDeAnexos";
-import { normalizarApelido, podeAnalisar } from "@/projeto/midia-cliente";
-import { useProjeto } from "@/projeto/ProjetoProvider";
+import { gerarLegendas, palavrasDaMidia } from "@/ia/conteudo";
+import {
+  extrairAudioDoVideo,
+  gerarApelido,
+  lerDuracaoDaUrl,
+  normalizarApelido,
+  podeAnalisar,
+  proximoNome,
+} from "@/projeto/midia-cliente";
+import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 import { useEnvio } from "@/projeto/useEnvio";
 
@@ -129,6 +137,100 @@ const SituacaoIA: React.FC<{ midia: Midia }> = ({ midia }) => {
   );
 };
 
+// Ações extras: tirar o áudio de um vídeo (vira um arquivo de áudio novo,
+// já mandado para transcrição) e legendar o vídeo com a fala do arquivo.
+const AcoesDoArquivo: React.FC<{ midia: Midia }> = ({ midia }) => {
+  const { obterBiblioteca, adicionarMidia, atualizarAnalise, aplicar } =
+    useProjeto();
+  const [extraindo, setExtraindo] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  const extrair = async () => {
+    setExtraindo(true);
+    setAviso(null);
+    try {
+      const url = await extrairAudioDoVideo(midia.url, false);
+      const biblioteca = obterBiblioteca();
+      const audio: Midia = {
+        id: novoId(),
+        nome: proximoNome(biblioteca, "audio"),
+        apelido: gerarApelido(
+          `${midia.apelido.slice(0, 24)}-audio`,
+          biblioteca,
+        ),
+        usarIA: true,
+        papel: "audio",
+        formato: "audio",
+        url,
+        nomeArquivo: `${midia.nomeArquivo} (áudio)`,
+        duracao: (await lerDuracaoDaUrl(url)) ?? midia.duracao,
+        largura: null,
+        altura: null,
+      };
+      adicionarMidia(audio);
+      iniciarAnalise(audio, atualizarAnalise);
+      setAviso(`✓ virou ${audio.nome} (@${audio.apelido})`);
+    } catch (e) {
+      setAviso(`⚠ ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setExtraindo(false);
+    }
+  };
+
+  const legendar = () => {
+    let quantas = 0;
+    const ok = aplicar((t) => {
+      const legendas = gerarLegendas(
+        palavrasDaMidia(t, obterBiblioteca(), midia),
+        6,
+      );
+      quantas = legendas.length;
+      return { ...t, legendas };
+    });
+    setAviso(
+      ok && quantas
+        ? `✓ ${quantas} legendas criadas (Ctrl+Z desfaz)`
+        : "⚠ a fala deste arquivo não aparece no trecho usado na timeline",
+    );
+  };
+
+  const podeExtrair =
+    midia.formato === "video" && midia.url.startsWith("/api/midia/");
+  const temFala = Boolean(midia.analise?.transcricao?.palavras.length);
+  if (!podeExtrair && !temFala) return null;
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      {podeExtrair ? (
+        <button
+          onClick={() => void extrair()}
+          disabled={extraindo}
+          className="border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-violet-500 hover:text-tinta disabled:opacity-50"
+          title="Cria um arquivo de áudio com o som deste vídeo (o vídeo continua na biblioteca)"
+        >
+          {extraindo ? "extraindo…" : "♪ extrair áudio"}
+        </button>
+      ) : null}
+      {temFala ? (
+        <button
+          onClick={legendar}
+          className="border border-zinc-700 px-2 py-1 text-zinc-300 hover:border-violet-500 hover:text-tinta"
+          title="Troca as legendas do vídeo pela fala deste arquivo, sincronizada palavra por palavra (vale mesmo com o arquivo mudo ou fora da timeline)"
+        >
+          ✎ legendar com esta fala
+        </button>
+      ) : null}
+      {aviso ? (
+        <span
+          className={aviso.startsWith("⚠") ? "text-spray" : "text-emerald-400"}
+        >
+          {aviso}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
 // Aba "Arquivos": subir inserts/cenas/áudios escolhendo se a IA analisa
 // cada um, e gerenciar os apelidos (@) usados para citar no chat.
 export default function PaginaArquivos() {
@@ -152,7 +254,9 @@ export default function PaginaArquivos() {
           <p className="mt-1 text-sm text-zinc-400">
             Suba cenas, inserts e áudios. Para cada um, escolha se a IA deve
             analisar (ler a fala e o que aparece) ou se é um arquivo <b>frio</b>
-            , usado sem leitura e sem custo. Cite no chat com o @apelido.
+            , usado sem leitura e sem custo. Cite no chat com o @apelido. Para
+            legendar com a fala de um vídeo, envie-o como <b>Só o áudio</b> (ou
+            use “extrair áudio” na biblioteca).
           </p>
           {meta ? (
             <p className="mt-3 inline-block border-2 border-tinta px-3 py-1.5 font-mono text-xs">
@@ -237,6 +341,7 @@ export default function PaginaArquivos() {
                   <th className="py-2 font-medium">Tipo</th>
                   <th className="py-2 font-medium">Duração</th>
                   <th className="py-2 font-medium">IA</th>
+                  <th className="py-2 font-medium">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -263,8 +368,11 @@ export default function PaginaArquivos() {
                     <td className="py-2 pr-3 tabular-nums text-zinc-400">
                       {m.duracao !== null ? formatarTempo(m.duracao) : "—"}
                     </td>
-                    <td className="py-2 text-xs">
+                    <td className="py-2 pr-3 text-xs">
                       <SituacaoIA midia={m} />
+                    </td>
+                    <td className="py-2 text-xs">
+                      <AcoesDoArquivo midia={m} />
                     </td>
                   </tr>
                 ))}

@@ -170,6 +170,39 @@ export const aguardarAnalises = async () =>
     ),
   );
 
+// Extrai o áudio de um vídeo já enviado e devolve a URL do mp3 novo.
+export const extrairAudioDoVideo = async (
+  url: string,
+  apagarOriginal: boolean,
+) => {
+  const resposta = await fetch("/api/extrair-audio", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url, apagarOriginal }),
+  });
+  const corpo = (await resposta.json().catch(() => ({}))) as {
+    url?: string;
+    erro?: string;
+  };
+  if (!resposta.ok || !corpo.url) {
+    throw new Error(
+      corpo.erro ?? `Falha ao extrair o áudio (${resposta.status}).`,
+    );
+  }
+  return corpo.url;
+};
+
+// Duração (s) de um áudio já enviado, lida pelo navegador.
+export const lerDuracaoDaUrl = (url: string): Promise<number | null> =>
+  new Promise((resolve) => {
+    const el = document.createElement("audio");
+    el.preload = "metadata";
+    el.onloadedmetadata = () =>
+      resolve(Number.isFinite(el.duration) ? el.duration : null);
+    el.onerror = () => resolve(null);
+    el.src = url;
+  });
+
 // Ditado: envia a gravação do microfone e devolve o texto.
 export const transcreverGravacao = async (audio: Blob) => {
   const dados = new FormData();

@@ -7,7 +7,9 @@ import { Anexo, useEnvio } from "@/projeto/useEnvio";
 // e se a IA deve analisar (ler fala e imagem) ou não.
 
 const PAPEIS: Record<Anexo["formato"], PapelMidia[]> = {
-  video: ["cena", "insert"],
+  // Vídeo como "Áudio" = só o som dele é guardado (ex.: narração gravada
+  // em vídeo, para legendar).
+  video: ["cena", "insert", "audio"],
   imagem: ["insert"],
   audio: ["audio"],
 };
@@ -50,16 +52,22 @@ export const ListaDeAnexos: React.FC<{
               disabled={enviando}
               onChange={(e) => {
                 const papel = e.target.value as PapelMidia;
+                // Cena e "só o áudio" de um vídeo precisam da fala transcrita.
+                const precisaIA =
+                  papel === "cena" ||
+                  (a.formato === "video" && papel === "audio");
                 atualizarAnexo(a.id, {
                   papel,
-                  ...(papel === "cena" ? { usarIA: true } : {}),
+                  ...(precisaIA ? { usarIA: true } : {}),
                 });
               }}
               className="bg-zinc-800 px-1 py-0.5"
             >
               {PAPEIS[a.formato].map((p) => (
                 <option key={p} value={p}>
-                  {ROTULO_PAPEL[p]}
+                  {a.formato === "video" && p === "audio"
+                    ? "Só o áudio"
+                    : ROTULO_PAPEL[p]}
                 </option>
               ))}
             </select>

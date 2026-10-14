@@ -4,8 +4,10 @@ import { useState } from "react";
 import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
 import {
   enviarArquivo,
+  extrairAudioDoVideo,
   formatoDoArquivo,
   gerarApelido,
+  lerDuracaoDaUrl,
   lerMetadados,
   normalizarApelido,
   papelSugerido,
@@ -100,11 +102,21 @@ export const useEnvio = () => {
 
     for (const anexo of anexos) {
       try {
-        const meta = await lerMetadados(anexo.arquivo, anexo.formato);
+        let meta = await lerMetadados(anexo.arquivo, anexo.formato);
         atualizarAnexo(anexo.id, { progresso: 0 });
-        const url = await enviarArquivo(anexo.arquivo, (p) =>
+        let url = await enviarArquivo(anexo.arquivo, (p) =>
           atualizarAnexo(anexo.id, { progresso: p }),
         );
+        // Vídeo enviado como "Só o áudio": guarda só o som, em mp3.
+        const soAudio = anexo.formato === "video" && anexo.papel === "audio";
+        if (soAudio) {
+          url = await extrairAudioDoVideo(url, true);
+          meta = {
+            duracao: (await lerDuracaoDaUrl(url)) ?? meta.duracao,
+            largura: null,
+            altura: null,
+          };
+        }
         const apelidoLivre =
           anexo.apelido && !biblioteca.some((m) => m.apelido === anexo.apelido);
         const midia: Midia = {
@@ -115,7 +127,7 @@ export const useEnvio = () => {
             : gerarApelido(anexo.arquivo.name, biblioteca),
           usarIA: anexo.usarIA,
           papel: anexo.papel,
-          formato: anexo.formato,
+          formato: soAudio ? "audio" : anexo.formato,
           url,
           nomeArquivo: anexo.arquivo.name,
           ...meta,

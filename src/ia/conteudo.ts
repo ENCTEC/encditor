@@ -83,29 +83,50 @@ const trechos = (t: Timeline, biblioteca: Midia[]): Trecho[] => {
   return lista;
 };
 
+// Palavras faladas num trecho, já no tempo do vídeo final.
+const palavrasDoTrecho = (tr: Trecho): PalavraFinal[] =>
+  (tr.midia.analise?.transcricao?.palavras ?? []).flatMap((p) => {
+    const de = tr.inicioFinal + (p.de - tr.origem);
+    if (p.de < tr.origem - 0.05 || de >= tr.fimFinal) return [];
+    return [
+      {
+        de: r2(de),
+        ate: r2(Math.min(tr.fimFinal, tr.inicioFinal + (p.ate - tr.origem))),
+        palavra: p.palavra,
+        fonte: tr.fonte,
+      },
+    ];
+  });
+
 export const palavrasNoVideoFinal = (
   t: Timeline,
   biblioteca: Midia[],
 ): PalavraFinal[] =>
   trechos(t, biblioteca)
-    .filter((tr) => tr.audivel && tr.midia.analise?.transcricao)
-    .flatMap((tr) =>
-      tr.midia.analise!.transcricao!.palavras.flatMap((p) => {
-        const de = tr.inicioFinal + (p.de - tr.origem);
-        if (p.de < tr.origem - 0.05 || de >= tr.fimFinal) return [];
-        return [
-          {
-            de: r2(de),
-            ate: r2(
-              Math.min(tr.fimFinal, tr.inicioFinal + (p.ate - tr.origem)),
-            ),
-            palavra: p.palavra,
-            fonte: tr.fonte,
-          },
-        ];
-      }),
-    )
+    .filter((tr) => tr.audivel)
+    .flatMap(palavrasDoTrecho)
     .sort((a, b) => a.de - b.de);
+
+// Palavras de UM arquivo no vídeo final, mesmo que ele esteja mudo (ex.:
+// narração usada só como base das legendas). Se o arquivo não está na
+// timeline, as legendas começam no segundo "inicio" do vídeo.
+export const palavrasDaMidia = (
+  t: Timeline,
+  biblioteca: Midia[],
+  midia: Midia,
+  inicio = 0,
+): PalavraFinal[] => {
+  const usos = trechos(t, biblioteca).filter((tr) => tr.midia.id === midia.id);
+  if (!usos.length) {
+    return (midia.analise?.transcricao?.palavras ?? []).map((p) => ({
+      de: r2(inicio + p.de),
+      ate: r2(inicio + p.ate),
+      palavra: p.palavra,
+      fonte: midia.nome,
+    }));
+  }
+  return usos.flatMap(palavrasDoTrecho).sort((a, b) => a.de - b.de);
+};
 
 export const momentosNoVideoFinal = (
   t: Timeline,
