@@ -4,7 +4,7 @@ import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { EstiloLegenda, TipoTransicao } from "../../timeline/schema";
 import { LegendaAnimada } from "../EditorTimeline/Legendas";
 import { FONTES } from "../EditorTimeline/fontes";
-import { criarTransicao } from "../EditorTimeline/transicoes";
+import { CURVA_TRANSICAO, criarTransicao } from "../EditorTimeline/transicoes";
 
 // Pequenos vídeos de exemplo para o menu "Estilos": mostram cada transição
 // e cada estilo de legenda funcionando, em loop.
@@ -54,7 +54,10 @@ export const DemoTransicao: React.FC<{ tipo: TipoTransicao }> = ({ tipo }) => {
       {tipo !== "corte" ? (
         <TransitionSeries.Transition
           presentation={criarTransicao(tipo, undefined, width, height)}
-          timing={linearTiming({ durationInFrames: duracaoTransicao })}
+          timing={linearTiming({
+            durationInFrames: duracaoTransicao,
+            easing: CURVA_TRANSICAO,
+          })}
         />
       ) : null}
       <TransitionSeries.Sequence durationInFrames={cena}>

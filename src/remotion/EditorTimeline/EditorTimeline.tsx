@@ -2,23 +2,23 @@ import React from "react";
 import {
   AbsoluteFill,
   CalculateMetadataFunction,
-  Easing,
   Img,
   OffthreadVideo,
+  Sequence,
   useVideoConfig,
 } from "remotion";
-import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { Timeline } from "../../timeline/schema";
 import {
   calcularClipes,
   calcularDuracaoTotal,
+  inicioDosClipes,
   validarTimeline,
 } from "../../timeline/calculos";
 import { Audios } from "./Audios";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
 import { PREMONTAR_S } from "./premontar";
-import { criarTransicao } from "./transicoes";
+import { ClipeComTransicoes } from "./transicoes";
 import { Zoom } from "./Zoom";
 
 // Ajusta duração, fps e tamanho do vídeo a partir do JSON recebido.
@@ -39,61 +39,51 @@ export const calcularMetadata: CalculateMetadataFunction<Timeline> = ({
 // zoom, como uma câmera) → legendas. O áudio não aparece na tela.
 export const EditorTimeline: React.FC<Timeline> = (timeline) => {
   const clipes = calcularClipes(timeline);
+  const inicios = inicioDosClipes(clipes);
   const { width, height } = useVideoConfig();
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
       <Zoom zooms={timeline.zooms}>
-        <TransitionSeries>
-          {clipes.map((clipe, i) => (
-            <React.Fragment key={i}>
-              {clipe.transicaoFrames > 0 && clipe.transicao !== "corte" ? (
-                <TransitionSeries.Transition
-                  presentation={criarTransicao(
-                    clipe.transicao,
-                    clipe.direcao,
-                    width,
-                    height,
-                  )}
-                  timing={linearTiming({
-                    durationInFrames: clipe.transicaoFrames,
-                    // Acelera e desacelera: a mistura fica mais natural
-                    // que a linear (que "anda" e para de repente).
-                    easing: Easing.inOut(Easing.cubic),
-                  })}
+        {clipes.map((clipe, i) => (
+          <Sequence
+            key={i}
+            from={inicios[i]}
+            durationInFrames={clipe.duracaoFrames}
+            name={`Clipe ${i + 1}`}
+            premountFor={PREMONTAR_S * timeline.fps}
+          >
+            <ClipeComTransicoes
+              clipe={clipe}
+              proximo={clipes[i + 1]}
+              largura={width}
+              altura={height}
+            >
+              {clipe.tipo === "imagem" ? (
+                <Img
+                  src={clipe.url}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
                 />
-              ) : null}
-              <TransitionSeries.Sequence
-                durationInFrames={clipe.duracaoFrames}
-                name={`Clipe ${i + 1}`}
-                premountFor={PREMONTAR_S * timeline.fps}
-              >
-                {clipe.tipo === "imagem" ? (
-                  <Img
-                    src={clipe.url}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : (
-                  <OffthreadVideo
-                    src={clipe.url}
-                    trimBefore={clipe.trimInicio}
-                    trimAfter={clipe.trimFim}
-                    volume={clipe.volume}
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                )}
-              </TransitionSeries.Sequence>
-            </React.Fragment>
-          ))}
-        </TransitionSeries>
+              ) : (
+                <OffthreadVideo
+                  src={clipe.url}
+                  trimBefore={clipe.trimInicio}
+                  trimAfter={clipe.trimFim}
+                  volume={clipe.volume}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              )}
+            </ClipeComTransicoes>
+          </Sequence>
+        ))}
         <Inserts inserts={timeline.inserts} />
       </Zoom>
       <Legendas
