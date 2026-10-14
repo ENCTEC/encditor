@@ -15,6 +15,7 @@ import {
   Faixa,
   moverClipe,
   removerItem,
+  substituirNasLegendas,
   trocarUrl,
 } from "@/timeline/operacoes";
 import { EfeitoAudio, IDS_EFEITOS_AUDIO } from "@/catalogo/estilos";
@@ -23,6 +24,7 @@ import { aplicarEfeitos } from "@/servidor/efeitos";
 import {
   direcaoSchema,
   estiloLegendaSchema,
+  posicaoLegendaSchema,
   Timeline,
   tipoTransicaoSchema,
 } from "@/timeline/schema";
@@ -912,6 +914,102 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         return aplicar(
           (t) => atualizarItem(t, "legendas", indice, { estilo: e.estilo }),
           `legenda ${e.legenda} agora no estilo #${e.estilo}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "corrigir_texto_das_legendas",
+      description:
+        'Troca uma palavra ou expressão em TODAS as legendas de uma vez (ex.: "linda" -> "Linnda", "trivit" -> "Trivitt"), mantendo o tempo de cada palavra. Só troca palavras inteiras e não diferencia maiúsculas. Use sempre que o usuário pedir para corrigir um nome/palavra "em todas", em vez de editar legenda por legenda.',
+      inputSchema: z.object({
+        procurar: z.string().min(1).describe("Como está escrito hoje."),
+        trocar_por: z.string().describe("Como deve ficar."),
+      }),
+      run: (e) => {
+        const { trocas } = substituirNasLegendas(
+          sessao.timeline,
+          e.procurar,
+          e.trocar_por,
+        );
+        if (!trocas) {
+          throw new Error(
+            `Não achei "${e.procurar}" em nenhuma legenda (já pode estar corrigido).`,
+          );
+        }
+        return aplicar(
+          (t) => substituirNasLegendas(t, e.procurar, e.trocar_por).timeline,
+          `"${e.procurar}" trocado por "${e.trocar_por}" em ${trocas} lugar(es) das legendas`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "aparencia_das_legendas",
+      description:
+        "Muda tamanho, posição na tela (topo/centro/base), distância da borda e espaço entre as linhas de TODAS as legendas, em qualquer estilo. Campos null não mudam.",
+      inputSchema: z.object({
+        tamanho_percent: z
+          .number()
+          .min(30)
+          .max(300)
+          .nullable()
+          .describe(
+            "Tamanho da letra em % do padrão do estilo (100 = padrão; 'um pouco menor' ≈ 80; 'bem menor' ≈ 60; 'maior' ≈ 125).",
+          ),
+        posicao: posicaoLegendaSchema
+          .nullable()
+          .describe(
+            "topo, centro ou base (sempre centralizada na horizontal).",
+          ),
+        distancia_da_borda_percent: z
+          .number()
+          .min(0)
+          .max(45)
+          .nullable()
+          .describe(
+            "Só topo/base: distância da borda em % da altura (padrão 9; 'mais para baixo' ≈ 5; 'mais para cima' ≈ 15).",
+          ),
+        espaco_entre_linhas: z
+          .number()
+          .min(0.7)
+          .max(2.5)
+          .nullable()
+          .describe(
+            "Altura de cada linha em relação à letra. #gigante usa 0.95 (linhas coladas), os outros ~1.15–1.2. 'Menos juntas' ≈ 1.25–1.35.",
+          ),
+        voltar_ao_padrao: z
+          .boolean()
+          .describe("true = descarta os ajustes e volta ao padrão do estilo."),
+      }),
+      run: (e) => {
+        const mudancas = {
+          ...(e.tamanho_percent !== null
+            ? { tamanho: Math.round(e.tamanho_percent) / 100 }
+            : {}),
+          ...(e.posicao !== null ? { posicao: e.posicao } : {}),
+          ...(e.distancia_da_borda_percent !== null
+            ? { margem: e.distancia_da_borda_percent }
+            : {}),
+          ...(e.espaco_entre_linhas !== null
+            ? { entrelinhas: e.espaco_entre_linhas }
+            : {}),
+        };
+        if (!e.voltar_ao_padrao && !Object.keys(mudancas).length) {
+          throw new Error("Nenhum ajuste pedido.");
+        }
+        return aplicar(
+          (t) => ({
+            ...t,
+            aparenciaLegendas: e.voltar_ao_padrao
+              ? undefined
+              : { ...t.aparenciaLegendas, ...mudancas },
+          }),
+          e.voltar_ao_padrao
+            ? "legendas voltaram ao tamanho/posição padrão do estilo"
+            : `legendas: ${Object.entries(mudancas)
+                .map(([k, v]) => `${k} ${v}`)
+                .join(", ")}`,
         );
       },
     }),

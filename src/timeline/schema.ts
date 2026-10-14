@@ -122,6 +122,20 @@ export const legendaSchema = z.object({
     .optional(),
 });
 
+// Aparência de TODAS as legendas (vale para qualquer estilo). Campos sem
+// valor = o padrão de cada estilo.
+export const posicaoLegendaSchema = z.enum(["topo", "centro", "base"]);
+export const aparenciaLegendasSchema = z.object({
+  // Multiplica o tamanho da letra do estilo (1 = padrão; 0.8 = 20% menor).
+  tamanho: z.number().min(0.3).max(3).optional(),
+  posicao: posicaoLegendaSchema.optional(),
+  // Distância da borda (topo ou base), em % da altura do vídeo.
+  margem: z.number().min(0).max(45).optional(),
+  // Altura de cada linha em relação à letra (1 = linhas coladas; 1.3 =
+  // mais espaço entre elas).
+  entrelinhas: z.number().min(0.7).max(2.5).optional(),
+});
+
 export const timelineSchema = z.object({
   fps: z.number().int().positive(),
   largura: z.number().int().positive(),
@@ -135,6 +149,7 @@ export const timelineSchema = z.object({
   legendas: z.array(legendaSchema),
   // Estilo padrão das legendas (sem valor = clássico).
   estiloLegenda: estiloLegendaSchema.optional(),
+  aparenciaLegendas: aparenciaLegendasSchema.optional(),
 });
 
 export type TipoTransicao = z.infer<typeof tipoTransicaoSchema>;
@@ -145,4 +160,6 @@ export type AudioFaixa = z.infer<typeof audioSchema>;
 export type Zoom = z.infer<typeof zoomSchema>;
 export type Legenda = z.infer<typeof legendaSchema>;
 export type EstiloLegenda = z.infer<typeof estiloLegendaSchema>;
+export type PosicaoLegenda = z.infer<typeof posicaoLegendaSchema>;
+export type AparenciaLegendas = z.infer<typeof aparenciaLegendasSchema>;
 export type Timeline = z.infer<typeof timelineSchema>;

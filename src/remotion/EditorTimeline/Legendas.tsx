@@ -7,7 +7,12 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { EstiloLegenda, Legenda } from "../../timeline/schema";
+import {
+  AparenciaLegendas,
+  EstiloLegenda,
+  Legenda,
+  PosicaoLegenda,
+} from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
 import { FONTES } from "./fontes";
 
@@ -51,34 +56,53 @@ const useSaida = (duracaoFrames: number) => {
   });
 };
 
+// Onde a legenda fica: a posição escolhida pelo usuário ou o padrão do
+// estilo (embaixo; "centro" para o gigante).
 const Base: React.FC<{
   children: React.ReactNode;
+  aparencia?: AparenciaLegendas;
   centro?: boolean;
   opacidade?: number;
-}> = ({ children, centro, opacidade = 1 }) => (
-  <AbsoluteFill
-    style={{
-      justifyContent: centro ? "center" : "flex-end",
-      alignItems: "center",
-      paddingBottom: centro ? 0 : "9%",
-      paddingLeft: "6%",
-      paddingRight: "6%",
-      opacity: opacidade,
-    }}
-  >
-    {children}
-  </AbsoluteFill>
-);
+}> = ({ children, aparencia, centro, opacidade = 1 }) => {
+  const posicao: PosicaoLegenda =
+    aparencia?.posicao ?? (centro ? "centro" : "base");
+  const margem = `${aparencia?.margem ?? 9}%`;
+  return (
+    <AbsoluteFill
+      style={{
+        justifyContent:
+          posicao === "centro"
+            ? "center"
+            : posicao === "topo"
+              ? "flex-start"
+              : "flex-end",
+        alignItems: "center",
+        paddingTop: posicao === "topo" ? margem : 0,
+        paddingBottom: posicao === "base" ? margem : 0,
+        paddingLeft: "6%",
+        paddingRight: "6%",
+        opacity: opacidade,
+      }}
+    >
+      {children}
+    </AbsoluteFill>
+  );
+};
 
 export const LegendaAnimada: React.FC<{
   legenda: Legenda;
   estilo: EstiloLegenda;
   duracaoFrames: number;
-}> = ({ legenda, estilo, duracaoFrames }) => {
+  aparencia?: AparenciaLegendas;
+}> = ({ legenda, estilo, duracaoFrames, aparencia }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
   const t = frame / fps;
-  const base = Math.min(width, height);
+  // Tudo é proporcional a "base": mudar o tamanho escala letra e espaços.
+  const base = Math.min(width, height) * (aparencia?.tamanho ?? 1);
+  // Entrelinhas escolhidas pelo usuário (ou o padrão do estilo).
+  const entrelinhas = (padrao: number | "normal") =>
+    aparencia?.entrelinhas ?? padrao;
   const saida = useSaida(duracaoFrames);
   const palavras = palavrasDa(legenda, duracaoFrames / fps);
   // Palavra sendo falada agora (ou a última já falada).
@@ -95,7 +119,7 @@ export const LegendaAnimada: React.FC<{
         justifyContent: "center",
         gap: `0 ${base * 0.018}px`,
         textAlign: "center",
-        lineHeight: 1.15,
+        lineHeight: entrelinhas(1.15),
         ...estiloTexto,
       }}
     >
@@ -110,7 +134,7 @@ export const LegendaAnimada: React.FC<{
   switch (estilo) {
     case "karaoke":
       return (
-        <Base opacidade={saida}>
+        <Base aparencia={aparencia} opacidade={saida}>
           {linhaDePalavras(
             (p, i) => (
               <span
@@ -135,7 +159,7 @@ export const LegendaAnimada: React.FC<{
 
     case "pop":
       return (
-        <Base opacidade={saida}>
+        <Base aparencia={aparencia} opacidade={saida}>
           {linhaDePalavras(
             (p) => {
               const entrada = spring({
@@ -169,7 +193,7 @@ export const LegendaAnimada: React.FC<{
 
     case "destaque":
       return (
-        <Base opacidade={saida}>
+        <Base aparencia={aparencia} opacidade={saida}>
           {linhaDePalavras(
             (p, i) => (
               <span
@@ -203,12 +227,12 @@ export const LegendaAnimada: React.FC<{
         config: { damping: 12, stiffness: 220 },
       });
       return (
-        <Base centro opacidade={saida}>
+        <Base aparencia={aparencia} centro opacidade={saida}>
           <div
             style={{
               fontFamily: FONTES.condensada,
               fontSize: base * 0.14,
-              lineHeight: 0.95,
+              lineHeight: entrelinhas(0.95),
               color: "white",
               textTransform: "uppercase",
               textAlign: "center",
@@ -231,11 +255,12 @@ export const LegendaAnimada: React.FC<{
         { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
       );
       return (
-        <Base opacidade={saida}>
+        <Base aparencia={aparencia} opacidade={saida}>
           <div
             style={{
               fontFamily: FONTES.spray,
               fontSize: base * 0.075,
+              lineHeight: entrelinhas("normal"),
               color: VERMELHO,
               textAlign: "center",
               transform: "rotate(-3deg)",
@@ -262,12 +287,13 @@ export const LegendaAnimada: React.FC<{
       );
       const cursor = Math.floor(t * 2) % 2 === 0;
       return (
-        <Base opacidade={saida}>
+        <Base aparencia={aparencia} opacidade={saida}>
           <div
             style={{
               fontFamily: FONTES.mono,
               fontWeight: 700,
               fontSize: base * 0.048,
+              lineHeight: entrelinhas("normal"),
               color: "#F4F1EA",
               background: "rgba(10,10,10,0.85)",
               padding: `${base * 0.012}px ${base * 0.022}px`,
@@ -288,12 +314,13 @@ export const LegendaAnimada: React.FC<{
       const passo = Math.floor(frame / 3);
       const brilho = passo < piscadas.length ? piscadas[passo] : 1;
       return (
-        <Base opacidade={saida * brilho}>
+        <Base aparencia={aparencia} opacidade={saida * brilho}>
           <div
             style={{
               fontFamily: FONTES.forte,
               fontWeight: 800,
               fontSize: base * 0.064,
+              lineHeight: entrelinhas("normal"),
               color: "#FFFFFF",
               textAlign: "center",
               textShadow:
@@ -312,7 +339,7 @@ export const LegendaAnimada: React.FC<{
         extrapolateRight: "clamp",
       });
       return (
-        <Base opacidade={Math.min(entrada, saida)}>
+        <Base aparencia={aparencia} opacidade={Math.min(entrada, saida)}>
           <div
             style={{
               maxWidth: "85%",
@@ -324,7 +351,7 @@ export const LegendaAnimada: React.FC<{
               fontWeight: 800,
               fontSize: base * 0.048,
               textAlign: "center",
-              lineHeight: 1.2,
+              lineHeight: entrelinhas(1.2),
             }}
           >
             {legenda.texto}
@@ -338,7 +365,8 @@ export const LegendaAnimada: React.FC<{
 export const Legendas: React.FC<{
   legendas: Legenda[];
   estiloPadrao?: EstiloLegenda;
-}> = ({ legendas, estiloPadrao }) => {
+  aparencia?: AparenciaLegendas;
+}> = ({ legendas, estiloPadrao, aparencia }) => {
   const { fps } = useVideoConfig();
 
   return (
@@ -361,6 +389,7 @@ export const Legendas: React.FC<{
               legenda={legenda}
               estilo={legenda.estilo ?? estiloPadrao ?? "classico"}
               duracaoFrames={duracao}
+              aparencia={aparencia}
             />
           </Sequence>
         );

@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
 import { useProjeto } from "@/projeto/ProjetoProvider";
-import { EstiloLegenda } from "@/timeline/schema";
+import {
+  AparenciaLegendas,
+  EstiloLegenda,
+  PosicaoLegenda,
+} from "@/timeline/schema";
 import {
   atualizarItem,
   definirFormato,
@@ -130,6 +134,90 @@ const estiloCampo =
 
 // Campo que só aplica a mudança ao sair do campo ou apertar Enter (assim
 // cada tecla não vira um passo no desfazer).
+// Número opcional: vazio = padrão do estilo; fora da faixa = encosta no
+// limite.
+const numeroOuPadrao = (texto: string, min: number, max: number) =>
+  texto.trim() === "" ? undefined : Math.min(max, Math.max(min, Number(texto)));
+
+// Tamanho, posição e espaço entre linhas de TODAS as legendas (valem para
+// qualquer estilo). Campos vazios = padrão do estilo.
+const AjustesDasLegendas: React.FC<{
+  aparencia: AparenciaLegendas;
+  ajustar: (mudancas: AparenciaLegendas) => void;
+}> = ({ aparencia, ajustar }) => (
+  <div className="space-y-2 border-l-2 border-zinc-700 pl-3">
+    <div className="grid grid-cols-2 gap-2">
+      <label className="block">
+        <span className="mb-1 block text-xs text-zinc-400">Tamanho (%)</span>
+        <CampoEditavel
+          valor={
+            aparencia.tamanho !== undefined
+              ? String(Math.round(aparencia.tamanho * 100))
+              : ""
+          }
+          numerico
+          passo={5}
+          aoConfirmar={(v) => {
+            const pct = numeroOuPadrao(v, 30, 300);
+            ajustar({ tamanho: pct === undefined ? undefined : pct / 100 });
+          }}
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs text-zinc-400">Posição</span>
+        <select
+          value={aparencia.posicao ?? ""}
+          onChange={(e) =>
+            ajustar({
+              posicao: (e.target.value || undefined) as
+                | PosicaoLegenda
+                | undefined,
+            })
+          }
+          className={estiloCampo}
+        >
+          <option value="">Padrão do estilo</option>
+          <option value="topo">Topo</option>
+          <option value="centro">Centro</option>
+          <option value="base">Base</option>
+        </select>
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs text-zinc-400">
+          Distância da borda (%)
+        </span>
+        <CampoEditavel
+          valor={aparencia.margem !== undefined ? String(aparencia.margem) : ""}
+          numerico
+          passo={1}
+          aoConfirmar={(v) => ajustar({ margem: numeroOuPadrao(v, 0, 45) })}
+        />
+      </label>
+      <label className="block">
+        <span className="mb-1 block text-xs text-zinc-400">
+          Espaço entre linhas
+        </span>
+        <CampoEditavel
+          valor={
+            aparencia.entrelinhas !== undefined
+              ? String(aparencia.entrelinhas)
+              : ""
+          }
+          numerico
+          passo={0.05}
+          aoConfirmar={(v) =>
+            ajustar({ entrelinhas: numeroOuPadrao(v, 0.7, 2.5) })
+          }
+        />
+      </label>
+    </div>
+    <p className="text-xs text-zinc-500">
+      Vazio = padrão do estilo. Ex.: tamanho 80, posição Base, distância 6,
+      espaço 1.3.
+    </p>
+  </div>
+);
+
 const CampoEditavel: React.FC<{
   valor: string;
   numerico: boolean;
@@ -271,6 +359,23 @@ export const Inspetor: React.FC<{
             ))}
           </select>
         </label>
+        <AjustesDasLegendas
+          aparencia={timeline.aparenciaLegendas ?? {}}
+          ajustar={(mudancas) =>
+            aplicar((t) => {
+              const juntas = { ...t.aparenciaLegendas, ...mudancas };
+              const definidas = Object.fromEntries(
+                Object.entries(juntas).filter(([, v]) => v !== undefined),
+              );
+              return {
+                ...t,
+                aparenciaLegendas: Object.keys(definidas).length
+                  ? definidas
+                  : undefined,
+              };
+            })
+          }
+        />
         <p className="text-xs text-zinc-500">
           Clique num item da timeline para editar. Veja os exemplos de cada
           estilo na aba Estilos.

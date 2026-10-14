@@ -55,8 +55,63 @@ export const atualizarItem = <F extends Faixa>(
 ): Timeline => {
   conferirIndice(t, faixa, indice);
   const itens = [...t[faixa]] as ItensPorFaixa[F][];
-  itens[indice] = { ...itens[indice], ...mudancas };
+  const novo = { ...itens[indice], ...mudancas };
+  // Legenda com texto novo: mantém o tempo de cada palavra.
+  itens[indice] = (
+    faixa === "legendas" && "texto" in mudancas
+      ? comTextoNovo(novo as unknown as Legenda, (novo as Legenda).texto)
+      : novo
+  ) as ItensPorFaixa[F];
   return { ...t, [faixa]: itens };
+};
+
+// Troca o texto de uma legenda que veio da fala. Se o número de palavras
+// não mudou, cada palavra nova herda o tempo da antiga (karaokê, pop e
+// destaque continuam no ritmo da fala). Se mudou, os tempos saem e a
+// animação divide a duração igualmente.
+export const comTextoNovo = (legenda: Legenda, texto: string): Legenda => {
+  const novas = texto.split(/\s+/).filter(Boolean);
+  const antigas = legenda.palavras;
+  return {
+    ...legenda,
+    texto,
+    palavras:
+      antigas && antigas.length === novas.length
+        ? antigas.map((p, i) => ({ ...p, texto: novas[i] }))
+        : undefined,
+  };
+};
+
+const escaparRegex = (texto: string) =>
+  texto.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Troca uma palavra/expressão em TODAS as legendas (ex.: "linda" ->
+// "Linnda"). Só palavras inteiras, sem diferenciar maiúsculas. Devolve
+// também quantas trocas foram feitas.
+export const substituirNasLegendas = (
+  t: Timeline,
+  procurar: string,
+  trocarPor: string,
+) => {
+  const alvo = procurar.trim();
+  if (!alvo) throw new Error("Diga o que procurar.");
+  const regex = new RegExp(
+    `(?<![\\p{L}\\p{N}])${escaparRegex(alvo)}(?![\\p{L}\\p{N}])`,
+    "giu",
+  );
+  let trocas = 0;
+  const legendas = t.legendas.map((l) => {
+    const noTexto = l.texto.match(regex)?.length ?? 0;
+    // Também conta as palavras animadas: o texto pode já ter sido
+    // corrigido à mão e elas ainda estarem com a grafia antiga.
+    const nasPalavras = (l.palavras ?? []).filter((p) =>
+      p.texto.match(regex),
+    ).length;
+    if (!noTexto && !nasPalavras) return l;
+    trocas += Math.max(noTexto, nasPalavras);
+    return comTextoNovo(l, l.texto.replace(regex, trocarPor));
+  });
+  return { timeline: { ...t, legendas }, trocas };
 };
 
 export const removerItem = (

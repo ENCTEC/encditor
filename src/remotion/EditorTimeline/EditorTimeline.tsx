@@ -93,6 +93,7 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
       <Legendas
         legendas={timeline.legendas}
         estiloPadrao={timeline.estiloLegenda}
+        aparencia={timeline.aparenciaLegendas}
       />
       <Audios audios={timeline.audios} />
     </AbsoluteFill>
