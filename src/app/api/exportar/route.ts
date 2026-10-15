@@ -1,25 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { exportarProjeto, lerTrabalho } from "@/servidor/exportar";
+import { IDS_FORMATO } from "@/timeline/formatos";
 
 // Exportar o MP4 final de um projeto.
-// POST { projetoId, nome? } → { trabalho }   (começa na fila)
+// POST { projetoId, nome?, formatos? } → { trabalhos }  (começam na fila)
 // GET ?trabalho=<id>        → { trabalho }   (progresso)
 
 export async function POST(req: NextRequest) {
   const corpo = z
-    .object({ projetoId: z.string(), nome: z.string().max(80).optional() })
+    .object({
+      projetoId: z.string(),
+      nome: z.string().max(80).optional(),
+      // Proporções a exportar (uma versão para cada). Vazio = a do projeto.
+      formatos: z.array(z.enum(IDS_FORMATO)).max(4).default([]),
+    })
     .safeParse(await req.json().catch(() => null));
   if (!corpo.success) {
     return NextResponse.json({ erro: "Pedido inválido." }, { status: 400 });
   }
   try {
-    const trabalho = exportarProjeto(
+    const trabalhos = exportarProjeto(
       corpo.data.projetoId,
       req.nextUrl.origin,
       corpo.data.nome,
+      corpo.data.formatos,
     );
-    return NextResponse.json({ trabalho });
+    return NextResponse.json({ trabalhos });
   } catch (e) {
     return NextResponse.json(
       { erro: e instanceof Error ? e.message : String(e) },

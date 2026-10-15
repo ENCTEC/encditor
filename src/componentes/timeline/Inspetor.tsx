@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
 import { useProjeto } from "@/projeto/ProjetoProvider";
+import { FORMATOS } from "@/timeline/formatos";
 import {
   AparenciaLegendas,
   EstiloLegenda,
@@ -252,13 +253,6 @@ const CampoEditavel: React.FC<{
   );
 };
 
-const FORMATOS = [
-  { rotulo: "16:9", largura: 1920, altura: 1080 },
-  { rotulo: "9:16", largura: 1080, altura: 1920 },
-  { rotulo: "1:1", largura: 1080, altura: 1080 },
-  { rotulo: "4:5", largura: 1080, altura: 1350 },
-];
-
 export const Inspetor: React.FC<{
   selecao: Selecao;
   aoSelecionar: (s: Selecao) => void;
@@ -289,7 +283,7 @@ export const Inspetor: React.FC<{
                 ) < 0.01;
               return (
                 <button
-                  key={f.rotulo}
+                  key={f.id}
                   onClick={() =>
                     aplicar((t) => definirFormato(t, f.largura, f.altura))
                   }
@@ -299,7 +293,7 @@ export const Inspetor: React.FC<{
                       : "border-zinc-700 text-zinc-300 hover:border-zinc-500"
                   }`}
                 >
-                  {f.rotulo}
+                  {f.id}
                 </button>
               );
             })}

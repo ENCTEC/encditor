@@ -1,3 +1,4 @@
+import { mudarFormato } from "./formatos";
 import { AudioFaixa, Clipe, Insert, Legenda, Timeline, Zoom } from "./schema";
 
 // Todas as mudanças na timeline passam por estas funções. Elas são puras:
@@ -139,11 +140,12 @@ export const moverClipe = (t: Timeline, de: number, para: number): Timeline => {
 };
 
 // Muda formato do vídeo final (ex.: 1920x1080 ou 1080x1920).
+// Muda a proporção do vídeo (os inserts em janela mantêm o formato).
 export const definirFormato = (
   t: Timeline,
   largura: number,
   altura: number,
-): Timeline => ({ ...t, largura, altura });
+): Timeline => mudarFormato(t, largura, altura);
 
 // Coloca um clipe numa posição da trilha (0 = primeiro). Sem posição, vai
 // para o fim. Permite também repetir uma cena já usada.

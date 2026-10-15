@@ -4,6 +4,12 @@ import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
 import { Midia } from "@/projeto/tipos";
 import { calcularClipes, calcularDuracaoTotal } from "@/timeline/calculos";
+import {
+  formatoDaTimeline,
+  formatoPorId,
+  IdFormato,
+  mudarFormato,
+} from "@/timeline/formatos";
 import { Timeline } from "@/timeline/schema";
 import { apagarArquivos, reservarArquivo } from "./armazenamento";
 import {
@@ -59,10 +65,13 @@ const comEnderecoCompleto = (t: Timeline, origem: string): Timeline => {
 
 export const lerTrabalho = (id: string) => trabalhos.get(id) ?? null;
 
+// Começa a exportação em uma ou mais proporções (uma versão para cada,
+// todas com o mesmo nome base: "Versão 3 (9:16)", "Versão 3 (1:1)").
 export const exportarProjeto = (
   projetoId: string,
   origem: string,
-  nomePedido?: string,
+  nomePedido: string | undefined,
+  formatos: IdFormato[],
 ) => {
   const salvo = lerProjeto(projetoId);
   if (!salvo) throw new Error("Projeto não encontrado.");
@@ -70,11 +79,34 @@ export const exportarProjeto = (
   if (!timeline.clipes.length) {
     throw new Error("O projeto ainda não tem cenas na trilha principal.");
   }
+  const atual = formatoDaTimeline(timeline);
+  const pedidos = formatos.length ? [...new Set(formatos)] : [atual];
+  const base =
+    nomePedido?.trim() || `Versão ${contarExportacoes(projetoId) + 1}`;
+  return pedidos.map((formato) => {
+    const marcar = formato && (pedidos.length > 1 || formato !== atual);
+    const f = formato && formato !== atual ? formatoPorId(formato) : null;
+    return exportarUmFormato(
+      projetoId,
+      salvo.cliente.id,
+      origem,
+      marcar ? `${base} (${formato})` : base,
+      f ? mudarFormato(timeline, f.largura, f.altura) : timeline,
+    );
+  });
+};
 
+const exportarUmFormato = (
+  projetoId: string,
+  clienteId: string,
+  origem: string,
+  nome: string,
+  timeline: Timeline,
+) => {
   const trabalho: Trabalho = {
     id: randomUUID(),
     projetoId,
-    nome: nomePedido?.trim() || `Versão ${contarExportacoes(projetoId) + 1}`,
+    nome,
     estado: "na-fila",
     progresso: 0,
     erro: null,
@@ -119,7 +151,7 @@ export const exportarProjeto = (
         ...timeline.inserts.map((i) => i.url),
         ...timeline.audios.map((a) => a.url),
       ]);
-      const usados = (lerMidiasDoCliente(salvo.cliente.id) as Midia[])
+      const usados = (lerMidiasDoCliente(clienteId) as Midia[])
         .filter((m) => urls.has(m.url))
         .map((m) => ({
           id: m.id,
@@ -131,7 +163,7 @@ export const exportarProjeto = (
         }));
       trabalho.exportacaoId = registrarExportacao({
         projetoId,
-        clienteId: salvo.cliente.id,
+        clienteId,
         nome: trabalho.nome,
         arquivo: destino.nome,
         duracao: calcularDuracaoTotal(calcularClipes(timeline)) / timeline.fps,

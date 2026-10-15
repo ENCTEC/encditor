@@ -21,6 +21,7 @@ import {
 import { EfeitoAudio, IDS_EFEITOS_AUDIO } from "@/catalogo/estilos";
 import { nomeDaUrl } from "@/servidor/armazenamento";
 import { aplicarEfeitos } from "@/servidor/efeitos";
+import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
 import {
   direcaoSchema,
   estiloLegendaSchema,
@@ -95,13 +96,6 @@ const FAIXA_POR_TIPO: Record<string, Faixa> = {
   audio: "audios",
   zoom: "zooms",
   legenda: "legendas",
-};
-
-const FORMATOS: Record<string, [number, number]> = {
-  "16:9": [1920, 1080],
-  "9:16": [1080, 1920],
-  "1:1": [1080, 1080],
-  "4:5": [1080, 1350],
 };
 
 export const criarFerramentas = (sessao: SessaoEdicao) => {
@@ -1067,7 +1061,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       description:
         "Muda o formato do vídeo final, o fps ou a duração padrão das transições. Campos null não mudam.",
       inputSchema: z.object({
-        formato: z.enum(["16:9", "9:16", "1:1", "4:5"]).nullable(),
+        formato: z.enum(IDS_FORMATO).nullable(),
         fps: z
           .union([z.literal(24), z.literal(25), z.literal(30), z.literal(60)])
           .nullable(),
@@ -1077,7 +1071,10 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         aplicar(
           (t) => {
             let nova = t;
-            if (e.formato) nova = definirFormato(nova, ...FORMATOS[e.formato]);
+            if (e.formato) {
+              const f = formatoPorId(e.formato);
+              nova = definirFormato(nova, f.largura, f.altura);
+            }
             if (e.fps) nova = { ...nova, fps: e.fps };
             if (e.duracao_padrao_transicao_s !== null) {
               nova = {
