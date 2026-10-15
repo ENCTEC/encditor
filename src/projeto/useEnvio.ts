@@ -31,9 +31,10 @@ export type Anexo = {
   progresso: number | null;
 };
 
-// Cenas costumam ter fala/conteúdo importante; inserts e áudios (música)
-// em geral não precisam ser lidos.
-const iaPadrao = (papel: PapelMidia) => papel === "cena";
+// Vídeos e imagens são descritos pela IA por padrão: o banco do cliente
+// vai acumulando a descrição de tudo para ser reaproveitado nos próximos
+// vídeos. Áudios (música) ficam "frios": descrever não ajuda a escolher.
+const iaPadrao = (formato: Midia["formato"]) => formato !== "audio";
 
 export const useEnvio = () => {
   const { obterBiblioteca, adicionarMidia, atualizarAnalise } = useProjeto();
@@ -64,7 +65,7 @@ export const useEnvio = () => {
         formato,
         papel,
         apelido,
-        usarIA: iaPadrao(papel),
+        usarIA: iaPadrao(formato),
         progresso: null,
       });
     }

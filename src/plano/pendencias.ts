@@ -104,7 +104,8 @@ export const itensDoPlano = (
       papel: "insert",
       aceita: "video/*,image/*",
       obrigatorio: true,
-      usarIA: false,
+      // Descrito como tudo do banco (para reaproveitar depois).
+      usarIA: true,
       doBanco,
       midia,
       status: midia ? "pronto" : doBanco ? "nao-achado" : "pendente",

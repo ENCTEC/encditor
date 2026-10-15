@@ -36,6 +36,7 @@ import {
   palavrasDaMidia,
   palavrasNoVideoFinal,
 } from "./conteudo";
+import { buscarNoBanco } from "./busca-banco";
 import { resumoDoProjeto } from "./estado";
 import {
   caixaParaPosicao,
@@ -791,6 +792,55 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           falas,
           visual,
           ...(pendentes.length ? { sem_analise: pendentes } : {}),
+        });
+      },
+    }),
+
+    ferramenta({
+      name: "buscar_no_banco",
+      description:
+        'Procura no BANCO DE MÍDIA do cliente (todos os vídeos e imagens já enviados, inclusive de outros projetos dele) pelo CONTEÚDO descrito pela IA: o que aparece, texto na tela e fala. Use quando o usuário pedir algo do banco ("troque a cena 4 por algo que mostre a fachada", "tem algum clipe do kit na mão?") ou quando faltar um clipe para uma fala. Devolve os melhores arquivos com o @apelido e os momentos (segundos DENTRO do arquivo) que combinam; depois use adicionar_cena, colocar_insert e aparar_cena com eles.',
+      inputSchema: z.object({
+        o_que: z
+          .string()
+          .min(2)
+          .describe(
+            "O que procurar, em palavras (ex.: 'fachada da loja com letreiro').",
+          ),
+        tipo: z
+          .enum(["video", "imagem", "qualquer"])
+          .nullable()
+          .describe("Só vídeos, só imagens ou qualquer um. null = qualquer."),
+      }),
+      run: (e) => {
+        const naTimeline = new Set([
+          ...sessao.timeline.clipes.map((c) => c.url),
+          ...sessao.timeline.inserts.map((x) => x.url),
+        ]);
+        const candidatos = sessao.biblioteca.filter(
+          (m) =>
+            m.formato !== "audio" &&
+            (!e.tipo || e.tipo === "qualquer" || m.formato === e.tipo),
+        );
+        const achados = buscarNoBanco(candidatos, e.o_que).slice(0, 8);
+        const frios = candidatos.filter(
+          (m) => m.analise?.status !== "pronta",
+        ).length;
+        if (!achados.length) {
+          return `Nada no banco combina com "${e.o_que}".${frios ? ` (${frios} arquivo(s) ainda sem descrição da IA não entram na busca.)` : ""}`;
+        }
+        return JSON.stringify({
+          achados: achados.map((a) => ({
+            arquivo: `@${a.midia.apelido}`,
+            nome: a.midia.nome,
+            papel: a.midia.papel,
+            formato: a.midia.formato,
+            duracao_s: a.midia.duracao,
+            ja_esta_no_video: naTimeline.has(a.midia.url),
+            resumo: a.midia.analise?.visual?.resumo ?? "",
+            momentos_que_combinam: a.momentos,
+          })),
+          ...(frios ? { sem_descricao: frios } : {}),
         });
       },
     }),

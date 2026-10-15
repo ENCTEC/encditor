@@ -231,6 +231,41 @@ const AcoesDoArquivo: React.FC<{ midia: Midia }> = ({ midia }) => {
   );
 };
 
+// Arquivos "frios" (sem descrição da IA) que já estão no banco: analisar
+// todos de uma vez, para o planejador e o chat poderem reaproveitá-los.
+// Custo medido: ~US$ 0,01 por vídeo curto, ~US$ 0,005 por imagem.
+const AnalisarFrios: React.FC = () => {
+  const { projeto, editarMidia, atualizarAnalise } = useProjeto();
+  const frios = projeto.biblioteca.filter(
+    (m) =>
+      m.formato !== "audio" &&
+      m.url.startsWith("/api/midia/") &&
+      m.usarIA === false,
+  );
+  if (!frios.length) return null;
+  const videos = frios.filter((m) => m.formato === "video").length;
+  const custo = videos * 0.01 + (frios.length - videos) * 0.005;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3 border-2 border-dashed border-tinta px-3 py-2 text-sm">
+      <span>
+        ❄ <b>{frios.length}</b> arquivo(s) do banco sem descrição da IA — o
+        planejador e o chat não sabem o que eles mostram.
+      </span>
+      <button
+        onClick={() => {
+          for (const m of frios) {
+            editarMidia(m.id, { usarIA: true });
+            iniciarAnalise({ ...m, usarIA: true }, atualizarAnalise);
+          }
+        }}
+        className="botao-spray !px-3 !py-1 !text-sm"
+      >
+        Analisar todos (≈ US$ {custo.toFixed(2).replace(".", ",")})
+      </button>
+    </div>
+  );
+};
+
 // Aba "Arquivos": subir inserts/cenas/áudios escolhendo se a IA analisa
 // cada um, e gerenciar os apelidos (@) usados para citar no chat.
 export default function PaginaArquivos() {
@@ -252,11 +287,12 @@ export default function PaginaArquivos() {
             </span>
           </h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Suba cenas, inserts e áudios. Para cada um, escolha se a IA deve
-            analisar (ler a fala e o que aparece) ou se é um arquivo <b>frio</b>
-            , usado sem leitura e sem custo. Cite no chat com o @apelido. Para
-            legendar com a fala de um vídeo, envie-o como <b>Só o áudio</b> (ou
-            use “extrair áudio” na biblioteca).
+            Suba cenas, inserts, imagens e áudios. Vídeos e imagens são
+            descritos pela IA (fala + o que aparece, com minutagem) e ficam no
+            banco do cliente para serem reaproveitados nos próximos vídeos;
+            desmarque para deixar um arquivo <b>frio</b> (sem custo). Cite no
+            chat com o @apelido. Para legendar com a fala de um vídeo, envie-o
+            como <b>Só o áudio</b> (ou use “extrair áudio” na biblioteca).
           </p>
           {meta ? (
             <p className="mt-3 inline-block border-2 border-tinta px-3 py-1.5 font-mono text-xs">
@@ -264,6 +300,7 @@ export default function PaginaArquivos() {
               por todos os vídeos desse cliente.
             </p>
           ) : null}
+          <AnalisarFrios />
 
           <div
             onDragOver={(e) => {

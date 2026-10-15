@@ -35,6 +35,7 @@ import {
   salvarAprendizados,
   salvarPlano,
 } from "./banco";
+import { buscarNoBanco } from "@/ia/busca-banco";
 import { esquemaEstrito } from "./esquema-estrito";
 import { extrairQuadros } from "./ffmpeg";
 import { clienteOpenAI, comNovaTentativa, MODELOS } from "./openai";
@@ -242,6 +243,13 @@ CONVERSA
 
 // ---------- Contexto ----------
 
+// Banco grande: até 80 arquivos vão todos em detalhe; acima disso, os 60
+// mais relevantes para o roteiro (e os de versões boas) em detalhe e o
+// resto em uma linha (até 600).
+const TODOS_EM_DETALHE = 80;
+const DETALHADOS = 60;
+const LIMITE_RESUMIDOS = 600;
+
 type ImagemEntrada = { titulo: string; dataUrl: string };
 
 // Imagem de referência reduzida (jpg 512 px) para a IA ver.
@@ -342,12 +350,53 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
       usoPorUrl.set(url, lista);
     }
   }
-  const banco = midias
-    .filter((m) => m.formato !== "audio")
-    .map((m) => {
-      const uso = usoPorUrl.get(m.url);
-      return `- @${m.apelido} (${m.papel}, ${m.formato}${m.duracao ? `, ${r1(m.duracao)}s` : ""}): ${descreverAnalise(m.analise ?? null)}${uso ? ` | usado em: ${uso.join(", ")}` : ""}`;
-    });
+  // Banco: com muitos arquivos, só os que têm a ver com este vídeo (pela
+  // descrição) e os usados em versões que deram resultado vão em detalhe;
+  // o resto vai numa linha cada (a IA sabe que existem e pode usar).
+  const visuais = midias.filter((m) => m.formato !== "audio");
+  const consulta = [
+    b.roteiro,
+    b.objetivo,
+    b.observacoes,
+    ...b.obrigatorias,
+    ...b.exemplos.map((e) => e.detalhe),
+    ...plano.conversa
+      .filter((m) => m.autor === "usuario")
+      .slice(-4)
+      .map((m) => m.texto),
+    plano.gerado?.copy ?? "",
+  ].join(" ");
+  const relevantes = new Set(
+    buscarNoBanco(visuais, consulta)
+      .slice(0, DETALHADOS)
+      .map((a) => a.midia.id),
+  );
+  const deramResultado = new Set(
+    versoes
+      .filter((v) => v.resultado?.avaliacao === "bom")
+      .flatMap((v) => v.usou),
+  );
+  const detalhar = (m: Midia) =>
+    visuais.length <= TODOS_EM_DETALHE ||
+    relevantes.has(m.id) ||
+    deramResultado.has(m.url);
+  const linha = (m: Midia, detalhe: boolean) => {
+    const uso = usoPorUrl.get(m.url);
+    const conteudo = detalhe
+      ? descreverAnalise(m.analise ?? null)
+      : curto(m.analise?.visual?.resumo, 110) || "(sem análise)";
+    return `- @${m.apelido} (${m.papel}, ${m.formato}${m.duracao ? `, ${r1(m.duracao)}s` : ""}): ${conteudo}${uso ? ` | usado em: ${uso.join(", ")}` : ""}`;
+  };
+  const resumidos = visuais.filter((m) => !detalhar(m));
+  const banco = [
+    ...visuais.filter(detalhar).map((m) => linha(m, true)),
+    ...(resumidos.length
+      ? [
+          `-- Outros ${resumidos.length} arquivo(s), em resumo (também podem ser usados):`,
+          ...resumidos.slice(0, LIMITE_RESUMIDOS).map((m) => linha(m, false)),
+        ]
+      : []),
+  ];
 
   const secoes = [
     `CLIENTE: ${projeto.cliente.nome}. PROJETO: ${projeto.nome}.`,
@@ -393,7 +442,7 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
           .join("\n")
       : "(nenhuma ainda)",
     "== BANCO DE MÍDIA DO CLIENTE (pode reaproveitar) ==",
-    banco.length ? banco.slice(0, 150).join("\n") : "(vazio)",
+    banco.length ? banco.join("\n") : "(vazio)",
   ];
   return {
     texto: secoes.filter(Boolean).join("\n"),
