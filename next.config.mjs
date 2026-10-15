@@ -17,6 +17,10 @@ const nextConfig = {
   // Sem o indicador "N" do Next (só aparece em desenvolvimento e cobria o
   // botão Enviar do chat e os nomes das faixas da timeline).
   devIndicators: false,
+  // Endereço fácil no navegador: http://enceditor.localhost (o Chrome e o
+  // Edge mandam qualquer *.localhost para este PC). O Next só aceita outro
+  // nome além de "localhost" no modo de desenvolvimento se estiver aqui.
+  allowedDevOrigins: ["enceditor.localhost"],
   // Raiz do projeto fixa: existe um package-lock.json solto na pasta do
   // usuário que confundiria o Next na hora de achar a raiz.
   turbopack: {

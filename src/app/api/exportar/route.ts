@@ -7,6 +7,15 @@ import { IDS_FORMATO } from "@/timeline/formatos";
 // POST { projetoId, nome?, formatos? } → { trabalhos }  (começam na fila)
 // GET ?trabalho=<id>        → { trabalho }   (progresso)
 
+// O renderizador busca os vídeos no próprio servidor: usa "localhost" (com
+// a mesma porta), seja qual for o nome usado no navegador (ex.:
+// enceditor.localhost).
+const enderecoInterno = (req: NextRequest) => {
+  const url = new URL(req.nextUrl.origin);
+  url.hostname = "localhost";
+  return url.origin;
+};
+
 export async function POST(req: NextRequest) {
   const corpo = z
     .object({
@@ -22,7 +31,7 @@ export async function POST(req: NextRequest) {
   try {
     const trabalhos = exportarProjeto(
       corpo.data.projetoId,
-      req.nextUrl.origin,
+      enderecoInterno(req),
       corpo.data.nome,
       corpo.data.formatos,
     );

@@ -71,6 +71,8 @@ Estrutura: Next.js na raiz; composição Remotion em `src/remotion/` (Studio: `n
 
 ## Ambiente
 - Windows, VS Code, terminal PowerShell. ffmpeg 8.1 instalado via winget (na VPS: apt install ffmpeg).
+- **Endereço local fácil:** http://enceditor.localhost (o Chrome/Edge mandam *.localhost para este PC). O Next continua na porta 3000 (`npm run dev`); um repassador na porta 80 (`src/servidor/porta80.ts`, iniciado por `src/instrumentation.ts`, repassa também o websocket de recarga) entrega tudo para ela. NÃO rodar o Next direto na porta 80: no modo de desenvolvimento ele fica recarregando a página sem parar. `allowedDevOrigins` no next.config libera o nome; a exportação busca as mídias por "localhost" (`enderecoInterno`). Atalho na área de trabalho: `ENCeditor.url` (ícone `public/enceditor.ico`). Testes automáticos continuam usando http://localhost:3000.
+- **Queda do PC em 2026-10-15 ~19:15:** zerou o CLAUDE.md e corrompeu o índice do git (recuperados: `git reset` + `git checkout -- CLAUDE.MD`; o índice estragado ficou em .git/index.corrompido-*). Banco íntegro (cópia em dados/backups/antes-da-recuperacao-*). Lição: ainda não há backup automático de `dados/` e `midia/` — prioridade.
 - Conectores do claude.ai desativados no Claude Code (disableClaudeAiConnectors). Supabase será adicionado localmente só quando necessário.
 
 ## Como trabalhar comigo
