@@ -8,13 +8,14 @@ import { ModalNovoVideo } from "@/componentes/clientes/ModalNovoVideo";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
 
+// Abas do projeto aberto. "Clientes" fica fora daqui: é a raiz do caminho
+// de pastas (Clientes › Cliente › Projeto), ao lado.
 const ABAS = [
-  { href: "/clientes", rotulo: "Clientes" },
-  { href: "/planejar", rotulo: "Planejar" },
   { href: "/", rotulo: "Criar" },
   { href: "/timeline", rotulo: "Timeline" },
   { href: "/arquivos", rotulo: "Arquivos" },
   { href: "/estilos", rotulo: "Estilos" },
+  { href: "/planejar", rotulo: "Planejar" },
 ];
 
 const botao =
@@ -78,18 +79,41 @@ export const Cabecalho: React.FC = () => {
         })}
       </nav>
 
-      {meta ? (
+      {/* Caminho de pastas: Clientes › Cliente › Projeto. */}
+      <div className="flex min-w-0 flex-1 items-center gap-2 border-l-2 border-tinta pl-4 font-mono text-[11px] tracking-wider uppercase">
         <Link
-          href={`/clientes/${meta.cliente.id}`}
-          className="min-w-0 truncate border-l-2 border-tinta pl-4 font-mono text-[11px] tracking-wider uppercase hover:text-spray"
-          title="Ver os projetos e o banco de mídia deste cliente"
+          href="/clientes"
+          className={`shrink-0 border-2 border-tinta px-2 py-1 ${
+            caminho === "/clientes"
+              ? "bg-tinta text-papel"
+              : "hover:bg-tinta hover:text-papel"
+          }`}
+          title="Todos os clientes (pastas)"
         >
-          📁 {meta.cliente.nome} <span className="text-zinc-500">›</span>{" "}
-          <b>{meta.nome}</b>
+          📁 Clientes
         </Link>
-      ) : null}
+        {meta ? (
+          // Cliente em cima e projeto embaixo: cada nome usa a largura toda.
+          <div className="flex min-w-0 flex-col leading-tight">
+            <Link
+              href={`/clientes/${meta.cliente.id}`}
+              className={`truncate text-[10px] hover:text-spray ${
+                caminho.startsWith("/clientes/")
+                  ? "text-spray"
+                  : "text-zinc-500"
+              }`}
+              title="Ver os projetos e o banco de mídia deste cliente"
+            >
+              › {meta.cliente.nome}
+            </Link>
+            <b className="truncate" title={meta.nome}>
+              › {meta.nome}
+            </b>
+          </div>
+        ) : null}
+      </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <span
           className={`mr-3 font-mono text-[11px] tracking-[0.12em] uppercase ${
             salvamento === "erro" ? "text-spray" : "text-zinc-500"
