@@ -6,7 +6,11 @@ import OpenAI from "openai";
 import { z } from "zod";
 import { TRANSICOES, ESTILOS_LEGENDA } from "@/catalogo/estilos";
 import { Analise, analiseSchema } from "@/projeto/analise";
-import { Resultado, resultadoSchema } from "@/projeto/resultado";
+import {
+  lerResultado,
+  Resultado,
+  resumoDoResultado,
+} from "@/projeto/resultado";
 import { Midia } from "@/projeto/tipos";
 import { Elemento } from "@/plano/elementos";
 import { normalizarApelido } from "@/projeto/midia-cliente";
@@ -57,26 +61,20 @@ type Versao = {
   usou: string[]; // urls dos arquivos usados
 };
 
-// Nota única para ordenar (só para ordenar; a IA vê os números crus).
+// Nota única para ordenar (só para ordenar; a IA vê os números crus):
+// avaliação, depois vendas, CTR e alcance orgânico.
 const pontuacao = (r: Resultado | null) => {
   if (!r) return -1;
   const base = { bom: 3, neutro: 2, ruim: 1 }[r.avaliacao];
-  const roas = r.metricas.roas ?? 0;
-  const ctr = r.metricas.ctr ?? 0;
-  return base * 100 + roas * 10 + ctr;
+  const vendas = r.pago.vendas ?? 0;
+  const ctr = r.pago.ctr ?? 0;
+  const views =
+    (r.organico.tiktok.visualizacoes ?? 0) +
+    (r.organico.instagram.visualizacoes ?? 0);
+  return base * 10000 + vendas * 50 + ctr * 10 + Math.log10(1 + views);
 };
 
-const metricasEmTexto = (r: Resultado) =>
-  [
-    r.metricas.roas !== null ? `ROAS ${r.metricas.roas}` : "",
-    r.metricas.cpa !== null ? `CPA R$${r.metricas.cpa}` : "",
-    r.metricas.ctr !== null ? `CTR ${r.metricas.ctr}%` : "",
-    r.metricas.investimento !== null
-      ? `investimento R$${r.metricas.investimento}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join(", ") || "sem métricas";
+const metricasEmTexto = resumoDoResultado;
 
 // Resumo da edição exportada: sequência de cenas (com o que mostram),
 // inserts, estilo de legenda e transições.
@@ -126,14 +124,14 @@ const versoesDoCliente = (clienteId: string, midias: Midia[]): Versao[] => {
   const edicoes = lerEdicoesDoCliente(clienteId);
   return listarExportacoesDoCliente(clienteId)
     .map((x) => {
-      const resultado = resultadoSchema.safeParse(x.resultado);
+      const resultado = lerResultado(x.resultado);
       const resumo = resumoDaEdicao(edicoes.get(x.id), porUrl);
       return {
         id: x.id,
         nome: x.nome,
         projeto: lerProjeto(x.projetoId)?.nome ?? "?",
         duracao: x.duracao,
-        resultado: resultado.success ? resultado.data : null,
+        resultado,
         edicao: resumo.texto,
         usou: resumo.usou,
       };
@@ -183,7 +181,7 @@ export const obterAprendizados = async (
     clienteOpenAI().responses.create({
       model: MODELOS.editor,
       instructions:
-        "Você analisa resultados de anúncios em vídeo (tráfego pago) de um cliente e condensa aprendizados curtos e acionáveis para os PRÓXIMOS roteiros e clipes. Números (ROAS, CPA, CTR, avaliação) pesam MUITO mais que opiniões; opiniões sobre o visual viram regras de 'problemas visuais a evitar' na geração dos clipes (ex.: 'mostrar mais a loja', 'evitar ângulo de baixo na modelo'). Junte opiniões repetidas numa regra só. Não invente números. Português do Brasil, frases curtas.",
+        "Você analisa resultados de anúncios em vídeo (tráfego pago) de um cliente e condensa aprendizados curtos e acionáveis para os PRÓXIMOS roteiros e clipes. Números pesam MUITO mais que opiniões — no PAGO (Meta Ads): vendas, custo por conversa/clique, CTR, conversas/cliques; no ORGÂNICO (TikTok, Instagram): visualizações, compartilhamentos, salvamentos, comentários, seguidores; opiniões sobre o visual viram regras de 'problemas visuais a evitar' na geração dos clipes (ex.: 'mostrar mais a loja', 'evitar ângulo de baixo na modelo'). Junte opiniões repetidas numa regra só. Não invente números. Português do Brasil, frases curtas.",
       input: linhas.join("\n"),
       text: {
         format: {
@@ -210,7 +208,7 @@ COMO O VÍDEO É FEITO
 O ENCeditor NÃO faz: mudar velocidade, câmera lenta, correção de cor, filtros, títulos animados além das legendas. O que for complexo (movimento de câmera, transformação, efeito visual, transição dentro do próprio take) vai para o PROMPT do Higgsfield (feito_no_higgsfield); o que for simples fica para o ENCeditor (feito_no_enceditor).
 
 O QUE VOCÊ USA (nesta ordem de peso)
-1) RESULTADOS EM NÚMEROS das versões já exportadas do cliente (ROAS, CPA, CTR, avaliação): copie o que deu certo (gancho, ritmo, tipo de cena, estilo de legenda, duração) e evite o que deu errado. Números não mentem.
+1) RESULTADOS EM NÚMEROS das versões já exportadas do cliente — pago no Meta Ads (vendas, custo por conversa/clique, CTR, conversas/cliques) e orgânico no TikTok e no Instagram (visualizações, compartilhamentos, salvamentos…), mais a avaliação geral. Vídeo que vai bem no orgânico pode não vender no pago e vice-versa: considere o objetivo do novo vídeo. copie o que deu certo (gancho, ritmo, tipo de cena, estilo de legenda, duração) e evite o que deu errado. Números não mentem.
 2) APRENDIZADOS condensados e OPINIÕES SOBRE O VISUAL (pesam menos que números, mas toda regra de "problema visual a evitar" deve ser respeitada nos prompts dos takes — ex.: se reclamaram de iluminação, peça iluminação clara e uniforme).
 3) O ROTEIRO do usuário (mantenha o sentido e a oferta; melhore gancho nos 2 primeiros segundos, clareza e chamada para ação; explique em melhorias_no_roteiro). Sem roteiro, crie do zero a partir do objetivo.
 4) EXEMPLOS enviados, cada um com a sua finalidade (edição, ângulo, cena específica, estilo). Se a finalidade/detalhe de um exemplo estiver vago, PERGUNTE o que copiar dele.
@@ -234,7 +232,7 @@ REGRAS DO PLANO
 - legendas: escolha estilo e palavras_por_legenda (3 a 5 para reels) com base nos dados e exemplos. tamanho_percent é o tamanho da letra em % do PADRÃO do estilo (100 = normal): use null (padrão) ou 80 a 120; nunca menos de 60. posicao: null (padrão do estilo), "base", "centro" ou "topo".
 - musica: usar true na maioria dos anúncios; descreva o estilo; volume_percent 8 a 15 por baixo da narração.
 - formato: o pedido pelo usuário ou 9:16.
-- motivo de cada cena e aprendizados_aplicados: cite os dados que justificam (ex.: "versão X teve ROAS 4 com gancho de pergunta"). Não invente números.
+- motivo de cada cena e aprendizados_aplicados: cite os dados que justificam (ex.: "versão X teve 12 vendas a R$ 2,80 por conversa com gancho de pergunta"). Não invente números.
 
 CONVERSA
 - Se faltar informação essencial (o que vender/oferta e objetivo) e não houver roteiro, faça até 3 perguntas curtas e devolva plano null.
@@ -338,7 +336,7 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
       const lista = usoPorUrl.get(url) ?? [];
       lista.push(
         v.resultado
-          ? `"${v.nome}" ${v.resultado.avaliacao}${v.resultado.metricas.roas !== null ? ` ROAS ${v.resultado.metricas.roas}` : ""}`
+          ? `"${v.nome}" ${v.resultado.avaliacao}${v.resultado.pago.vendas !== null ? ` ${v.resultado.pago.vendas} vendas` : ""}`
           : `"${v.nome}" sem resultado`,
       );
       usoPorUrl.set(url, lista);

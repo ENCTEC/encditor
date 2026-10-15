@@ -6,7 +6,12 @@ import { useCallback, useEffect, useState } from "react";
 import { formatarTempo } from "@/componentes/Biblioteca";
 import { ModalResultado } from "@/componentes/clientes/ModalResultado";
 import { abrirProjeto, esquecerProjetos } from "@/projeto/ProjetoProvider";
-import { Resultado, ROTULO_AVALIACAO } from "@/projeto/resultado";
+import {
+  lerResultado,
+  Resultado,
+  resumoDoResultado,
+  ROTULO_AVALIACAO,
+} from "@/projeto/resultado";
 import { Midia } from "@/projeto/tipos";
 
 // Página de um cliente: CLIENTE → PROJETOS → VÍDEOS EXPORTADOS (versões).
@@ -57,16 +62,6 @@ const data = (ms: number) =>
     minute: "2-digit",
   });
 
-const metricasEmTexto = (r: Resultado) =>
-  [
-    r.metricas.investimento !== null && `R$ ${r.metricas.investimento}`,
-    r.metricas.ctr !== null && `CTR ${r.metricas.ctr}%`,
-    r.metricas.cpa !== null && `CPA R$ ${r.metricas.cpa}`,
-    r.metricas.roas !== null && `ROAS ${r.metricas.roas}`,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
 export default function PaginaCliente() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -87,7 +82,15 @@ export default function PaginaCliente() {
       setNaoAchou(true);
       return;
     }
-    setDados((await r1.json()) as Dados);
+    const lidos = (await r1.json()) as Dados;
+    // Resultados antigos (investimento/CPA/ROAS) viram o formato novo.
+    setDados({
+      ...lidos,
+      exportacoes: lidos.exportacoes.map((e) => ({
+        ...e,
+        resultado: lerResultado(e.resultado),
+      })),
+    });
     setBanco(((await r2.json()) as { midias: Midia[] }).midias);
   }, [id]);
 
@@ -368,7 +371,7 @@ export default function PaginaCliente() {
                           </div>
                           {e.resultado ? (
                             <p className="mt-1 text-xs">
-                              {metricasEmTexto(e.resultado)}
+                              {resumoDoResultado(e.resultado)}
                               {e.resultado.nota ? (
                                 <span className="block text-zinc-500 italic">
                                   “{e.resultado.nota}”
