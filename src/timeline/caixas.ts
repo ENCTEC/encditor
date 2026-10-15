@@ -109,3 +109,26 @@ export const caixaPadrao = (posicao: "tela-cheia" | "janela"): Caixa =>
 
 export const ehTelaCheia = (c: Caixa) =>
   c.x <= 0.5 && c.y <= 0.5 && c.largura >= 99.5 && c.altura >= 99.5;
+
+// Caixa (posição/tamanho em %) a partir de um atalho: layout (tela cheia,
+// metades), ponto da grade 3×3 ou "janela" (canto superior direito).
+// proporcaoMidia/proporcaoVideo = largura / altura.
+export const caixaParaPosicao = (
+  posicao: Layout | PosicaoGrade | "janela",
+  tamanho: Tamanho | null,
+  proporcaoMidia: number,
+  proporcaoVideo: number,
+  largura?: number | null,
+): Caixa => {
+  if ((LAYOUTS as readonly string[]).includes(posicao)) {
+    return caixaDoLayout(posicao as Layout);
+  }
+  const ponto =
+    posicao === "janela" ? "canto-sup-dir" : (posicao as PosicaoGrade);
+  return caixaNaGrade(
+    ponto,
+    largura ?? TAMANHOS[tamanho ?? "M"],
+    proporcaoMidia,
+    proporcaoVideo,
+  );
+};

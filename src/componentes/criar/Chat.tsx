@@ -42,6 +42,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     obterBiblioteca,
     limparChat,
     editarMidia,
+    meta,
   } = useProjeto();
   const envio = useEnvio();
   const [texto, setTexto] = useState("");
@@ -142,6 +143,8 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
           historico,
           timeline: obterTimeline(),
           biblioteca,
+          // A IA lê o plano do vídeo (aba Planejar), se houver.
+          projetoId: meta?.id,
         }),
       });
       const dados = (await resposta.json().catch(() => ({}))) as Partial<

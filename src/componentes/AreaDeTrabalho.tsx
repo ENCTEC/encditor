@@ -15,8 +15,10 @@ export const AreaDeTrabalho: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const caminho = usePathname();
   const naCriar = caminho === "/";
-  // Telas de clientes não têm chat (não são de um projeto específico).
-  const semChat = caminho.startsWith("/clientes");
+  // Telas de clientes não têm chat (não são de um projeto específico); o
+  // Planejar tem a sua própria conversa (com a IA planejadora).
+  const semChat =
+    caminho.startsWith("/clientes") || caminho.startsWith("/planejar");
   const { carregado } = useProjeto();
   const [chatAberto, setChatAberto] = useState(true);
 

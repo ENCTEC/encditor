@@ -38,15 +38,11 @@ import {
 } from "./conteudo";
 import { resumoDoProjeto } from "./estado";
 import {
-  caixaDoLayout,
-  caixaNaGrade,
+  caixaParaPosicao,
   ehTelaCheia,
-  Layout,
   LAYOUTS,
   POSICOES,
-  PosicaoGrade,
   Tamanho,
-  TAMANHOS,
 } from "@/timeline/caixas";
 
 const posicaoSchema = z.enum([...LAYOUTS, ...POSICOES, "janela"]);
@@ -114,19 +110,14 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     midia?: Pick<Midia, "largura" | "altura">,
     largura?: number | null,
   ) => {
-    if ((LAYOUTS as readonly string[]).includes(posicao)) {
-      return caixaDoLayout(posicao as Layout);
-    }
     const proporcaoMidia =
       midia?.largura && midia.altura ? midia.largura / midia.altura : 16 / 9;
-    const proporcaoVideo = sessao.timeline.largura / sessao.timeline.altura;
-    const ponto =
-      posicao === "janela" ? "canto-sup-dir" : (posicao as PosicaoGrade);
-    return caixaNaGrade(
-      ponto,
-      largura ?? TAMANHOS[tamanho ?? "M"],
+    return caixaParaPosicao(
+      posicao,
+      tamanho,
       proporcaoMidia,
-      proporcaoVideo,
+      sessao.timeline.largura / sessao.timeline.altura,
+      largura,
     );
   };
 

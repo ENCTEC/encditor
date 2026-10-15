@@ -10,6 +10,7 @@ import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
 
 const ABAS = [
   { href: "/clientes", rotulo: "Clientes" },
+  { href: "/planejar", rotulo: "Planejar" },
   { href: "/", rotulo: "Criar" },
   { href: "/timeline", rotulo: "Timeline" },
   { href: "/arquivos", rotulo: "Arquivos" },

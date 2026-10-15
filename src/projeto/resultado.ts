@@ -11,6 +11,10 @@ export const resultadoSchema = z.object({
     roas: z.number().nullable(),
   }),
   nota: z.string().max(2000),
+  // O que ficou bom ou ruim no VISUAL dos clipes ("ângulo ruim da modelo",
+  // "a loja apareceu pouco"). Pesa menos que os números, mas a IA condensa
+  // essas opiniões em aprendizados para os próximos roteiros.
+  opiniaoVisual: z.string().max(3000).default(""),
   registradoEm: z.number(),
 });
 

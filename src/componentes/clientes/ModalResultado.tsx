@@ -31,6 +31,9 @@ export const ModalResultado: React.FC<{
   const [cpa, setCpa] = useState(texto(atual?.metricas.cpa));
   const [roas, setRoas] = useState(texto(atual?.metricas.roas));
   const [nota, setNota] = useState(atual?.nota ?? "");
+  const [opiniaoVisual, setOpiniaoVisual] = useState(
+    atual?.opiniaoVisual ?? "",
+  );
 
   return (
     <div
@@ -39,7 +42,7 @@ export const ModalResultado: React.FC<{
       role="dialog"
       aria-label="Resultado do vídeo"
     >
-      <div className="cartao-zine w-full max-w-lg p-5">
+      <div className="cartao-zine max-h-full w-full max-w-lg overflow-y-auto p-5">
         <h2 className="font-display text-3xl leading-none tracking-wide uppercase">
           Resultado
         </h2>
@@ -104,6 +107,20 @@ export const ModalResultado: React.FC<{
           />
         </label>
 
+        <label className="mt-4 block">
+          <span className="mb-1 block text-xs text-zinc-400">
+            Opinião sobre o visual dos clipes (o ENCeditor aprende com isso nos
+            próximos roteiros)
+          </span>
+          <textarea
+            value={opiniaoVisual}
+            onChange={(e) => setOpiniaoVisual(e.target.value)}
+            rows={3}
+            placeholder="ex.: ângulo ruim da modelo; a loja apareceu pouco; roupas feias; iluminação escura"
+            className={`${campo} resize-none`}
+          />
+        </label>
+
         <div className="mt-5 flex gap-2">
           {atual ? (
             <button
@@ -130,6 +147,7 @@ export const ModalResultado: React.FC<{
                   roas: numero(roas),
                 },
                 nota: nota.trim(),
+                opiniaoVisual: opiniaoVisual.trim(),
                 registradoEm: Date.now(),
               })
             }

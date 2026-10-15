@@ -1,0 +1,233 @@
+import { z } from "zod";
+import { LAYOUTS, POSICOES } from "@/timeline/caixas";
+import { IDS_FORMATO } from "@/timeline/formatos";
+import {
+  estiloLegendaSchema,
+  posicaoLegendaSchema,
+  tipoTransicaoSchema,
+} from "@/timeline/schema";
+
+// Planejamento de um vídeo (aba Planejar): o que o usuário informa
+// (briefing), a conversa com a IA planejadora e o plano que ela devolve
+// (roteiro/copy, takes do Higgsfield, reaproveitamento do banco e edição).
+
+// ---------- O que o usuário informa ----------
+
+export const FINALIDADES_EXEMPLO = {
+  edicao: "Edição (ritmo, cortes, legendas, efeitos)",
+  angulo: "Ângulo / enquadramento de câmera",
+  cena: "Cena específica (quero algo assim)",
+  estilo: "Estilo visual (cor, luz, cenário, figurino)",
+  outro: "Outro",
+} as const;
+
+export const exemploSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  nomeArquivo: z.string(),
+  formato: z.enum(["video", "imagem"]),
+  duracao: z.number().nullable(),
+  finalidade: z.enum(
+    Object.keys(FINALIDADES_EXEMPLO) as [keyof typeof FINALIDADES_EXEMPLO],
+  ),
+  // O que copiar desse exemplo ("o zoom no rosto aos 3s", "esse ângulo de
+  // cima"). A IA pergunta quando estiver vago.
+  detalhe: z.string(),
+});
+export type Exemplo = z.infer<typeof exemploSchema>;
+
+export const briefingSchema = z.object({
+  // Roteiro escrito pelo usuário (vazio = a IA cria do zero).
+  roteiro: z.string(),
+  // Produto, oferta, público, objetivo do vídeo.
+  objetivo: z.string(),
+  formato: z.enum(IDS_FORMATO).nullable(),
+  duracaoAlvo: z.number().nullable(),
+  // Cenas que precisam estar no vídeo.
+  obrigatorias: z.array(z.string()),
+  exemplos: z.array(exemploSchema),
+  // Ids dos elementos do Higgsfield (do cliente) para usar.
+  elementos: z.array(z.string()),
+  observacoes: z.string(),
+});
+export type Briefing = z.infer<typeof briefingSchema>;
+
+export const briefingVazio = (): Briefing => ({
+  roteiro: "",
+  objetivo: "",
+  formato: null,
+  duracaoAlvo: null,
+  obrigatorias: [],
+  exemplos: [],
+  elementos: [],
+  observacoes: "",
+});
+
+// ---------- O plano que a IA devolve ----------
+// Todos os campos são obrigatórios (formato estrito da OpenAI); "null"
+// quando não se aplica. Números são conferidos/limitados depois.
+
+const POSICOES_INSERT = [...LAYOUTS, ...POSICOES] as const;
+
+export const VOLUMES_TAKE = {
+  mudo: "Sem o som do take",
+  ambiente: "Som ambiente baixo, por baixo da narração",
+  efeito: "Efeito pontual mais alto (explosão, avião…)",
+  fala: "Fala do próprio take em volume cheio",
+} as const;
+
+const transicaoPlano = z
+  .object({ tipo: tipoTransicaoSchema, duracao_s: z.number() })
+  .nullable();
+
+export const cenaPlanoSchema = z.object({
+  numero: z.number(),
+  // Nome do take (vira o @apelido ao enviar), ex.: "take01-gancho".
+  apelido: z.string(),
+  origem: z.enum(["higgsfield", "banco"]),
+  // Origem "banco": arquivo já enviado em outro projeto do cliente.
+  apelido_banco: z.string().nullable(),
+  trecho_banco_de: z.number().nullable(),
+  trecho_banco_ate: z.number().nullable(),
+  // Trecho da narração/fala que acontece durante esta cena.
+  fala: z.string(),
+  descricao: z.string(),
+  duracao_s: z.number(),
+  // Duração para gerar no Higgsfield (com folga para aparar).
+  duracao_gerar_s: z.number().nullable(),
+  // Prompt pronto para o Higgsfield, com os @elementos.
+  prompt_higgsfield: z.string().nullable(),
+  elementos: z.array(z.string()),
+  // O que é feito na geração (movimentos de câmera, efeitos complexos) e
+  // o que fica para o ENCeditor (cortes, zoom, transição, legenda).
+  feito_no_higgsfield: z.string(),
+  feito_no_enceditor: z.string(),
+  // Som pedido no prompt (ex.: "barulho de avião passando") e como ele
+  // entra por baixo da narração.
+  som_do_take: z.string(),
+  volume_do_take: z.enum(
+    Object.keys(VOLUMES_TAKE) as [keyof typeof VOLUMES_TAKE],
+  ),
+  transicao_entrada: transicaoPlano,
+  zoom: z
+    .object({ frase: z.string(), escala: z.number(), rampa_s: z.number() })
+    .nullable(),
+  // Por que esta cena (dados, exemplos, aprendizados).
+  motivo: z.string(),
+});
+export type CenaPlano = z.infer<typeof cenaPlanoSchema>;
+
+export const insertPlanoSchema = z.object({
+  apelido: z.string(),
+  origem: z.enum(["higgsfield", "banco", "enviar"]),
+  apelido_banco: z.string().nullable(),
+  trecho_banco_de: z.number().nullable(),
+  // Frase da narração em que o insert aparece.
+  frase: z.string(),
+  duracao_s: z.number(),
+  posicao: z.enum(POSICOES_INSERT),
+  tamanho: z.enum(["P", "M", "G"]),
+  prompt_higgsfield: z.string().nullable(),
+  descricao: z.string(),
+  motivo: z.string(),
+});
+export type InsertPlano = z.infer<typeof insertPlanoSchema>;
+
+export const planoGeradoSchema = z.object({
+  titulo: z.string(),
+  ideia: z.string(),
+  // narracao = voz em off separada (o usuário envia o áudio);
+  // fala_nos_takes = os próprios takes falam; so_musica = sem fala.
+  modo_audio: z.enum(["narracao", "fala_nos_takes", "so_musica"]),
+  // Texto completo da narração (ou das falas), já melhorado.
+  copy: z.string(),
+  melhorias_no_roteiro: z.string(),
+  aprendizados_aplicados: z.array(z.string()),
+  formato: z.enum(IDS_FORMATO),
+  duracao_total_s: z.number(),
+  narracao: z
+    .object({ apelido: z.string(), orientacoes: z.string() })
+    .nullable(),
+  cenas: z.array(cenaPlanoSchema),
+  inserts: z.array(insertPlanoSchema),
+  legendas: z.object({
+    usar: z.boolean(),
+    estilo: estiloLegendaSchema,
+    palavras_por_legenda: z.number(),
+    tamanho_percent: z.number().nullable(),
+    posicao: posicaoLegendaSchema.nullable(),
+  }),
+  musica: z.object({
+    usar: z.boolean(),
+    apelido: z.string(),
+    descricao: z.string(),
+    volume_percent: z.number(),
+  }),
+});
+export type PlanoGerado = z.infer<typeof planoGeradoSchema>;
+
+export const respostaPlanejadorSchema = z.object({
+  // Texto para o usuário (perguntas, explicação do plano, mudanças).
+  mensagem: z.string(),
+  // Plano completo (atualizado) ou null se ainda faltam respostas.
+  plano: planoGeradoSchema.nullable(),
+});
+
+// ---------- O que fica salvo ----------
+
+export const mensagemPlanoSchema = z.object({
+  autor: z.enum(["usuario", "ia"]),
+  texto: z.string(),
+  em: z.number(),
+});
+export type MensagemPlano = z.infer<typeof mensagemPlanoSchema>;
+
+export const planoSalvoSchema = z.object({
+  briefing: briefingSchema,
+  conversa: z.array(mensagemPlanoSchema),
+  gerado: planoGeradoSchema.nullable(),
+  geradoEm: z.number().nullable(),
+  // Item do plano (ex.: "cena:take01-gancho", "narracao", "musica") →
+  // id do arquivo da biblioteca que o atende.
+  vinculos: z.record(z.string(), z.string()),
+  musicaPulada: z.boolean(),
+  montadoEm: z.number().nullable(),
+});
+export type PlanoSalvo = z.infer<typeof planoSalvoSchema>;
+
+export const planoVazio = (): PlanoSalvo => ({
+  briefing: briefingVazio(),
+  conversa: [],
+  gerado: null,
+  geradoEm: null,
+  vinculos: {},
+  musicaPulada: false,
+  montadoEm: null,
+});
+
+// Lê um plano salvo tolerando versões antigas (campos que faltam = padrão).
+export const lerPlanoSalvo = (bruto: unknown): PlanoSalvo => {
+  const base = planoVazio();
+  if (!bruto || typeof bruto !== "object") return base;
+  const b = bruto as Partial<PlanoSalvo>;
+  const briefing = briefingSchema.safeParse({
+    ...base.briefing,
+    ...(b.briefing ?? {}),
+  });
+  const gerado = planoGeradoSchema.nullable().safeParse(b.gerado ?? null);
+  return {
+    briefing: briefing.success ? briefing.data : base.briefing,
+    conversa: z
+      .array(mensagemPlanoSchema)
+      .catch([])
+      .parse(b.conversa ?? []),
+    gerado: gerado.success ? gerado.data : null,
+    geradoEm: typeof b.geradoEm === "number" ? b.geradoEm : null,
+    vinculos: z
+      .record(z.string(), z.string())
+      .catch({})
+      .parse(b.vinculos ?? {}),
+    musicaPulada: b.musicaPulada === true,
+    montadoEm: typeof b.montadoEm === "number" ? b.montadoEm : null,
+  };
+};

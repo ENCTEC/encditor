@@ -374,6 +374,11 @@ export default function PaginaCliente() {
                                   “{e.resultado.nota}”
                                 </span>
                               ) : null}
+                              {e.resultado.opiniaoVisual ? (
+                                <span className="block text-zinc-500">
+                                  👁 Visual: {e.resultado.opiniaoVisual}
+                                </span>
+                              ) : null}
                             </p>
                           ) : null}
                           {assistindo === e.id ? (

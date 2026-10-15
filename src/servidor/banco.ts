@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { Elemento } from "@/plano/elementos";
 
 // Banco de dados do ENCeditor: um arquivo SQLite (padrão dados/encditor.db),
 // usando o SQLite que já vem no Node — sem serviço externo nem custo.
@@ -17,7 +18,14 @@ export const CLIENTE_PADRAO = "geral";
 
 // Em desenvolvimento o Next recarrega módulos; guardar a conexão no
 // globalThis evita abrir o mesmo arquivo várias vezes.
-const global = globalThis as unknown as { bancoEncditor?: DatabaseSync };
+const global = globalThis as unknown as {
+  bancoEncditor?: DatabaseSync;
+  esquemaEncditor?: number;
+};
+
+// Suba este número ao criar tabelas/colunas: a conexão guardada (em
+// desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
+const VERSAO_ESQUEMA = 2;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -74,9 +82,10 @@ const migrar = (db: DatabaseSync) => {
 };
 
 const banco = () => {
-  if (global.bancoEncditor) return global.bancoEncditor;
-  mkdirSync(path.dirname(ARQUIVO), { recursive: true });
-  const db = new DatabaseSync(ARQUIVO);
+  const aberto = global.bancoEncditor;
+  if (aberto && global.esquemaEncditor === VERSAO_ESQUEMA) return aberto;
+  if (!aberto) mkdirSync(path.dirname(ARQUIVO), { recursive: true });
+  const db = aberto ?? new DatabaseSync(ARQUIVO);
   db.exec(`
     PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS clientes (
@@ -121,9 +130,30 @@ const banco = () => {
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS planos (
+      projeto_id TEXT PRIMARY KEY,
+      dados TEXT NOT NULL,
+      atualizado_em INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS elementos (
+      id TEXT PRIMARY KEY,
+      cliente_id TEXT NOT NULL,
+      nome TEXT NOT NULL,
+      descricao TEXT NOT NULL,
+      imagem TEXT,
+      criado_em INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_elementos_cliente ON elementos (cliente_id);
+    CREATE TABLE IF NOT EXISTS aprendizados (
+      cliente_id TEXT PRIMARY KEY,
+      fonte TEXT NOT NULL,
+      dados TEXT NOT NULL,
+      atualizado_em INTEGER NOT NULL
+    );
   `);
   migrar(db);
   global.bancoEncditor = db;
+  global.esquemaEncditor = VERSAO_ESQUEMA;
   return db;
 };
 
@@ -412,11 +442,25 @@ export const apagarExportacao = (id: string) =>
 // Projeto + os vídeos exportados dele. O banco de mídia é do cliente e fica.
 export const apagarProjeto = (id: string) =>
   emTransacao(() => {
-    const arquivos = arquivosExportados("projeto_id", id);
+    const arquivos = [
+      ...arquivosExportados("projeto_id", id),
+      ...arquivosDoPlano(id),
+    ];
     banco().prepare("DELETE FROM exportacoes WHERE projeto_id = ?").run(id);
+    banco().prepare("DELETE FROM planos WHERE projeto_id = ?").run(id);
     banco().prepare("DELETE FROM projetos WHERE id = ?").run(id);
     return arquivos;
   });
+
+// Arquivos de referência do plano (exemplos enviados para a IA).
+const arquivosDoPlano = (projetoId: string) => {
+  const plano = lerPlano(projetoId) as {
+    briefing?: { exemplos?: { url?: string }[] };
+  } | null;
+  return (plano?.briefing?.exemplos ?? [])
+    .map((e) => e.url?.split("/").pop() ?? "")
+    .filter(Boolean);
+};
 
 // Cliente inteiro: projetos, vídeos exportados e banco de mídia (com as
 // análises dos arquivos).
@@ -433,9 +477,30 @@ export const apagarCliente = (id: string) =>
       .flatMap((m) => [m.url, m.urlOriginal, m.preview?.url])
       .map((u) => u?.split("?")[0].split("/").pop() ?? "")
       .filter(Boolean);
+    const projetos = (
+      db.prepare("SELECT id FROM projetos WHERE cliente_id = ?").all(id) as {
+        id: string;
+      }[]
+    ).map((p) => p.id);
+    const imagensDosElementos = (
+      db
+        .prepare("SELECT imagem FROM elementos WHERE cliente_id = ?")
+        .all(id) as { imagem: string | null }[]
+    )
+      .map((e) => e.imagem ?? "")
+      .filter(Boolean);
     const arquivos = [
-      ...new Set([...arquivosExportados("cliente_id", id), ...daMidia]),
+      ...new Set([
+        ...arquivosExportados("cliente_id", id),
+        ...daMidia,
+        ...projetos.flatMap(arquivosDoPlano),
+        ...imagensDosElementos,
+      ]),
     ];
+    const apagarPlano = db.prepare("DELETE FROM planos WHERE projeto_id = ?");
+    for (const p of projetos) apagarPlano.run(p);
+    db.prepare("DELETE FROM elementos WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM aprendizados WHERE cliente_id = ?").run(id);
     const apagarAnalise = db.prepare("DELETE FROM analises WHERE arquivo = ?");
     const apagarProxy = db.prepare(
       "DELETE FROM proxies WHERE original = ? OR proxy = ?",
@@ -560,4 +625,140 @@ export const atualizarExportacao = (
         id,
       );
   }
+};
+
+// Edição exportada ("foto": timeline + arquivos usados) de cada versão do
+// cliente, para a IA cruzar o que foi feito com o resultado.
+export const lerEdicoesDoCliente = (clienteId: string) =>
+  new Map(
+    (
+      banco()
+        .prepare("SELECT id, edicao FROM exportacoes WHERE cliente_id = ?")
+        .all(clienteId) as { id: string; edicao: string }[]
+    ).map((l) => [l.id, JSON.parse(l.edicao) as unknown]),
+  );
+
+// ---------- Planejamento (roteiro + takes + edição de um projeto) ----------
+
+export const lerPlano = (projetoId: string): unknown => {
+  const l = banco()
+    .prepare("SELECT dados FROM planos WHERE projeto_id = ?")
+    .get(projetoId) as { dados: string } | undefined;
+  return l ? JSON.parse(l.dados) : null;
+};
+
+export const salvarPlano = (projetoId: string, plano: unknown) => {
+  const agora = Date.now();
+  banco()
+    .prepare(
+      `INSERT INTO planos (projeto_id, dados, atualizado_em) VALUES (?, ?, ?)
+       ON CONFLICT(projeto_id) DO UPDATE SET dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
+    )
+    .run(projetoId, JSON.stringify(plano), agora);
+  return agora;
+};
+
+// ---------- Elementos do Higgsfield (personagens, produtos, lugares) ----------
+// Cada cliente tem os seus, citados nos prompts com @nome (como no
+// Higgsfield), com uma imagem de referência e uma descrição.
+
+type LinhaElemento = {
+  id: string;
+  cliente_id: string;
+  nome: string;
+  descricao: string;
+  imagem: string | null;
+  criado_em: number;
+};
+
+const paraElemento = (l: LinhaElemento): Elemento => ({
+  id: l.id,
+  clienteId: l.cliente_id,
+  nome: l.nome,
+  descricao: l.descricao,
+  imagem: l.imagem,
+  criadoEm: l.criado_em,
+});
+
+export const listarElementos = (clienteId: string) =>
+  (
+    banco()
+      .prepare(
+        "SELECT * FROM elementos WHERE cliente_id = ? ORDER BY criado_em",
+      )
+      .all(clienteId) as LinhaElemento[]
+  ).map(paraElemento);
+
+export const lerElemento = (id: string) => {
+  const l = banco().prepare("SELECT * FROM elementos WHERE id = ?").get(id) as
+    | LinhaElemento
+    | undefined;
+  return l ? paraElemento(l) : null;
+};
+
+export const criarElemento = (e: Omit<Elemento, "id" | "criadoEm">) => {
+  const id = randomUUID();
+  banco()
+    .prepare(
+      `INSERT INTO elementos (id, cliente_id, nome, descricao, imagem, criado_em)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(id, e.clienteId, e.nome, e.descricao, e.imagem, Date.now());
+  return id;
+};
+
+export const atualizarElemento = (
+  id: string,
+  m: Partial<Pick<Elemento, "nome" | "descricao" | "imagem">>,
+) => {
+  const atual = lerElemento(id);
+  if (!atual) return;
+  const novo = { ...atual, ...m };
+  banco()
+    .prepare(
+      "UPDATE elementos SET nome = ?, descricao = ?, imagem = ? WHERE id = ?",
+    )
+    .run(novo.nome, novo.descricao, novo.imagem, id);
+};
+
+// Devolve a imagem do elemento apagado (para remover do disco).
+export const apagarElemento = (id: string) => {
+  const atual = lerElemento(id);
+  banco().prepare("DELETE FROM elementos WHERE id = ?").run(id);
+  return atual?.imagem ? [atual.imagem] : [];
+};
+
+// ---------- Aprendizados do cliente ----------
+// Resumo (feito pela IA) do que funcionou e do que deu errado nos vídeos
+// do cliente. "fonte" = impressão digital dos resultados usados: se nada
+// mudou, não precisa resumir de novo.
+
+export const lerAprendizados = (clienteId: string) => {
+  const l = banco()
+    .prepare(
+      "SELECT fonte, dados, atualizado_em FROM aprendizados WHERE cliente_id = ?",
+    )
+    .get(clienteId) as
+    | { fonte: string; dados: string; atualizado_em: number }
+    | undefined;
+  return l
+    ? {
+        fonte: l.fonte,
+        dados: JSON.parse(l.dados) as unknown,
+        atualizadoEm: l.atualizado_em,
+      }
+    : null;
+};
+
+export const salvarAprendizados = (
+  clienteId: string,
+  fonte: string,
+  dados: unknown,
+) => {
+  banco()
+    .prepare(
+      `INSERT INTO aprendizados (cliente_id, fonte, dados, atualizado_em) VALUES (?, ?, ?, ?)
+       ON CONFLICT(cliente_id) DO UPDATE SET fonte = excluded.fonte, dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
+    )
+    .run(clienteId, fonte, JSON.stringify(dados), Date.now());
 };

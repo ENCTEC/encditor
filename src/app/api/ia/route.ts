@@ -8,6 +8,44 @@ import { analiseSchema } from "@/projeto/analise";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
 import { Midia } from "@/projeto/tipos";
 import { timelineSchema } from "@/timeline/schema";
+import { chaveCena, chaveInsert } from "@/plano/pendencias";
+import { lerPlanoSalvo } from "@/plano/tipos";
+import { lerPlano } from "@/servidor/banco";
+
+// Resumo do plano para o editor: copy e o que cada cena deveria ser.
+const resumoDoPlano = (projetoId: string, biblioteca: Midia[]) => {
+  const plano = lerPlanoSalvo(lerPlano(projetoId));
+  const g = plano.gerado;
+  if (!g) return null;
+  // Apelido real do arquivo ligado a cada item (pode ter ganhado sufixo).
+  const apelidoDe = (chave: string, planejado: string) =>
+    `@${biblioteca.find((m) => m.id === plano.vinculos[chave])?.apelido ?? planejado}`;
+  return JSON.stringify({
+    titulo: g.titulo,
+    modo_audio: g.modo_audio,
+    copy: g.copy,
+    cenas: g.cenas.map((c) => ({
+      cena: c.numero,
+      take:
+        c.origem === "banco"
+          ? `@${c.apelido_banco}`
+          : apelidoDe(chaveCena(c), c.apelido),
+      fala: c.fala,
+      descricao: c.descricao,
+      no_enceditor: c.feito_no_enceditor,
+      som: c.som_do_take,
+      volume_do_som: c.volume_do_take,
+    })),
+    inserts: g.inserts.map((x) => ({
+      insert: x.apelido_banco
+        ? `@${x.apelido_banco}`
+        : apelidoDe(chaveInsert(x), x.apelido),
+      frase: x.frase,
+      posicao: x.posicao,
+    })),
+    legendas: g.legendas,
+  });
+};
 
 // Recebe um pedido do chat, deixa a IA editar a timeline com as
 // ferramentas e devolve a timeline nova + a resposta em texto.
@@ -23,6 +61,7 @@ const corpoSchema = z.object({
     z.object({ autor: z.enum(["usuario", "ia"]), texto: z.string() }),
   ),
   timeline: timelineSchema,
+  projetoId: z.string().optional(),
   biblioteca: z.array(
     z.object({
       id: z.string(),
@@ -69,7 +108,11 @@ export async function POST(req: NextRequest) {
   if (!corpo.success) {
     return erro("Pedido inválido.", 400);
   }
-  const { pedido, anexos, historico, timeline, biblioteca } = corpo.data;
+  const { pedido, anexos, historico, timeline, biblioteca, projetoId } =
+    corpo.data;
+  const plano = projetoId
+    ? resumoDoPlano(projetoId, biblioteca as Midia[])
+    : null;
 
   const sessao: SessaoEdicao = { timeline, biblioteca, acoes: [] };
 
@@ -88,6 +131,10 @@ export async function POST(req: NextRequest) {
     pedido: [
       "Estado atual do projeto:",
       JSON.stringify(resumoDoProjeto(timeline, biblioteca)),
+      plano
+        ? `Plano do vídeo (feito na aba Planejar; siga o que foi imaginado quando o pedido for vago):
+${plano}`
+        : "",
       anexos.length ? `Anexados nesta mensagem: ${anexos.join(", ")}.` : "",
       `Pedido: ${pedido}`,
     ]
