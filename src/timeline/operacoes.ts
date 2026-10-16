@@ -479,3 +479,205 @@ export const urlsDeMusica = (
       return !m?.analise?.transcricao?.palavras?.length && a.fim - a.inicio > 8;
     })
     .map((a) => a.url);
+
+// ---------- Ferramentas padrão de edição (Timeline e chat) ----------
+
+// Itens com "ponto do arquivo" (origemInicio): mexer no começo deles
+// precisa andar no arquivo junto, senão o conteúdo escorrega.
+const temOrigem = (faixa: Faixa, item: { tipo?: string }) =>
+  faixa === "audios" || (faixa === "inserts" && item.tipo === "video");
+
+// Apara uma ponta de um áudio, insert, zoom ou legenda até um tempo do
+// vídeo final, mantendo o conteúdo no lugar (áudio não "escorrega").
+export const apararItem = (
+  t: Timeline,
+  faixa: "audios" | "inserts" | "zooms" | "legendas",
+  indice: number,
+  ponta: "inicio" | "fim",
+  tempo: number,
+): Timeline => {
+  conferirIndice(t, faixa, indice);
+  const item = t[faixa][indice] as AudioFaixa | Insert | Zoom | Legenda;
+  const novo = r3(Math.max(0, tempo));
+  if (
+    ponta === "inicio" ? novo >= item.fim - 0.05 : novo <= item.inicio + 0.05
+  ) {
+    throw new Error("Esse corte deixaria o item sem duração.");
+  }
+  if (ponta === "fim") {
+    const leg = faixa === "legendas" ? (item as Legenda) : null;
+    if (leg?.palavras?.length) {
+      const dur = novo - leg.inicio;
+      const palavras = leg.palavras
+        .filter((p) => p.de < dur - 0.05)
+        .map((p) => ({ ...p, ate: Math.min(p.ate, r3(dur)) }));
+      return atualizarItem(t, "legendas", indice, {
+        fim: novo,
+        palavras,
+        texto: palavras.map((p) => p.texto).join(" ") || leg.texto,
+      });
+    }
+    return atualizarItem(t, faixa, indice, { fim: novo } as never);
+  }
+  const andou = novo - item.inicio;
+  const mudancas: Record<string, unknown> = { inicio: novo };
+  if (temOrigem(faixa, item as { tipo?: string })) {
+    const origem = (item as AudioFaixa).origemInicio + andou;
+    if (origem < -0.001) {
+      throw new Error("O arquivo não tem nada antes desse ponto.");
+    }
+    mudancas.origemInicio = r3(Math.max(0, origem));
+  }
+  if (faixa === "legendas" && (item as Legenda).palavras?.length) {
+    // As palavras continuam no mesmo momento do vídeo.
+    mudancas.palavras = (item as Legenda)
+      .palavras!.map((p) => ({
+        ...p,
+        de: r3(p.de - andou),
+        ate: r3(p.ate - andou),
+      }))
+      .filter((p) => p.ate > 0)
+      .map((p) => ({ ...p, de: Math.max(0, p.de) }));
+    // O texto perde as palavras que ficaram de fora.
+    mudancas.texto = (mudancas.palavras as { texto: string }[])
+      .map((p) => p.texto)
+      .join(" ");
+  }
+  return atualizarItem(t, faixa, indice, mudancas as never);
+};
+
+// Junta o item com o próximo pedaço do MESMO arquivo, colado nele (o
+// contrário de dividir). Cenas: a cena seguinte, se continua o mesmo
+// trecho do arquivo. Áudios/inserts: o pedaço que começa onde este termina.
+export const juntarItens = (
+  t: Timeline,
+  faixa: Faixa,
+  indice: number,
+): Timeline => {
+  conferirIndice(t, faixa, indice);
+  if (faixa === "clipes") {
+    const a = t.clipes[indice];
+    const b = t.clipes[indice + 1];
+    if (
+      !b ||
+      b.url !== a.url ||
+      Math.abs(b.inicio - a.fim) > 0.05 ||
+      (b.velocidade ?? 1) !== (a.velocidade ?? 1)
+    ) {
+      throw new Error(
+        "Só dá para juntar com a próxima cena se ela continua o mesmo trecho do mesmo arquivo (como depois de dividir).",
+      );
+    }
+    const clipes = [...t.clipes];
+    clipes.splice(indice, 2, { ...a, fim: b.fim });
+    return { ...t, clipes };
+  }
+  if (faixa === "zooms" || faixa === "legendas") {
+    const lista = t[faixa] as (Zoom | Legenda)[];
+    const atual = lista[indice];
+    const j = lista.findIndex(
+      (x, k) => k !== indice && Math.abs(x.inicio - atual.fim) <= 0.05,
+    );
+    if (j < 0) throw new Error("Não há um item colado logo depois deste.");
+    const prox = lista[j];
+    let junto: Zoom | Legenda = { ...atual, fim: prox.fim };
+    if (faixa === "legendas") {
+      const la = atual as Legenda;
+      const lb = prox as Legenda;
+      const desloc = lb.inicio - la.inicio;
+      junto = {
+        ...la,
+        fim: lb.fim,
+        texto: `${la.texto} ${lb.texto}`.trim(),
+        palavras:
+          la.palavras && lb.palavras
+            ? [
+                ...la.palavras,
+                ...lb.palavras.map((p) => ({
+                  ...p,
+                  de: r3(p.de + desloc),
+                  ate: r3(p.ate + desloc),
+                })),
+              ]
+            : undefined,
+      };
+    }
+    const itens = lista
+      .filter((_, k) => k !== j)
+      .map((x) => (x === atual ? junto : x));
+    return { ...t, [faixa]: itens };
+  }
+  const lista = t[faixa] as (AudioFaixa | Insert)[];
+  const atual = lista[indice];
+  const j = lista.findIndex(
+    (x, k) =>
+      k !== indice &&
+      x.url === atual.url &&
+      Math.abs(x.inicio - atual.fim) <= 0.05 &&
+      Math.abs(
+        x.origemInicio - (atual.origemInicio + (atual.fim - atual.inicio)),
+      ) <= 0.1,
+  );
+  if (j < 0) {
+    throw new Error(
+      "Não há um pedaço do mesmo arquivo colado logo depois e continuando do mesmo ponto (como depois de dividir).",
+    );
+  }
+  const prox = lista[j];
+  const junto =
+    faixa === "audios"
+      ? {
+          ...(atual as AudioFaixa),
+          fim: prox.fim,
+          fadeSaida: (prox as AudioFaixa).fadeSaida,
+        }
+      : { ...atual, fim: prox.fim };
+  const itens = lista
+    .filter((_, k) => k !== j)
+    .map((x) => (x === atual ? junto : x));
+  return { ...t, [faixa]: itens };
+};
+
+// Duplica o item: cena logo depois dela; os outros, colados no fim dele.
+export const duplicarItem = (
+  t: Timeline,
+  faixa: Faixa,
+  indice: number,
+): Timeline => {
+  conferirIndice(t, faixa, indice);
+  if (faixa === "clipes") {
+    const c = t.clipes[indice];
+    const clipes = [...t.clipes];
+    clipes.splice(indice + 1, 0, {
+      ...c,
+      transicao: "corte",
+      direcao: undefined,
+      duracaoTransicao: undefined,
+    });
+    return { ...t, clipes };
+  }
+  const item = t[faixa][indice] as { inicio: number; fim: number };
+  const d = item.fim - item.inicio;
+  const copia = { ...item, inicio: r3(item.fim), fim: r3(item.fim + d) };
+  const itens = [...t[faixa]];
+  itens.splice(indice + 1, 0, copia as never);
+  return { ...t, [faixa]: itens };
+};
+
+// Pedaços do MESMO arquivo de áudio tocando ao mesmo tempo quase sempre
+// são erro de corte (a fala se repete por cima). Devolve a descrição do
+// primeiro problema, ou null.
+export const sobreposicaoDeAudio = (t: Timeline): string | null => {
+  for (let i = 0; i < t.audios.length; i++) {
+    for (let j = i + 1; j < t.audios.length; j++) {
+      const a = t.audios[i];
+      const b = t.audios[j];
+      if (a.url !== b.url) continue;
+      const sobra = Math.min(a.fim, b.fim) - Math.max(a.inicio, b.inicio);
+      if (sobra > 0.05) {
+        return `os áudios ${i + 1} e ${j + 1} são do mesmo arquivo e tocam juntos por ${sobra.toFixed(2)}s (${Math.max(a.inicio, b.inicio).toFixed(2)}s–${Math.min(a.fim, b.fim).toFixed(2)}s)`;
+      }
+    }
+  }
+  return null;
+};

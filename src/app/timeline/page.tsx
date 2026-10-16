@@ -51,7 +51,14 @@ export default function PaginaTimeline() {
   // Delete/Backspace remove o item selecionado (fora de campos de texto).
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).closest("input, textarea, select")) return;
+      const alvo = e.target as HTMLElement;
+      if (alvo.closest("input, textarea, select")) return;
+      // Espaço toca/pausa (o player já trata quando ele mesmo tem o foco).
+      if (e.key === " " && !alvo.closest(".__remotion-player")) {
+        e.preventDefault();
+        player.current?.toggle();
+        return;
+      }
       // Shift+Delete é "remover trecho e fechar o buraco" (nas Trilhas).
       if (
         (e.key === "Delete" || e.key === "Backspace") &&

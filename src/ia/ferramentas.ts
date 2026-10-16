@@ -11,8 +11,13 @@ import {
   atualizarItem,
   definirFormato,
   colocarCena,
+  apararItem,
   cortarTrecho,
   dividirClipe,
+  dividirItemNoTempo,
+  duplicarItem,
+  juntarItens,
+  sobreposicaoDeAudio,
   Faixa,
   moverClipe,
   removerItem,
@@ -168,6 +173,14 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
   const aplicar = (operacao: (t: Timeline) => Timeline, descricao: string) => {
     const nova = operacao(sessao.timeline);
     validarTimeline(nova);
+    // Trava contra o erro mais comum de corte: pedaços do mesmo áudio
+    // tocando por cima um do outro (a fala se repete).
+    const sobreposto = sobreposicaoDeAudio(nova);
+    if (sobreposto && !sobreposicaoDeAudio(sessao.timeline)) {
+      throw new Error(
+        `Não apliquei: ${sobreposto}. Para tirar um pedaço da fala use cortar_trecho (fecha o buraco) ou aparar_item; para dividir, dividir_item.`,
+      );
+    }
     sessao.timeline = nova;
     sessao.acoes.push(descricao);
     return `OK: ${descricao}. Duração total agora: ${duracaoTotal()}s.`;
@@ -839,11 +852,109 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         if (Object.keys(mudancas).length === 0) {
           throw new Error("Nenhum campo para alterar.");
         }
+        // Só o começo de um áudio (ou insert de vídeo) mudou: é aparar —
+        // o ponto do arquivo anda junto e a fala não escorrega.
+        const item = sessao.timeline[faixa][indice] as { tipo?: string };
+        if (
+          e.de !== null &&
+          e.ate === null &&
+          e.comeca_no_segundo_do_arquivo === null &&
+          (faixa === "audios" ||
+            (faixa === "inserts" && item?.tipo === "video"))
+        ) {
+          const de = e.de;
+          const resto = { ...mudancas };
+          delete resto.inicio;
+          return aplicar(
+            (t) => {
+              const aparada = apararItem(t, faixa, indice, "inicio", de);
+              return Object.keys(resto).length
+                ? atualizarItem(aparada, faixa, indice, resto)
+                : aparada;
+            },
+            `${e.tipo} ${e.numero}: começo aparado em ${s(de)}s (o som continua no mesmo lugar)`,
+          );
+        }
         return aplicar(
           (t) => atualizarItem(t, faixa, indice, mudancas),
           `${e.tipo} ${e.numero} alterado (${Object.keys(mudancas).join(", ")})`,
         );
       },
+    }),
+
+    ferramenta({
+      name: "dividir_item",
+      description:
+        "Divide (corta em dois) um áudio, insert ou zoom num segundo do vídeo final, como a lâmina dos editores. O segundo pedaço continua do ponto certo do arquivo. Para cenas use dividir_cena.",
+      inputSchema: z.object({
+        tipo: z.enum(["audio", "insert", "zoom"]),
+        numero: z.number().int().min(1),
+        no_segundo: z.number().min(0).describe("Segundo do vídeo final."),
+      }),
+      run: (e) => {
+        const faixa = FAIXA_POR_TIPO[e.tipo] as "audios" | "inserts" | "zooms";
+        return aplicar(
+          (t) => dividirItemNoTempo(t, faixa, e.numero - 1, e.no_segundo),
+          `${e.tipo} ${e.numero} dividido em ${s(e.no_segundo)}s (agora são o ${e.tipo} ${e.numero} e o ${e.numero + 1})`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "aparar_item",
+      description:
+        "Apara o começo ou o fim de um áudio, insert, zoom ou legenda até um segundo do vídeo final, SEM tirar tempo do vídeo (fica silêncio/espaço). O conteúdo fica no lugar: aparar o começo de uma narração não faz a fala escorregar. Para tirar o tempo do vídeo inteiro use cortar_trecho; para cenas, aparar_cena.",
+      inputSchema: z.object({
+        tipo: z.enum(["audio", "insert", "zoom", "legenda"]),
+        numero: z.number().int().min(1),
+        ponta: z.enum(["inicio", "fim"]),
+        no_segundo: z.number().min(0),
+      }),
+      run: (e) => {
+        const faixa = FAIXA_POR_TIPO[e.tipo] as
+          | "audios"
+          | "inserts"
+          | "zooms"
+          | "legendas";
+        return aplicar(
+          (t) => apararItem(t, faixa, e.numero - 1, e.ponta, e.no_segundo),
+          `${e.tipo} ${e.numero}: ${e.ponta === "inicio" ? "começo" : "fim"} aparado em ${s(e.no_segundo)}s`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "juntar_itens",
+      description:
+        "Junta um item com o pedaço seguinte do mesmo arquivo, colado nele (desfaz um dividir). Vale para cena (com a próxima cena), áudio, insert, zoom e legenda.",
+      inputSchema: z.object({
+        tipo: z.enum(["cena", "insert", "audio", "zoom", "legenda"]),
+        numero: z
+          .number()
+          .int()
+          .min(1)
+          .describe("O PRIMEIRO dos dois pedaços."),
+      }),
+      run: (e) =>
+        aplicar(
+          (t) => juntarItens(t, FAIXA_POR_TIPO[e.tipo], e.numero - 1),
+          `${e.tipo} ${e.numero} juntado com o pedaço seguinte`,
+        ),
+    }),
+
+    ferramenta({
+      name: "duplicar_item",
+      description:
+        "Duplica uma cena (a cópia entra logo depois dela), insert, áudio, zoom ou legenda (a cópia fica colada no fim do original).",
+      inputSchema: z.object({
+        tipo: z.enum(["cena", "insert", "audio", "zoom", "legenda"]),
+        numero: z.number().int().min(1),
+      }),
+      run: (e) =>
+        aplicar(
+          (t) => duplicarItem(t, FAIXA_POR_TIPO[e.tipo], e.numero - 1),
+          `${e.tipo} ${e.numero} duplicado (a cópia é o número ${e.numero + 1})`,
+        ),
     }),
 
     ferramenta({
