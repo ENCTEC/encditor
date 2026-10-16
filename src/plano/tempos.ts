@@ -1,5 +1,6 @@
 import { buscarFala, PalavraFinal } from "@/ia/conteudo";
 import { Midia } from "@/projeto/tipos";
+import { cenasDaFala } from "./alinhamento";
 import { compactarFala } from "./respiros";
 import { CenaPlano } from "./tipos";
 
@@ -76,18 +77,17 @@ export const temposDasCenas = (
     return { inicios: lista, fimTotal: acumulado, naoAchadas };
   }
 
-  inicios[0] = 0;
-  let cursor = 0;
-  cenas.forEach((c, i) => {
-    if (i === 0) return;
-    const de = momentoDaFrase(palavras, c.fala, cursor);
-    const anterior =
-      [...inicios.slice(0, i)].reverse().find((x) => x !== null) ?? 0;
-    if (de !== null && de > anterior + 0.4) {
-      inicios[i] = de;
-      cursor = de;
-    }
+  // Alinha o roteiro com o que foi gravado, palavra a palavra: cada cena
+  // começa na primeira palavra dita que pertence a ela (inclusive
+  // improvisos, que entram na cena em que foram ditos).
+  const cenaDe = cenasDaFala(
+    cenas.map((c) => c.fala),
+    palavras.map((p) => p.palavra),
+  );
+  cenaDe.forEach((c, i) => {
+    if (inicios[c] === null) inicios[c] = palavras[i].de;
   });
+  inicios[0] = 0;
   const fimTotal = Math.max(
     palavras[palavras.length - 1].ate + SOBRA_NO_FIM,
     1,

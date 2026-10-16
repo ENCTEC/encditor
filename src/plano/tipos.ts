@@ -196,6 +196,8 @@ export type MensagemPlano = z.infer<typeof mensagemPlanoSchema>;
 export const verificacaoNarracaoSchema = z.object({
   // Arquivo da narração conferido (outro arquivo = conferir de novo).
   midiaId: z.string(),
+  // Versão do jeito de conferir (versão antiga = conferir de novo).
+  versao: z.number().optional(),
   // Respiros longos encurtados na edição (e os segundos que saíram).
   respiros: z.object({ quantos: z.number(), segundos: z.number() }).optional(),
   // geradoEm do plano conferido (plano novo = conferir de novo).

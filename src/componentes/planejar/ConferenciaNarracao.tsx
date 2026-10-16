@@ -19,9 +19,15 @@ export const ConferenciaNarracao: React.FC<{
       tempos das cenas e o quanto gerar de cada take (inclusive o número de
       segundos no prompt) foram ajustados à sua gravação.
     </p>
+    {v.respiros && v.respiros.quantos > 0 && v.respiros.segundos >= 0.3 ? (
+      <p className="text-xs text-zinc-400">
+        ✂ {v.respiros.quantos} respiro(s) longo(s) serão encurtados na edição (
+        {br(v.respiros.segundos)}s a menos).
+      </p>
+    ) : null}
     {v.avisos.map((a, i) => (
-      <p key={i} className="text-xs text-spray">
-        ⚠ {a}
+      <p key={i} className="text-xs text-zinc-400">
+        ↻ {a}
       </p>
     ))}
     <table className="w-full text-left text-xs">
@@ -48,12 +54,12 @@ export const ConferenciaNarracao: React.FC<{
               <td className="py-1 pr-3 tabular-nums">
                 {cena?.origem === "banco" ? "banco" : `${c.gerar}s`}
               </td>
-              <td className={`py-1 ${c.confere ? "" : "text-spray"}`}>
-                {c.confere ? "✓ " : "⚠ "}
+              <td className="py-1">
+                {c.confere ? "✓ " : "↻ "}
                 {c.falou || "(nada nesse trecho)"}
                 {!c.confere && cena?.fala ? (
                   <span className="block text-zinc-500">
-                    roteiro: “{cena.fala}”
+                    (adaptado; no roteiro era: “{cena.fala}”)
                   </span>
                 ) : null}
               </td>

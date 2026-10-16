@@ -1,4 +1,4 @@
-import { termos } from "@/ia/busca-banco";
+import { corrigirComRoteiro, fichas, parecido } from "./alinhamento";
 import { Midia } from "@/projeto/tipos";
 import { narracaoSemRespiros, temposDasCenas } from "./tempos";
 import { PlanoGerado, PlanoSalvo, VerificacaoNarracao } from "./tipos";
@@ -11,17 +11,29 @@ import { PlanoGerado, PlanoSalvo, VerificacaoNarracao } from "./tipos";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
+// Sobe quando o jeito de conferir melhora: conferências antigas são
+// refeitas sozinhas. 2 = alinhamento palavra a palavra + nomes corrigidos.
+export const VERSAO_CONFERENCIA = 2;
+
 // Folga em cada take: aparar o começo (quadros "travados") e uma sobra.
 const FOLGA_GERAR = 1;
 const MINIMO_GERAR = 3;
 
-// O que foi dito confere com a fala do roteiro? (palavras em comum)
+const palavrasDe = (texto: string) => texto.split(/\s+/).filter(Boolean);
+
+// O que foi dito confere com a fala do roteiro? (palavra a palavra,
+// tolerante a nomes transcritos tortos e a pequenas trocas)
 const confere = (fala: string, falou: string) => {
-  const esperado = termos(fala);
+  const esperado = fichas(palavrasDe(fala), true);
   if (!esperado.length) return true;
-  const dito = new Set(termos(falou));
-  const presentes = esperado.filter((t) => dito.has(t)).length;
-  return presentes / esperado.length >= 0.7;
+  const dito = fichas(palavrasDe(falou));
+  const presentes = esperado.filter((e) =>
+    dito.some((d) => {
+      const s = parecido(e.t, d.t);
+      return s >= 0.8 || (e.propria && s >= 0.5);
+    }),
+  ).length;
+  return presentes / esperado.length >= 0.6;
 };
 
 // "…, 5 seconds." no prompt passa a ser a duração nova.
@@ -38,7 +50,13 @@ const comSegundos = (prompt: string | null, segundos: number) =>
 export const verificarNarracao = (
   plano: PlanoSalvo,
   narracao: Midia,
-): { gerado: PlanoGerado; verificacao: VerificacaoNarracao } => {
+): {
+  gerado: PlanoGerado;
+  verificacao: VerificacaoNarracao;
+  // Palavras da transcrição com os nomes do roteiro corrigidos (mesma
+  // ordem da transcrição; "" = juntada à anterior, como "em vigo").
+  palavrasCorrigidas: string[];
+} => {
   const g = plano.gerado;
   if (!g) throw new Error("Ainda não há plano.");
   const { palavras, fala } = narracaoSemRespiros(narracao);
@@ -46,6 +64,10 @@ export const verificarNarracao = (
     throw new Error("A narração ainda não foi transcrita (ou não tem fala).");
   }
   const { inicios, fimTotal, naoAchadas } = temposDasCenas(g.cenas, palavras);
+  const palavrasCorrigidas = corrigirComRoteiro(
+    g.cenas.flatMap((c) => palavrasDe(c.fala)),
+    palavras.map((p) => p.palavra),
+  );
   const avisos: string[] = [];
 
   const cenas = g.cenas.map((c, i) => {
@@ -60,8 +82,10 @@ export const verificarNarracao = (
       MINIMO_GERAR,
       Math.ceil(duracao + transicao + FOLGA_GERAR),
     );
+    // O que foi dito na cena, já com os nomes corrigidos.
     const falou = palavras
-      .filter((p) => p.de >= inicio - 0.05 && p.de < fim - 0.05)
+      .map((p, k) => ({ de: p.de, palavra: palavrasCorrigidas[k] }))
+      .filter((p) => p.palavra && p.de >= inicio - 0.05 && p.de < fim - 0.05)
       .map((p) => p.palavra)
       .join(" ");
     return {
@@ -77,7 +101,7 @@ export const verificarNarracao = (
   const diferentes = cenas.filter((c) => !c.confere).map((c) => c.numero);
   if (diferentes.length) {
     avisos.push(
-      `A fala da${diferentes.length > 1 ? "s cenas" : " cena"} ${diferentes.join(", ")} não bate com o roteiro: confira abaixo o que foi dito (se falou diferente de propósito, tudo bem; os tempos seguem a sua gravação).`,
+      `Você falou a${diferentes.length > 1 ? "s cenas" : " cena"} ${diferentes.join(", ")} de um jeito diferente do roteiro — tudo bem: os tempos e as legendas seguem a sua gravação.`,
     );
   }
   const total = r1(fimTotal);
@@ -105,7 +129,9 @@ export const verificarNarracao = (
   };
   return {
     gerado,
+    palavrasCorrigidas,
     verificacao: {
+      versao: VERSAO_CONFERENCIA,
       respiros: { quantos: fala.respiros, segundos: fala.economizado },
       midiaId: narracao.id,
       doPlano: plano.geradoEm,

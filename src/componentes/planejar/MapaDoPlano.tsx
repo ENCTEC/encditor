@@ -16,7 +16,10 @@ import {
 import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 import { montarDoPlano } from "@/plano/montagem";
-import { verificarNarracao } from "@/plano/verificarNarracao";
+import {
+  VERSAO_CONFERENCIA,
+  verificarNarracao,
+} from "@/plano/verificarNarracao";
 import {
   ItemPlano,
   itensDoPlano,
@@ -218,6 +221,7 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
     obterTimeline,
     obterBiblioteca,
     adicionarMensagem,
+    atualizarAnalise,
   } = useProjeto();
   const envio = useEnviarItem(uso);
   const [montagem, setMontagem] = useState<{
@@ -237,7 +241,8 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
     !!plano?.narracaoVerificada &&
     !!narracao?.midia &&
     plano.narracaoVerificada.midiaId === narracao.midia.id &&
-    plano.narracaoVerificada.doPlano === plano.geradoEm;
+    plano.narracaoVerificada.doPlano === plano.geradoEm &&
+    plano.narracaoVerificada.versao === VERSAO_CONFERENCIA;
   const conferida = useRef("");
 
   // Narração transcrita e ainda não conferida: confere e ajusta os tempos
@@ -252,6 +257,34 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
     conferida.current = chave;
     try {
       const r = verificarNarracao(plano, narracao.midia);
+      // A transcrição da narração passa a ter os nomes do roteiro
+      // (Wella, Truss, Linnda…): as legendas saem certas.
+      const t = narracao.midia.analise?.transcricao;
+      if (t && narracao.midia.analise) {
+        const palavras: typeof t.palavras = [];
+        t.palavras.forEach((p, k) => {
+          const certa = r.palavrasCorrigidas[k];
+          if (certa === "" && palavras.length) {
+            // Juntada à anterior ("em vigo" → "Invigo").
+            palavras[palavras.length - 1].ate = p.ate;
+          } else if (certa !== "") {
+            palavras.push({ ...p, palavra: certa ?? p.palavra });
+          }
+        });
+        const mudou = palavras.some(
+          (p, k) => p.palavra !== t.palavras[k]?.palavra,
+        );
+        if (mudou || palavras.length !== t.palavras.length) {
+          atualizarAnalise(narracao.midia.id, {
+            ...narracao.midia.analise,
+            transcricao: {
+              ...t,
+              palavras,
+              texto: palavras.map((p) => p.palavra).join(" "),
+            },
+          });
+        }
+      }
       void mudar({
         gerado: r.gerado,
         narracaoVerificada: r.verificacao,
