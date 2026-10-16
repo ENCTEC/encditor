@@ -10,7 +10,7 @@ import { Midia } from "@/projeto/tipos";
 import { timelineSchema } from "@/timeline/schema";
 import { chaveCena, chaveInsert } from "@/plano/pendencias";
 import { lerPlanoSalvo } from "@/plano/tipos";
-import { lerPlano } from "@/servidor/banco";
+import { lerMidiasDoCliente, lerPlano, lerProjeto } from "@/servidor/banco";
 
 // Resumo do plano para o editor: copy e o que cada cena deveria ser.
 const resumoDoPlano = (projetoId: string, biblioteca: Midia[]) => {
@@ -110,11 +110,17 @@ export async function POST(req: NextRequest) {
   }
   const { pedido, anexos, historico, timeline, biblioteca, projetoId } =
     corpo.data;
+  // Banco inteiro do cliente: a IA pode reaproveitar arquivos de outros
+  // vídeos dele (o app manda só os deste projeto).
+  const clienteId = projetoId ? lerProjeto(projetoId)?.cliente.id : null;
+  const banco = clienteId
+    ? (lerMidiasDoCliente(clienteId) as Midia[])
+    : undefined;
   const plano = projetoId
-    ? resumoDoPlano(projetoId, biblioteca as Midia[])
+    ? resumoDoPlano(projetoId, banco ?? (biblioteca as Midia[]))
     : null;
 
-  const sessao: SessaoEdicao = { timeline, biblioteca, acoes: [] };
+  const sessao: SessaoEdicao = { timeline, biblioteca, banco, acoes: [] };
 
   // Histórico só em texto; a conversa precisa começar pelo usuário.
   const anteriores = historico

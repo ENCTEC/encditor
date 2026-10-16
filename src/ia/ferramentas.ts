@@ -69,7 +69,10 @@ const ferramenta = <S extends z.ZodType>(f: Ferramenta<S>) =>
 
 export type SessaoEdicao = {
   timeline: Timeline;
+  // Arquivos deste projeto.
   biblioteca: Midia[];
+  // Banco inteiro do cliente (para buscar_no_banco e reaproveitar).
+  banco?: Midia[];
   // Mídias que a IA alterou (ex.: efeitos de áudio), para o app atualizar.
   midiasAlteradas?: Midia[];
   // Inserts colocados sem posição definida: o app abre o popup para o
@@ -128,12 +131,17 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
 
   const acharMidia = (nome: string) => {
     const alvo = normalizar(nome.replace(/^@/, ""));
-    const midia = sessao.biblioteca.find(
-      (m) =>
-        normalizar(m.apelido ?? "") === alvo ||
-        normalizar(m.nome) === alvo ||
-        normalizar(m.nomeArquivo) === alvo,
-    );
+    const combina = (m: Midia) =>
+      normalizar(m.apelido ?? "") === alvo ||
+      normalizar(m.nome) === alvo ||
+      normalizar(m.nomeArquivo) === alvo;
+    let midia = sessao.biblioteca.find(combina);
+    if (!midia) {
+      // Reaproveitado do banco do cliente (achado com buscar_no_banco):
+      // pelo apelido, que é único no banco.
+      midia = sessao.banco?.find((m) => normalizar(m.apelido ?? "") === alvo);
+      if (midia) sessao.biblioteca = [...sessao.biblioteca, midia];
+    }
     if (!midia) {
       const nomes =
         sessao.biblioteca.map((m) => `${m.nome} (@${m.apelido})`).join(", ") ||
@@ -947,7 +955,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           ...sessao.timeline.clipes.map((c) => c.url),
           ...sessao.timeline.inserts.map((x) => x.url),
         ]);
-        const candidatos = sessao.biblioteca.filter(
+        const candidatos = (sessao.banco ?? sessao.biblioteca).filter(
           (m) =>
             m.formato !== "audio" &&
             (!e.tipo || e.tipo === "qualquer" || m.formato === e.tipo),

@@ -39,7 +39,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     adicionarMensagem,
     aplicar,
     obterTimeline,
-    obterBiblioteca,
+    obterArquivosDoProjeto,
     limparChat,
     editarMidia,
     meta,
@@ -127,7 +127,9 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     try {
       const analises = await aguardarAnalises();
       setPensando("Editando…");
-      const atual = obterBiblioteca();
+      // Só os arquivos deste projeto; o servidor busca o banco inteiro do
+      // cliente quando a IA quer reaproveitar algo (buscar_no_banco).
+      const atual = obterArquivosDoProjeto();
       const biblioteca = [
         ...atual,
         ...enviados.filter((e) => !atual.some((m) => m.id === e.id)),

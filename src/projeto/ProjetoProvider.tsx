@@ -15,9 +15,13 @@ import { timelineVazia } from "@/timeline/operacoes";
 import { Timeline } from "@/timeline/schema";
 import { Analise } from "./analise";
 import { gerarApelido } from "./midia-cliente";
+import { arquivosDoProjeto } from "./doProjeto";
 import { Mensagem, Midia, Projeto } from "./tipos";
 
-// Estado do projeto aberto, compartilhado pelas abas Criar e Timeline.
+// Estado do projeto aberto, compartilhado pelas abas.
+// Internamente guarda o banco INTEIRO do cliente (para nomes/apelidos
+// únicos e para a IA reaproveitar clipes), mas "projeto.biblioteca" que as
+// telas recebem só tem os arquivos deste projeto (doProjeto.ts).
 // Por enquanto fica salvo no navegador (localStorage); depois vai para o
 // Supabase.
 
@@ -165,7 +169,10 @@ const reducer = (estado: Estado, acao: Acao): Estado => {
 };
 
 type ContextoProjeto = {
+  // biblioteca = só os arquivos deste projeto.
   projeto: Projeto;
+  // Banco de mídia inteiro do cliente (todos os projetos dele).
+  banco: Midia[];
   carregado: boolean;
   // Projeto e cliente abertos.
   meta: MetaProjeto | null;
@@ -181,8 +188,11 @@ type ContextoProjeto = {
   // Timeline mais recente, inclusive mudanças feitas neste mesmo clique
   // (o "projeto" só atualiza na próxima renderização).
   obterTimeline: () => Timeline;
-  // Biblioteca mais recente (mesma ideia do obterTimeline).
+  // Banco inteiro do cliente, mais recente (mesma ideia do obterTimeline);
+  // usado para nomes e apelidos únicos.
   obterBiblioteca: () => Midia[];
+  // Só os arquivos deste projeto, mais recentes.
+  obterArquivosDoProjeto: () => Midia[];
   atualizarAnalise: (id: string, analise: Analise) => void;
   // Muda apelido / escolha de IA. Retorna false se o apelido já existir.
   editarMidia: (id: string, mudancas: Partial<Midia>) => boolean;
@@ -407,12 +417,30 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
   // Só guarda na biblioteca: a ordem das cenas na trilha é o usuário quem
   // decide (pelo chat ou pela Timeline).
   const adicionarMidia = useCallback((midia: Midia) => {
-    dispatch({ tipo: "midia", midia });
+    dispatch({
+      tipo: "midia",
+      midia: { ...midia, projetoId: midia.projetoId ?? idDoProjeto() },
+    });
   }, []);
+
+  const projetoVisivel = useMemo(
+    () => ({
+      ...estado.projeto,
+      biblioteca: arquivosDoProjeto(
+        estado.projeto.biblioteca,
+        estado.projeto.timeline,
+        // meta só existe depois de carregar (no navegador): no servidor
+        // não há "location" para ler o projeto.
+        meta?.id ?? "",
+      ),
+    }),
+    [estado.projeto, meta],
+  );
 
   const valor = useMemo<ContextoProjeto>(
     () => ({
-      projeto: estado.projeto,
+      projeto: projetoVisivel,
+      banco: estado.projeto.biblioteca,
       carregado,
       meta,
       salvamento,
@@ -423,6 +451,12 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       aplicar,
       obterTimeline: () => timelineAtual.current,
       obterBiblioteca: () => bibliotecaAtual.current,
+      obterArquivosDoProjeto: () =>
+        arquivosDoProjeto(
+          bibliotecaAtual.current,
+          timelineAtual.current,
+          idDoProjeto(),
+        ),
       editarMidia: (id, mudancas) => {
         if (
           mudancas.apelido !== undefined &&
@@ -452,7 +486,16 @@ export const ProjetoProvider: React.FC<{ children: React.ReactNode }> = ({
       novoProjeto: () =>
         dispatch({ tipo: "substituir", projeto: projetoVazio() }),
     }),
-    [estado, carregado, meta, salvamento, erro, aplicar, adicionarMidia],
+    [
+      estado,
+      projetoVisivel,
+      carregado,
+      meta,
+      salvamento,
+      erro,
+      aplicar,
+      adicionarMidia,
+    ],
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;

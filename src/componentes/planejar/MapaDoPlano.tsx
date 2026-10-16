@@ -264,6 +264,7 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
   const { plano, mudar } = uso;
   const {
     projeto,
+    banco,
     aplicar,
     obterTimeline,
     obterBiblioteca,
@@ -278,7 +279,8 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
   const [verCopy, setVerCopy] = useState(false);
   const tentouAuto = useRef(false);
 
-  const biblioteca = projeto.biblioteca;
+  // Banco inteiro: o plano pode reaproveitar clipes de outros vídeos.
+  const biblioteca = banco;
   const itens = plano ? itensDoPlano(plano, biblioteca) : [];
   const completo = planoCompleto(itens);
   const g = plano?.gerado ?? null;

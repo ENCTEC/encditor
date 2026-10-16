@@ -30,6 +30,9 @@ export type Midia = {
   // Cópia leve do vídeo (proxy) usada só no preview. "de" = a URL a partir
   // da qual foi feita: se o arquivo mudar (ex.: efeitos), é refeita.
   preview?: { de: string; url: string };
+  // Projeto em que o arquivo foi enviado. A biblioteca de um projeto mostra
+  // os enviados nele + os do banco do cliente que ele usa (doProjeto.ts).
+  projetoId?: string;
 };
 
 export type Mensagem = {
