@@ -90,17 +90,17 @@ export const Briefing: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
   return (
     <div className="space-y-6">
       <Secao
-        titulo="Roteiro"
-        dica="Cole o roteiro que você escreveu (a IA pode melhorar) ou deixe vazio para ela criar do zero."
+        titulo="Ideia do vídeo"
+        dica="Conte a ideia com as suas palavras. A IA escreve o roteiro inteiro, já com o jeito de falar cada frase, para você gravar a narração."
       >
         <textarea
-          value={b.roteiro}
+          value={b.ideia}
           onChange={(e) => {
-            const roteiro = e.target.value;
-            mudarBriefing((x) => ({ ...x, roteiro }));
+            const ideia = e.target.value;
+            mudarBriefing((x) => ({ ...x, ideia }));
           }}
-          rows={6}
-          placeholder="Ex.: Para tudo! Promoção relâmpago na Linnda Cosméticos…"
+          rows={4}
+          placeholder="Ex.: promoção relâmpago do kit Trivitt, começar chamando quem faz química no cabelo, mostrar a loja e terminar chamando no WhatsApp"
           className={`${campoZine} resize-y`}
         />
       </Secao>
@@ -291,6 +291,22 @@ export const Briefing: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
         />
         {erroEnvio ? <p className="text-xs text-spray">{erroEnvio}</p> : null}
       </Secao>
+
+      <details open={b.roteiro.trim().length > 0} className="space-y-2">
+        <summary className="cursor-pointer font-mono text-[11px] tracking-wider text-zinc-500 uppercase hover:text-tinta">
+          Já tem um texto pronto? (opcional)
+        </summary>
+        <textarea
+          value={b.roteiro}
+          onChange={(e) => {
+            const roteiro = e.target.value;
+            mudarBriefing((x) => ({ ...x, roteiro }));
+          }}
+          rows={5}
+          placeholder="Cole aqui só se já tiver o texto da narração; a IA mantém o sentido e melhora."
+          className={`${campoZine} mt-2 resize-y`}
+        />
+      </details>
 
       <Secao titulo="Observações">
         <textarea

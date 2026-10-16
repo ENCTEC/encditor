@@ -37,7 +37,9 @@ export const exemploSchema = z.object({
 export type Exemplo = z.infer<typeof exemploSchema>;
 
 export const briefingSchema = z.object({
-  // Roteiro escrito pelo usuário (vazio = a IA cria do zero).
+  // Ideia do vídeo (o principal: a IA cria o roteiro a partir dela).
+  ideia: z.string(),
+  // Texto pronto do usuário, opcional (vazio = a IA cria do zero).
   roteiro: z.string(),
   // Produto, oferta, público, objetivo do vídeo.
   objetivo: z.string(),
@@ -53,6 +55,7 @@ export const briefingSchema = z.object({
 export type Briefing = z.infer<typeof briefingSchema>;
 
 export const briefingVazio = (): Briefing => ({
+  ideia: "",
   roteiro: "",
   objetivo: "",
   formato: null,
@@ -112,6 +115,12 @@ export const cenaPlanoSchema = z.object({
   zoom: z
     .object({ frase: z.string(), escala: z.number(), rampa_s: z.number() })
     .nullable(),
+  // Como GRAVAR a fala desta cena (guia para o usuário e para a voz de
+  // exemplo): entonação, palavras com ênfase, ritmo e pausa depois.
+  entonacao: z.string(),
+  enfase: z.array(z.string()),
+  ritmo: z.enum(["lento", "normal", "rapido"]),
+  pausa_depois_s: z.number(),
   // Por que esta cena (dados, exemplos, aprendizados).
   motivo: z.string(),
 });
@@ -192,6 +201,18 @@ export const planoSalvoSchema = z.object({
   vinculos: z.record(z.string(), z.string()),
   musicaPulada: z.boolean(),
   montadoEm: z.number().nullable(),
+  // Narração de exemplo (voz sintética) para o usuário copiar a entonação.
+  vozTeste: z
+    .object({
+      voz: z.string(),
+      // Impressão digital do texto + indicações: muda = precisa refazer.
+      chave: z.string(),
+      // geradoEm do plano lido (outro plano = a voz ficou desatualizada).
+      doPlano: z.number().nullable(),
+      arquivo: z.string(),
+      trechos: z.array(z.object({ cena: z.number(), arquivo: z.string() })),
+    })
+    .nullable(),
 });
 export type PlanoSalvo = z.infer<typeof planoSalvoSchema>;
 
@@ -203,6 +224,7 @@ export const planoVazio = (): PlanoSalvo => ({
   vinculos: {},
   musicaPulada: false,
   montadoEm: null,
+  vozTeste: null,
 });
 
 // Lê um plano salvo tolerando versões antigas (campos que faltam = padrão).
@@ -214,7 +236,25 @@ export const lerPlanoSalvo = (bruto: unknown): PlanoSalvo => {
     ...base.briefing,
     ...(b.briefing ?? {}),
   });
-  const gerado = planoGeradoSchema.nullable().safeParse(b.gerado ?? null);
+  // Planos antigos (sem as indicações de gravação) ganham os padrões.
+  const brutoGerado = b.gerado as
+    | (Record<string, unknown> & { cenas?: Record<string, unknown>[] })
+    | null
+    | undefined;
+  const gerado = planoGeradoSchema.nullable().safeParse(
+    brutoGerado
+      ? {
+          ...brutoGerado,
+          cenas: (brutoGerado.cenas ?? []).map((c) => ({
+            entonacao: "",
+            enfase: [],
+            ritmo: "normal",
+            pausa_depois_s: 0,
+            ...c,
+          })),
+        }
+      : null,
+  );
   return {
     briefing: briefing.success ? briefing.data : base.briefing,
     conversa: z
@@ -229,5 +269,8 @@ export const lerPlanoSalvo = (bruto: unknown): PlanoSalvo => {
       .parse(b.vinculos ?? {}),
     musicaPulada: b.musicaPulada === true,
     montadoEm: typeof b.montadoEm === "number" ? b.montadoEm : null,
+    vozTeste: planoSalvoSchema.shape.vozTeste
+      .catch(null)
+      .parse(b.vozTeste ?? null),
   };
 };

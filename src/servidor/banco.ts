@@ -456,10 +456,16 @@ export const apagarProjeto = (id: string) =>
 const arquivosDoPlano = (projetoId: string) => {
   const plano = lerPlano(projetoId) as {
     briefing?: { exemplos?: { url?: string }[] };
+    vozTeste?: { arquivo?: string; trechos?: { arquivo?: string }[] } | null;
   } | null;
-  return (plano?.briefing?.exemplos ?? [])
-    .map((e) => e.url?.split("/").pop() ?? "")
-    .filter(Boolean);
+  return [
+    ...(plano?.briefing?.exemplos ?? []).map(
+      (e) => e.url?.split("/").pop() ?? "",
+    ),
+    // Narração de exemplo (voz sintética).
+    plano?.vozTeste?.arquivo ?? "",
+    ...(plano?.vozTeste?.trechos ?? []).map((t) => t.arquivo ?? ""),
+  ].filter(Boolean);
 };
 
 // Cliente inteiro: projetos, vídeos exportados e banco de mídia (com as

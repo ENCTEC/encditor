@@ -24,6 +24,7 @@ import {
 } from "@/plano/pendencias";
 import { VOLUMES_TAKE } from "@/plano/tipos";
 import { UsoPlano } from "@/plano/usePlano";
+import { GuiaDeGravacao } from "./GuiaDeGravacao";
 
 // O plano gerado, como um mapa: cada take com o prompt do Higgsfield e o
 // status (falta enviar / chegou), a narração e a música. Quando tudo
@@ -324,6 +325,8 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
           ) : null}
         </div>
       </header>
+
+      <GuiaDeGravacao uso={uso} />
 
       {/* Situação: o que falta e montar. */}
       <div className="flex flex-wrap items-center gap-3 border-[3px] border-tinta p-3">

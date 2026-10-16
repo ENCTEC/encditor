@@ -48,9 +48,22 @@ export async function PUT(req: NextRequest) {
       Object.entries(mudancas).filter(([, v]) => v !== undefined),
     ),
     ...(recomecar
-      ? { conversa: [], gerado: null, geradoEm: null, montadoEm: null }
+      ? {
+          conversa: [],
+          gerado: null,
+          geradoEm: null,
+          montadoEm: null,
+          vozTeste: null,
+        }
       : {}),
   };
+  // Recomeçar: a narração de exemplo (voz sintética) sai do disco.
+  if (recomecar && atual.vozTeste) {
+    await apagarArquivos([
+      atual.vozTeste.arquivo,
+      ...atual.vozTeste.trechos.map((t) => t.arquivo),
+    ]);
+  }
   // Exemplos tirados do briefing: o arquivo sai do disco.
   if (mudancas.briefing) {
     const ficam = new Set(mudancas.briefing.exemplos.map((e) => e.url));

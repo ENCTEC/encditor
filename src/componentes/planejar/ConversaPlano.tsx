@@ -8,7 +8,7 @@ import { UsoPlano } from "@/plano/usePlano";
 
 const SUGESTOES = [
   "Monte o plano do vídeo",
-  "Crie o roteiro do zero com base no objetivo",
+  "Crie o roteiro a partir da ideia, com o jeito de falar",
   "Use mais clipes do banco que deram resultado",
   "Deixe o gancho mais forte nos 2 primeiros segundos",
 ];

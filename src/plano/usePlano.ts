@@ -138,6 +138,35 @@ export const usePlano = () => {
     [projetoId, salvarBriefingAgora],
   );
 
+  // Narração de exemplo (voz sintética) do roteiro.
+  const [gerandoVoz, setGerandoVoz] = useState(false);
+  const gerarVoz = useCallback(
+    async (voz: string) => {
+      if (!projetoId) return;
+      setErro(null);
+      setGerandoVoz(true);
+      try {
+        const r = await fetch(`/api/plano/voz?projeto=${projetoId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voz }),
+        });
+        const d = (await r.json().catch(() => ({}))) as {
+          plano?: unknown;
+          erro?: string;
+        };
+        if (!r.ok || !d.plano) throw new Error(d.erro ?? `Erro ${r.status}.`);
+        const salvo = lerPlanoSalvo(d.plano);
+        setPlano((p) => (p ? { ...salvo, briefing: p.briefing } : salvo));
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : String(e));
+      } finally {
+        setGerandoVoz(false);
+      }
+    },
+    [projetoId],
+  );
+
   // Salva o que faltar ao sair da página.
   useEffect(
     () => () => {
@@ -155,6 +184,8 @@ export const usePlano = () => {
     conversar,
     pensando,
     salvando,
+    gerarVoz,
+    gerandoVoz,
     erro,
     limparErro: () => setErro(null),
   };

@@ -211,7 +211,7 @@ O ENCeditor NÃO faz: mudar velocidade, câmera lenta, correção de cor, filtro
 O QUE VOCÊ USA (nesta ordem de peso)
 1) RESULTADOS EM NÚMEROS das versões já exportadas do cliente — pago no Meta Ads (vendas, custo por conversa/clique, CTR, conversas/cliques) e orgânico no TikTok e no Instagram (visualizações, compartilhamentos, salvamentos…), mais a avaliação geral. Vídeo que vai bem no orgânico pode não vender no pago e vice-versa: considere o objetivo do novo vídeo. copie o que deu certo (gancho, ritmo, tipo de cena, estilo de legenda, duração) e evite o que deu errado. Números não mentem.
 2) APRENDIZADOS condensados e OPINIÕES SOBRE O VISUAL (pesam menos que números, mas toda regra de "problema visual a evitar" deve ser respeitada nos prompts dos takes — ex.: se reclamaram de iluminação, peça iluminação clara e uniforme).
-3) O ROTEIRO do usuário (mantenha o sentido e a oferta; melhore gancho nos 2 primeiros segundos, clareza e chamada para ação; explique em melhorias_no_roteiro). Sem roteiro, crie do zero a partir do objetivo.
+3) A IDEIA e o OBJETIVO: normalmente o usuário NÃO manda roteiro — VOCÊ escreve a copy inteira a partir da ideia e do objetivo (gancho forte nos 2 primeiros segundos, oferta clara, chamada para ação no fim), em português falado e natural, para ser gravada pelo usuário. Se ele mandar um texto pronto (roteiro), mantenha o sentido e a oferta e melhore; explique em melhorias_no_roteiro.
 4) EXEMPLOS enviados, cada um com a sua finalidade (edição, ângulo, cena específica, estilo). Se a finalidade/detalhe de um exemplo estiver vago, PERGUNTE o que copiar dele.
 5) CENAS OBRIGATÓRIAS: todas precisam estar no plano.
 6) BANCO DO CLIENTE: clipes já enviados em outros projetos DESTE cliente. Reaproveite (origem "banco", apelido_banco exato, trecho_banco_de/ate com base na minutagem da análise) quando um clipe combinar com a fala SEM perder o sentido do vídeo — principalmente clipes usados em versões que deram resultado. Nunca use arquivos que não estão na lista.
@@ -233,10 +233,11 @@ REGRAS DO PLANO
 - legendas: escolha estilo e palavras_por_legenda (3 a 5 para reels) com base nos dados e exemplos. tamanho_percent é o tamanho da letra em % do PADRÃO do estilo (100 = normal): use null (padrão) ou 80 a 120; nunca menos de 60. posicao: null (padrão do estilo), "base", "centro" ou "topo".
 - musica: usar true na maioria dos anúncios; descreva o estilo; volume_percent 8 a 15 por baixo da narração.
 - formato: o pedido pelo usuário ou 9:16.
+- GUIA DE GRAVAÇÃO (o usuário grava a narração imitando isso; uma voz sintética também lê seguindo estas indicações): em cada cena com fala, entonacao = como dizer, em poucas palavras e bem concreto (ex.: "urgente e animada, subindo no fim", "baixando a voz, em tom de segredo", "sorrindo, conversando com a amiga"); enfase = palavras EXATAS da fala que devem sair mais fortes: no máximo 2 por fala, cada uma com 1 a 3 palavras (ex.: "hoje", "125 e 90", "Trivitt") — ênfase demais perde o efeito; ritmo = lento, normal ou rapido; pausa_depois_s = respiro depois da frase (0 a 0.8; use 0.3–0.6 antes de revelar o preço ou de virar o assunto). narracao.orientacoes = tom geral da voz (quem fala, energia, como sorrir, velocidade média).
 - motivo de cada cena e aprendizados_aplicados: cite os dados que justificam (ex.: "versão X teve 12 vendas a R$ 2,80 por conversa com gancho de pergunta"). Não invente números.
 
 CONVERSA
-- Se faltar informação essencial (o que vender/oferta e objetivo) e não houver roteiro, faça até 3 perguntas curtas e devolva plano null.
+- Se faltar informação essencial (o que vender/oferta e objetivo — sem ideia, objetivo nem texto pronto), faça até 3 perguntas curtas e devolva plano null.
 - Caso contrário, devolva o PLANO COMPLETO e, na mensagem, explique em poucas linhas as decisões principais e faça no máximo 2 perguntas de refinamento (opcionais).
 - Quando o usuário pedir mudanças, devolva o plano completo atualizado.
 - mensagem: texto simples, curto, sem markdown pesado.`;
@@ -355,6 +356,7 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
   // o resto vai numa linha cada (a IA sabe que existem e pode usar).
   const visuais = midias.filter((m) => m.formato !== "audio");
   const consulta = [
+    b.ideia,
     b.roteiro,
     b.objetivo,
     b.observacoes,
@@ -401,7 +403,8 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
   const secoes = [
     `CLIENTE: ${projeto.cliente.nome}. PROJETO: ${projeto.nome}.`,
     "== BRIEFING ==",
-    `Roteiro do usuário: ${b.roteiro.trim() || "(nenhum — criar do zero)"}`,
+    `Ideia do vídeo: ${b.ideia.trim() || "(não informada)"}`,
+    `Texto pronto do usuário: ${b.roteiro.trim() || "(nenhum — escreva a copy do zero a partir da ideia e do objetivo)"}`,
     `Objetivo/produto/oferta: ${b.objetivo.trim() || "(não informado)"}`,
     `Formato: ${b.formato ?? "(não definido; padrão 9:16)"}. Duração desejada: ${b.duracaoAlvo ? `${b.duracaoAlvo}s` : "(livre; anúncios costumam ter 15 a 35 s)"}.`,
     `Cenas obrigatórias: ${b.obrigatorias.length ? b.obrigatorias.map((o, i) => `${i + 1}) ${o}`).join(" ") : "(nenhuma)"}`,
@@ -504,6 +507,11 @@ const ajustarPlano = (
               rampa_s: limitar(c.zoom.rampa_s, 0.15, 3),
             }
           : null,
+        enfase: c.enfase
+          .map((e) => e.trim())
+          .filter(Boolean)
+          .slice(0, 4),
+        pausa_depois_s: limitar(c.pausa_depois_s, 0, 1.5),
       };
     }),
     inserts: g.inserts.map((x, i) => {

@@ -9,6 +9,8 @@ export const MODELOS = {
   visao: process.env.OPENAI_MODELO_VISAO ?? "gpt-6.1-sol",
   // Único modelo da OpenAI com o tempo de cada palavra (para legendas).
   transcricaoComTempos: "whisper-1",
+  // Voz de exemplo do roteiro (segue instruções de entonação).
+  voz: process.env.OPENAI_MODELO_VOZ ?? "gpt-4o-mini-tts",
   // Ditado do chat (só precisa do texto).
   ditado: process.env.OPENAI_MODELO_DITADO ?? "gpt-transcribe",
 };
