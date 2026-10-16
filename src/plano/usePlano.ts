@@ -8,7 +8,15 @@ import { Briefing, lerPlanoSalvo, PlanoSalvo } from "./tipos";
 // briefing ~0,8s depois de cada mudança e conversa com a IA planejadora.
 
 type Mudancas = Partial<
-  Pick<PlanoSalvo, "briefing" | "vinculos" | "musicaPulada" | "montadoEm">
+  Pick<
+    PlanoSalvo,
+    | "briefing"
+    | "vinculos"
+    | "musicaPulada"
+    | "montadoEm"
+    | "gerado"
+    | "narracaoVerificada"
+  >
 > & { recomecar?: boolean };
 
 export const usePlano = () => {

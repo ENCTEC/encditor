@@ -54,19 +54,21 @@ export const Trilhas: React.FC<{
     if (bloco.faixa === "clipes") {
       // Em clipes, as pontas aparam o trecho do vídeo de origem.
       const clipe = timeline.clipes[bloco.indice];
+      // O arrasto é em tempo do vídeo final; no arquivo, conta a velocidade.
+      const passo = delta * (clipe.velocidade ?? 1);
       const duracaoOrigem =
         biblioteca.find((m) => m.url === clipe.url)?.duracao ?? Infinity;
       const mudancas =
         modo === "inicio"
           ? {
               inicio: arredondar(
-                Math.min(Math.max(0, clipe.inicio + delta), clipe.fim - MINIMO),
+                Math.min(Math.max(0, clipe.inicio + passo), clipe.fim - MINIMO),
               ),
             }
           : {
               fim: arredondar(
                 Math.max(
-                  Math.min(duracaoOrigem, clipe.fim + delta),
+                  Math.min(duracaoOrigem, clipe.fim + passo),
                   clipe.inicio + MINIMO,
                 ),
               ),

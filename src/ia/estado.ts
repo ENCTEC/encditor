@@ -40,6 +40,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
         ? { duracao_transicao_s: c.duracaoTransicao }
         : {}),
       volume: c.volume,
+      ...(c.velocidade ? { velocidade: c.velocidade } : {}),
     })),
     inserts: t.inserts.map((x, i) => ({
       numero: i + 1,

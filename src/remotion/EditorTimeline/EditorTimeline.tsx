@@ -78,6 +78,7 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
                   trimBefore={clipe.trimInicio}
                   trimAfter={clipe.trimFim}
                   volume={clipe.volume}
+                  playbackRate={clipe.velocidade ?? 1}
                   style={{
                     width: "100%",
                     height: "100%",

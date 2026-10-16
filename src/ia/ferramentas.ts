@@ -36,6 +36,7 @@ import {
   palavrasDaMidia,
   palavrasNoVideoFinal,
 } from "./conteudo";
+import { compactarFala } from "@/plano/respiros";
 import { buscarNoBanco } from "./busca-banco";
 import { resumoDoProjeto } from "./estado";
 import {
@@ -477,6 +478,102 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         return aplicar(
           (tl) => dividirClipe(tl, i, dentro),
           `cena ${i + 1} dividida em ${s(e.no_segundo)}s (agora são as cenas ${i + 1} e ${i + 2})`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "velocidade_da_cena",
+      description:
+        "Câmera lenta ou rápida numa cena (0.8 = lenta leve; 1 = normal; 1.25 = rápida). O trecho do arquivo continua o mesmo: a cena fica mais longa (lenta) ou mais curta (rápida) no vídeo. Use para esticar um take um pouco curto e cobrir a fala sem buraco, ou para dar ênfase. Abaixo de 0.75 já parece artificial.",
+      inputSchema: z.object({
+        cena: z
+          .number()
+          .int()
+          .min(1)
+          .nullable()
+          .describe("Número da cena; null = todas."),
+        velocidade: z.number().min(0.5).max(2),
+      }),
+      run: (e) => {
+        if (e.cena !== null) conferirCena(e.cena);
+        const normal = Math.abs(e.velocidade - 1) < 0.001;
+        return aplicar(
+          (t) => ({
+            ...t,
+            clipes: t.clipes.map((c, i) =>
+              e.cena === null || i === e.cena - 1
+                ? { ...c, velocidade: normal ? undefined : e.velocidade }
+                : c,
+            ),
+          }),
+          `${e.cena === null ? "todas as cenas" : `cena ${e.cena}`} em ${normal ? "velocidade normal" : `${e.velocidade}×`}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "cortar_respiros",
+      description:
+        "Encurta os silêncios longos (respiros) de uma narração/áudio da timeline sem cortar palavras: pausas maiores que pausa_maxima_s viram pausa_nova_s e o silêncio do começo sai (o áudio vira trechos colados). Depois disso as falas acontecem mais cedo: confira com ver_projeto e, se precisar, ajuste as cenas e refaça as legendas (legendar_automaticamente).",
+      inputSchema: z.object({
+        audio: z.number().int().min(1).describe("Número do áudio na timeline."),
+        pausa_maxima_s: z
+          .number()
+          .min(0.3)
+          .max(3)
+          .nullable()
+          .describe("Silêncio a partir do qual corta. null = 0.7."),
+        pausa_nova_s: z
+          .number()
+          .min(0.1)
+          .max(1.5)
+          .nullable()
+          .describe("Pausa que fica no lugar. null = 0.35."),
+      }),
+      run: (e) => {
+        const indice = e.audio - 1;
+        const a = sessao.timeline.audios[indice];
+        if (!a) throw new Error(`Áudio ${e.audio} não existe.`);
+        const midia = sessao.biblioteca.find((m) => m.url === a.url);
+        const palavras = midia?.analise?.transcricao?.palavras ?? [];
+        if (!palavras.length) {
+          throw new Error(
+            "Esse áudio não tem fala transcrita (analise o arquivo antes).",
+          );
+        }
+        const fimNoArquivo = a.origemInicio + (a.fim - a.inicio);
+        const fala = compactarFala(
+          palavras.filter(
+            (p) =>
+              p.de >= a.origemInicio - 0.05 && p.ate <= fimNoArquivo + 0.05,
+          ),
+          {
+            pausaMaxima: e.pausa_maxima_s ?? 0.7,
+            pausaNova: e.pausa_nova_s ?? 0.35,
+          },
+        );
+        if (!fala.respiros || fala.economizado < 0.05) {
+          return "OK: não há respiros longos para cortar nesse áudio.";
+        }
+        const novos = fala.trechos.map((tr, i) => ({
+          ...a,
+          inicio: s(a.inicio + tr.inicio),
+          fim: s(a.inicio + tr.inicio + (tr.ate - tr.de)),
+          origemInicio: tr.de,
+          fadeEntrada: i === 0 ? a.fadeEntrada : 0.02,
+          fadeSaida: i === fala.trechos.length - 1 ? a.fadeSaida : 0.03,
+        }));
+        return aplicar(
+          (t) => ({
+            ...t,
+            audios: [
+              ...t.audios.slice(0, indice),
+              ...novos,
+              ...t.audios.slice(indice + 1),
+            ],
+          }),
+          `áudio ${e.audio}: ${fala.respiros} respiro(s) cortado(s), ${s(fala.economizado)}s a menos (agora em ${novos.length} trechos)`,
         );
       },
     }),

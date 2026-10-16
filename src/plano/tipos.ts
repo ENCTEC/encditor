@@ -191,6 +191,32 @@ export const mensagemPlanoSchema = z.object({
 });
 export type MensagemPlano = z.infer<typeof mensagemPlanoSchema>;
 
+// Conferência da narração gravada: onde cada fala foi dita, quanto cada
+// cena dura de verdade e quanto gerar no Higgsfield (antes dos takes).
+export const verificacaoNarracaoSchema = z.object({
+  // Arquivo da narração conferido (outro arquivo = conferir de novo).
+  midiaId: z.string(),
+  // Respiros longos encurtados na edição (e os segundos que saíram).
+  respiros: z.object({ quantos: z.number(), segundos: z.number() }).optional(),
+  // geradoEm do plano conferido (plano novo = conferir de novo).
+  doPlano: z.number().nullable(),
+  duracao: z.number(),
+  em: z.number(),
+  cenas: z.array(
+    z.object({
+      numero: z.number(),
+      inicio: z.number(),
+      duracao: z.number(),
+      gerar: z.number(),
+      // O que foi dito no intervalo da cena e se bate com o roteiro.
+      falou: z.string(),
+      confere: z.boolean(),
+    }),
+  ),
+  avisos: z.array(z.string()),
+});
+export type VerificacaoNarracao = z.infer<typeof verificacaoNarracaoSchema>;
+
 export const planoSalvoSchema = z.object({
   briefing: briefingSchema,
   conversa: z.array(mensagemPlanoSchema),
@@ -201,6 +227,7 @@ export const planoSalvoSchema = z.object({
   vinculos: z.record(z.string(), z.string()),
   musicaPulada: z.boolean(),
   montadoEm: z.number().nullable(),
+  narracaoVerificada: verificacaoNarracaoSchema.nullable(),
   // Narração de exemplo (voz sintética) para o usuário copiar a entonação.
   vozTeste: z
     .object({
@@ -224,6 +251,7 @@ export const planoVazio = (): PlanoSalvo => ({
   vinculos: {},
   musicaPulada: false,
   montadoEm: null,
+  narracaoVerificada: null,
   vozTeste: null,
 });
 
@@ -269,6 +297,10 @@ export const lerPlanoSalvo = (bruto: unknown): PlanoSalvo => {
       .parse(b.vinculos ?? {}),
     musicaPulada: b.musicaPulada === true,
     montadoEm: typeof b.montadoEm === "number" ? b.montadoEm : null,
+    narracaoVerificada: verificacaoNarracaoSchema
+      .nullable()
+      .catch(null)
+      .parse(b.narracaoVerificada ?? null),
     vozTeste: planoSalvoSchema.shape.vozTeste
       .catch(null)
       .parse(b.vozTeste ?? null),

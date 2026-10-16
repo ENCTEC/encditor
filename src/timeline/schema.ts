@@ -41,6 +41,9 @@ export const clipeSchema = z.object({
   duracaoTransicao: z.number().min(0).optional(),
   // 0 = mudo, 1 = volume original.
   volume: z.number().min(0),
+  // Velocidade do vídeo (sem valor = 1). 0.8 = câmera lenta leve: o trecho
+  // inicio–fim do arquivo ocupa (fim - inicio) / 0.8 no vídeo final.
+  velocidade: z.number().min(0.25).max(4).optional(),
 });
 
 // Vídeo ou imagem por cima da trilha principal (B-roll, insert).

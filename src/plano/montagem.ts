@@ -1,5 +1,4 @@
 import {
-  buscarFala,
   gerarLegendas,
   PalavraFinal,
   palavrasDaMidia,
@@ -11,6 +10,7 @@ import { caixaParaPosicao, ehTelaCheia } from "@/timeline/caixas";
 import { formatoPorId, mudarFormato } from "@/timeline/formatos";
 import { AudioFaixa, Clipe, Insert, Timeline, Zoom } from "@/timeline/schema";
 import { chaveCena, chaveInsert, itensDoPlano } from "./pendencias";
+import { momentoDaFrase, narracaoSemRespiros, temposDasCenas } from "./tempos";
 import { CenaPlano, PlanoGerado, PlanoSalvo } from "./tipos";
 
 // Monta a edição a partir do plano, sem IA (determinístico e previsível):
@@ -23,6 +23,11 @@ import { CenaPlano, PlanoGerado, PlanoSalvo } from "./tipos";
 // Depois o usuário ajusta pelo chat ou na Timeline, como sempre.
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+// Câmera lenta máxima para esticar um take curto (0,75× ainda parece
+// natural; mais lento que isso fica estranho).
+const LENTO_MINIMO = 0.75;
 const limitar = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, n));
 
@@ -39,25 +44,6 @@ const VOLUME: Record<
 // Corte no começo de cada take do Higgsfield: os primeiros quadros
 // costumam sair "travados".
 const APARAR_INICIO = 0.2;
-const SOBRA_NO_FIM = 0.5;
-
-// Momento (no vídeo final) em que uma frase é dita, a partir de "desde".
-const momentoDaFrase = (
-  palavras: PalavraFinal[],
-  frase: string,
-  desde = 0,
-): number | null => {
-  if (!frase.trim() || !palavras.length) return null;
-  const achados = buscarFala(
-    palavras.filter((p) => p.de >= desde - 0.05),
-    frase,
-  );
-  if (!achados.length) return null;
-  const melhor = Math.max(...achados.map((a) => a.semelhanca));
-  return Math.min(
-    ...achados.filter((a) => a.semelhanca === melhor).map((a) => a.de),
-  );
-};
 
 export type ResultadoMontagem = { timeline: Timeline; avisos: string[] };
 
@@ -88,70 +74,24 @@ export const montarDoPlano = (
   );
   const fps = t.fps;
 
-  // ---------- Narração (base do tempo) ----------
+  // ---------- Narração (base do tempo) e início de cada cena ----------
   const narracao = g.modo_audio === "narracao" ? midiaDe("narracao") : null;
-  const palavrasNarracao: PalavraFinal[] = (
-    narracao?.analise?.transcricao?.palavras ?? []
-  ).map((p) => ({
-    de: p.de,
-    ate: p.ate,
-    palavra: p.palavra,
-    fonte: "narração",
-  }));
-  const fimDaFala = palavrasNarracao.length
-    ? palavrasNarracao[palavrasNarracao.length - 1].ate
-    : 0;
-
-  // ---------- Quando cada cena começa ----------
+  // Sem os respiros longos: a narração entra em trechos colados.
+  const { palavras: palavrasNarracao, fala: falaCompactada } =
+    narracaoSemRespiros(narracao);
+  if (falaCompactada.respiros > 0 && falaCompactada.economizado >= 0.3) {
+    avisos.push(
+      `Cortei ${falaCompactada.respiros} respiro(s) longo(s) da narração (${falaCompactada.economizado.toFixed(1).replace(".", ",")}s a menos).`,
+    );
+  }
   const cenas = g.cenas;
-  const inicios: (number | null)[] = cenas.map(() => null);
-  let fimTotal: number;
-  if (palavrasNarracao.length) {
-    inicios[0] = 0;
-    let cursor = 0;
-    cenas.forEach((c, i) => {
-      if (i === 0) return;
-      const de = momentoDaFrase(palavrasNarracao, c.fala, cursor);
-      const anterior =
-        [...inicios.slice(0, i)].reverse().find((x) => x !== null) ?? 0;
-      if (de !== null && de > anterior + 0.4) {
-        inicios[i] = de;
-        cursor = de;
-      }
-    });
-    fimTotal = Math.max(fimDaFala + SOBRA_NO_FIM, 1);
-    // Cenas sem frase achada: dividem o espaço entre as vizinhas conforme
-    // a duração prevista no plano.
-    for (let i = 0; i < cenas.length; i++) {
-      if (inicios[i] !== null) continue;
-      let j = i;
-      while (j < cenas.length && inicios[j] === null) j++;
-      const de = inicios[i - 1] ?? 0;
-      const ate = j < cenas.length ? inicios[j]! : fimTotal;
-      const pesos = cenas
-        .slice(i - 1, j)
-        .map((c) => Math.max(0.5, c.duracao_s));
-      const soma = pesos.reduce((a, b) => a + b, 0);
-      let acumulado = de;
-      for (let k = i; k < j; k++) {
-        acumulado += ((ate - de) * pesos[k - i]) / soma;
-        inicios[k] = acumulado;
-      }
-      avisos.push(
-        `Não achei na narração a fala da${j - i > 1 ? "s cenas" : " cena"} ${cenas
-          .slice(i, j)
-          .map((c) => c.numero)
-          .join(", ")}: dividi o tempo pela duração prevista.`,
-      );
-      i = j - 1;
-    }
-  } else {
-    let acumulado = 0;
-    cenas.forEach((c, i) => {
-      inicios[i] = acumulado;
-      acumulado += Math.max(0.5, c.duracao_s);
-    });
-    fimTotal = acumulado;
+  const tempos = temposDasCenas(cenas, palavrasNarracao);
+  const inicios = tempos.inicios;
+  const fimTotal = tempos.fimTotal;
+  if (tempos.naoAchadas.length) {
+    avisos.push(
+      `Não achei na narração a fala da${tempos.naoAchadas.length > 1 ? "s cenas" : " cena"} ${tempos.naoAchadas.join(", ")}: dividi o tempo pela duração prevista.`,
+    );
   }
 
   // ---------- Trilha principal ----------
@@ -199,7 +139,21 @@ export const montarDoPlano = (
         disponivel = duracao - inicio;
       }
     }
-    const usa = Math.min(quadros(precisa), Math.floor(disponivel * fps));
+    // Take um pouco curto: estica em câmera lenta (até LENTO_MINIMO) antes
+    // de adiantar a próxima cena.
+    const curto = !ehImagem && disponivel < precisa;
+    const velocidade = curto
+      ? Math.max(LENTO_MINIMO, Math.round((disponivel / precisa) * 1000) / 1000)
+      : 1;
+    const usa = Math.min(
+      quadros(precisa),
+      Math.floor((disponivel / velocidade) * fps),
+    );
+    if (velocidade < 1) {
+      avisos.push(
+        `Cena ${c.numero}: o take tem ${r2(disponivel)}s para ${r2(precisa)}s de fala; estiquei em câmera lenta (${velocidade.toFixed(2).replace(".", ",")}×).`,
+      );
+    }
     const falta = r2(precisa - usa / fps);
     if (falta > 0.05) {
       avisos.push(
@@ -213,7 +167,8 @@ export const montarDoPlano = (
       url: midia.url,
       ...(ehImagem ? { tipo: "imagem" as const } : {}),
       inicio: r2(inicio),
-      fim: r2(inicio + usa / fps),
+      fim: r3(inicio + (usa / fps) * velocidade),
+      ...(velocidade < 1 ? { velocidade } : {}),
       transicao:
         entrada > 0 && c.transicao_entrada ? c.transicao_entrada.tipo : "corte",
       ...(entrada > 0 ? { duracaoTransicao: entrada / fps } : {}),
@@ -227,15 +182,20 @@ export const montarDoPlano = (
   // ---------- Áudio: narração e música ----------
   const audios: AudioFaixa[] = [];
   if (narracao) {
-    audios.push({
-      url: narracao.url,
-      inicio: 0,
-      fim: r2(Math.min(narracao.duracao ?? duracaoVideo, duracaoVideo)),
-      origemInicio: 0,
-      volume: 1,
-      fadeEntrada: 0,
-      fadeSaida: 0,
-    });
+    // Um item de áudio por trecho de fala (os respiros cortados somem).
+    for (const tr of falaCompactada.trechos) {
+      if (tr.inicio >= duracaoVideo) break;
+      audios.push({
+        url: narracao.url,
+        inicio: r2(tr.inicio),
+        fim: r2(Math.min(duracaoVideo, tr.inicio + (tr.ate - tr.de))),
+        origemInicio: tr.de,
+        volume: 1,
+        // Fade curtinho para o corte não estalar.
+        fadeEntrada: 0.02,
+        fadeSaida: 0.03,
+      });
+    }
   }
   const musica = g.musica.usar ? midiaDe("musica") : null;
   if (musica) {

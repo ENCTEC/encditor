@@ -16,6 +16,7 @@ import {
 import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 import { montarDoPlano } from "@/plano/montagem";
+import { verificarNarracao } from "@/plano/verificarNarracao";
 import {
   ItemPlano,
   itensDoPlano,
@@ -24,6 +25,7 @@ import {
 } from "@/plano/pendencias";
 import { VOLUMES_TAKE } from "@/plano/tipos";
 import { UsoPlano } from "@/plano/usePlano";
+import { ConferenciaNarracao } from "./ConferenciaNarracao";
 import { GuiaDeGravacao } from "./GuiaDeGravacao";
 
 // O plano gerado, como um mapa: cada take com o prompt do Higgsfield e o
@@ -229,6 +231,36 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
   const itens = plano ? itensDoPlano(plano, biblioteca) : [];
   const completo = planoCompleto(itens);
   const g = plano?.gerado ?? null;
+  const narracao = itens.find((i) => i.tipo === "narracao") ?? null;
+  // A conferência vale para ESTA narração e ESTE plano.
+  const verificada =
+    !!plano?.narracaoVerificada &&
+    !!narracao?.midia &&
+    plano.narracaoVerificada.midiaId === narracao.midia.id &&
+    plano.narracaoVerificada.doPlano === plano.geradoEm;
+  const conferida = useRef("");
+
+  // Narração transcrita e ainda não conferida: confere e ajusta os tempos
+  // das cenas (antes de gerar os takes).
+  useEffect(() => {
+    if (!plano?.gerado || narracao?.status !== "pronto" || !narracao.midia) {
+      return;
+    }
+    if (verificada) return;
+    const chave = `${narracao.midia.id}:${plano.geradoEm}`;
+    if (conferida.current === chave) return;
+    conferida.current = chave;
+    try {
+      const r = verificarNarracao(plano, narracao.midia);
+      void mudar({
+        gerado: r.gerado,
+        narracaoVerificada: r.verificacao,
+        montadoEm: null,
+      });
+    } catch {
+      conferida.current = "";
+    }
+  }, [plano, narracao?.status, narracao?.midia, verificada, mudar]);
 
   const montar = () => {
     if (!plano || !g) return;
@@ -328,6 +360,86 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
 
       <GuiaDeGravacao uso={uso} />
 
+      {/* Passo 1: a narração vem ANTES dos takes (os tempos saem dela). */}
+      <section className="space-y-3">
+        <h3 className="rotulo-zine">
+          {g.modo_audio === "narracao"
+            ? "Passo 1 · Grave e envie a narração"
+            : "Áudio"}
+        </h3>
+        {itens
+          .filter((i) => i.tipo === "narracao" || i.tipo === "musica")
+          .map((item) => (
+            <article
+              key={item.chave}
+              className="space-y-2 border-2 border-tinta p-3"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm font-bold">
+                  {item.rotulo}
+                </span>
+                <span className="ml-auto">
+                  <Chip status={item.status} />
+                </span>
+              </div>
+              {item.tipo === "narracao" ? (
+                <p className="text-xs text-zinc-400">
+                  Grave a copy acima.{" "}
+                  {g.narracao?.orientacoes
+                    ? `Dica: ${g.narracao.orientacoes}`
+                    : ""}{" "}
+                  Pode mandar áudio ou vídeo (eu tiro o som). Os sons dos takes
+                  entram por baixo da voz.
+                </p>
+              ) : (
+                <p className="text-xs text-zinc-400">
+                  {g.musica.descricao} · volume {g.musica.volume_percent}% por
+                  baixo da narração.
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <AcoesDoItem
+                  item={item}
+                  biblioteca={biblioteca}
+                  envio={envio}
+                />
+                {item.tipo === "musica" && !item.midia ? (
+                  <button
+                    onClick={() =>
+                      void mudar({
+                        musicaPulada: !plano.musicaPulada,
+                        montadoEm: null,
+                      })
+                    }
+                    className="border-2 border-tinta px-2 py-1 font-mono text-[10px] uppercase hover:bg-tinta hover:text-papel"
+                  >
+                    {plano.musicaPulada ? "quero música" : "sem música"}
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        {g.modo_audio === "narracao" ? (
+          verificada ? (
+            <ConferenciaNarracao
+              verificacao={plano.narracaoVerificada!}
+              cenas={g.cenas}
+            />
+          ) : narracao?.status === "analisando" ? (
+            <p className="animate-pulse text-xs text-zinc-500">
+              Transcrevendo a narração para conferir e ajustar os tempos das
+              cenas…
+            </p>
+          ) : (
+            <p className="text-xs text-zinc-500">
+              Envie a narração antes de gerar os takes: eu confiro o que foi
+              falado e ajusto a duração de cada cena (e o tempo no prompt do
+              Higgsfield) à sua gravação — assim não sobra tela preta.
+            </p>
+          )
+        ) : null}
+      </section>
+
       {/* Situação: o que falta e montar. */}
       <div className="flex flex-wrap items-center gap-3 border-[3px] border-tinta p-3">
         <div className="min-w-40 flex-1">
@@ -400,7 +512,11 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
 
       {/* Cenas */}
       <section className="space-y-3">
-        <h3 className="rotulo-zine">Cenas e takes</h3>
+        <h3 className="rotulo-zine">
+          {g.modo_audio === "narracao"
+            ? "Passo 2 · Gere os takes no Higgsfield e envie"
+            : "Cenas e takes"}
+        </h3>
         {itens
           .filter((i) => i.tipo === "cena")
           .map((item) => {
@@ -419,7 +535,14 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
                   </span>
                   <span className="font-mono text-[11px] text-zinc-500">
                     {c.duracao_s}s na edição
-                    {c.duracao_gerar_s ? ` · gerar ${c.duracao_gerar_s}s` : ""}
+                    {c.duracao_gerar_s && c.origem !== "banco"
+                      ? ` · gerar ${c.duracao_gerar_s}s`
+                      : ""}
+                    {g.modo_audio === "narracao"
+                      ? verificada
+                        ? " · ⏱ ajustado à narração"
+                        : " · duração provisória (envie a narração)"
+                      : ""}
                   </span>
                   {c.origem === "banco" ? (
                     <span className="border-2 border-tinta bg-tinta px-1.5 py-0.5 font-mono text-[10px] text-papel uppercase">
@@ -535,63 +658,6 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
             })}
         </section>
       ) : null}
-
-      {/* Áudio */}
-      <section className="space-y-3">
-        <h3 className="rotulo-zine">Áudio</h3>
-        {itens
-          .filter((i) => i.tipo === "narracao" || i.tipo === "musica")
-          .map((item) => (
-            <article
-              key={item.chave}
-              className="space-y-2 border-2 border-tinta p-3"
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm font-bold">
-                  {item.rotulo}
-                </span>
-                <span className="ml-auto">
-                  <Chip status={item.status} />
-                </span>
-              </div>
-              {item.tipo === "narracao" ? (
-                <p className="text-xs text-zinc-400">
-                  Grave a copy acima.{" "}
-                  {g.narracao?.orientacoes
-                    ? `Dica: ${g.narracao.orientacoes}`
-                    : ""}{" "}
-                  Pode mandar áudio ou vídeo (eu tiro o som). Os sons dos takes
-                  entram por baixo da voz.
-                </p>
-              ) : (
-                <p className="text-xs text-zinc-400">
-                  {g.musica.descricao} · volume {g.musica.volume_percent}% por
-                  baixo da narração.
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-2">
-                <AcoesDoItem
-                  item={item}
-                  biblioteca={biblioteca}
-                  envio={envio}
-                />
-                {item.tipo === "musica" && !item.midia ? (
-                  <button
-                    onClick={() =>
-                      void mudar({
-                        musicaPulada: !plano.musicaPulada,
-                        montadoEm: null,
-                      })
-                    }
-                    className="border-2 border-tinta px-2 py-1 font-mono text-[10px] uppercase hover:bg-tinta hover:text-papel"
-                  >
-                    {plano.musicaPulada ? "quero música" : "sem música"}
-                  </button>
-                ) : null}
-              </div>
-            </article>
-          ))}
-      </section>
     </div>
   );
 };

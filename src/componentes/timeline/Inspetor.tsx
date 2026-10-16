@@ -70,6 +70,13 @@ const CAMPOS: Record<Faixa, Campo[]> = {
       opcional: true,
     },
     { chave: "volume", rotulo: "Volume (0 = mudo)", tipo: "numero" },
+    {
+      chave: "velocidade",
+      rotulo: "Velocidade (0,8 = câmera lenta; vazio = normal)",
+      tipo: "numero",
+      passo: 0.05,
+      opcional: true,
+    },
   ],
   inserts: [
     { chave: "inicio", rotulo: "Aparece em (s)", tipo: "numero" },

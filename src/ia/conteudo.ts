@@ -31,6 +31,8 @@ type Trecho = {
   inicioFinal: number;
   fimFinal: number;
   origem: number;
+  // Velocidade do arquivo nesse trecho (cenas em câmera lenta/rápida).
+  velocidade: number;
   audivel: boolean;
   visivel: boolean;
 };
@@ -50,6 +52,7 @@ const trechos = (t: Timeline, biblioteca: Midia[]): Trecho[] => {
       inicioFinal: inicios[i] / t.fps,
       fimFinal: (inicios[i] + c.duracaoFrames) / t.fps,
       origem: c.inicio,
+      velocidade: c.velocidade ?? 1,
       audivel: c.volume > 0,
       visivel: true,
     });
@@ -63,6 +66,7 @@ const trechos = (t: Timeline, biblioteca: Midia[]): Trecho[] => {
       inicioFinal: x.inicio,
       fimFinal: x.fim,
       origem: x.tipo === "imagem" ? 0 : x.origemInicio,
+      velocidade: 1,
       audivel: x.tipo === "video" && x.volume > 0,
       visivel: true,
     });
@@ -76,6 +80,7 @@ const trechos = (t: Timeline, biblioteca: Midia[]): Trecho[] => {
       inicioFinal: x.inicio,
       fimFinal: x.fim,
       origem: x.origemInicio,
+      velocidade: 1,
       audivel: x.volume > 0,
       visivel: false,
     });
@@ -86,12 +91,17 @@ const trechos = (t: Timeline, biblioteca: Midia[]): Trecho[] => {
 // Palavras faladas num trecho, já no tempo do vídeo final.
 const palavrasDoTrecho = (tr: Trecho): PalavraFinal[] =>
   (tr.midia.analise?.transcricao?.palavras ?? []).flatMap((p) => {
-    const de = tr.inicioFinal + (p.de - tr.origem);
+    const de = tr.inicioFinal + (p.de - tr.origem) / tr.velocidade;
     if (p.de < tr.origem - 0.05 || de >= tr.fimFinal) return [];
     return [
       {
         de: r2(de),
-        ate: r2(Math.min(tr.fimFinal, tr.inicioFinal + (p.ate - tr.origem))),
+        ate: r2(
+          Math.min(
+            tr.fimFinal,
+            tr.inicioFinal + (p.ate - tr.origem) / tr.velocidade,
+          ),
+        ),
         palavra: p.palavra,
         fonte: tr.fonte,
       },
@@ -151,9 +161,12 @@ export const momentosNoVideoFinal = (
       return visual.momentos.flatMap((m) => {
         const de = Math.max(
           tr.inicioFinal,
-          tr.inicioFinal + (m.de - tr.origem),
+          tr.inicioFinal + (m.de - tr.origem) / tr.velocidade,
         );
-        const ate = Math.min(tr.fimFinal, tr.inicioFinal + (m.ate - tr.origem));
+        const ate = Math.min(
+          tr.fimFinal,
+          tr.inicioFinal + (m.ate - tr.origem) / tr.velocidade,
+        );
         if (ate <= de) return [];
         return [{ ...m, de: r2(de), ate: r2(ate), fonte: tr.fonte }];
       });

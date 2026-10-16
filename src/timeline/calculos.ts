@@ -42,7 +42,12 @@ export const calcularClipes = (timeline: Timeline): ClipeCalculado[] => {
 
   const clipes = timeline.clipes.map((clipe) => ({
     ...clipe,
-    duracaoFrames: segParaFrames(clipe.fim - clipe.inicio, fps),
+    // Com velocidade, o trecho do arquivo ocupa mais (lento) ou menos
+    // (rápido) tempo no vídeo final.
+    duracaoFrames: segParaFrames(
+      (clipe.fim - clipe.inicio) / (clipe.velocidade ?? 1),
+      fps,
+    ),
     trimInicio: segParaFrames(clipe.inicio, fps),
     trimFim: segParaFrames(clipe.fim, fps),
     transicaoFrames: 0,

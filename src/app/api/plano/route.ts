@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { briefingSchema, lerPlanoSalvo, planoSalvoSchema } from "@/plano/tipos";
+import {
+  briefingSchema,
+  lerPlanoSalvo,
+  planoGeradoSchema,
+  planoSalvoSchema,
+  verificacaoNarracaoSchema,
+} from "@/plano/tipos";
 import { apagarArquivos } from "@/servidor/armazenamento";
 import { lerPlano, lerProjeto, salvarPlano } from "@/servidor/banco";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
@@ -9,7 +15,8 @@ import { conversarComPlanejador } from "@/servidor/planejador";
 // Plano de um projeto (aba Planejar).
 // GET  ?projeto=<id>                  → { plano }
 // PUT  ?projeto=<id> { briefing?, vinculos?, musicaPulada?, montadoEm?,
-//                      recomecar? }   → { plano }   (salva o que veio)
+//                      gerado?, narracaoVerificada?, recomecar? }
+//                                     → { plano }   (salva o que veio)
 // POST ?projeto=<id> { mensagem }     → { plano }   (conversa com a IA)
 
 const idDoProjeto = (req: NextRequest) => {
@@ -35,6 +42,9 @@ export async function PUT(req: NextRequest) {
       vinculos: planoSalvoSchema.shape.vinculos.optional(),
       musicaPulada: z.boolean().optional(),
       montadoEm: z.number().nullable().optional(),
+      // Plano ajustado à narração gravada (tempos das cenas) e a conferência.
+      gerado: planoGeradoSchema.optional(),
+      narracaoVerificada: verificacaoNarracaoSchema.nullable().optional(),
       // Apaga a conversa e o plano gerado (o briefing fica).
       recomecar: z.boolean().optional(),
     })
@@ -53,6 +63,7 @@ export async function PUT(req: NextRequest) {
           gerado: null,
           geradoEm: null,
           montadoEm: null,
+          narracaoVerificada: null,
           vozTeste: null,
         }
       : {}),

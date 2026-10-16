@@ -172,7 +172,11 @@ export const dividirClipe = (
 ): Timeline => {
   conferirIndice(t, "clipes", indice);
   const clipe = t.clipes[indice];
-  const ponto = Math.round((clipe.inicio + segundosNoClipe) * 100) / 100;
+  // segundosNoClipe é tempo do vídeo final; no arquivo, conta a velocidade.
+  const ponto =
+    Math.round(
+      (clipe.inicio + segundosNoClipe * (clipe.velocidade ?? 1)) * 100,
+    ) / 100;
   if (ponto <= clipe.inicio + 0.05 || ponto >= clipe.fim - 0.05) {
     throw new Error(
       `Ponto de divisão fora da cena ${indice + 1} (ela dura ${(clipe.fim - clipe.inicio).toFixed(2)}s).`,
