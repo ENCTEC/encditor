@@ -69,8 +69,8 @@ export const ConferenciaNarracao: React.FC<{
       </tbody>
     </table>
     <p className="text-[11px] text-zinc-500">
-      Se o Higgsfield só oferecer durações fixas (ex.: 5 ou 10 s), gere com a
-      próxima acima — o ENCeditor apara o que sobrar.
+      “Gerar” já está entre 4 s (mínimo do Higgsfield) e 30 s (máximo), com ~1 s
+      de folga — o ENCeditor apara o que sobrar.
     </p>
   </div>
 );

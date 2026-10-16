@@ -13,11 +13,13 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 // Sobe quando o jeito de conferir melhora: conferências antigas são
 // refeitas sozinhas. 2 = alinhamento palavra a palavra + nomes corrigidos.
-export const VERSAO_CONFERENCIA = 2;
+export const VERSAO_CONFERENCIA = 3;
 
 // Folga em cada take: aparar o começo (quadros "travados") e uma sobra.
 const FOLGA_GERAR = 1;
-const MINIMO_GERAR = 3;
+// O Higgsfield gera takes de 4 s (mínimo) a 30 s (máximo).
+const MINIMO_GERAR = 4;
+const MAXIMO_GERAR = 30;
 
 const palavrasDe = (texto: string) => texto.split(/\s+/).filter(Boolean);
 
@@ -78,9 +80,9 @@ export const verificarNarracao = (
     const proxima = g.cenas[i + 1]?.transicao_entrada;
     const transicao =
       proxima && proxima.tipo !== "corte" ? proxima.duracao_s : 0;
-    const gerar = Math.max(
-      MINIMO_GERAR,
-      Math.ceil(duracao + transicao + FOLGA_GERAR),
+    const gerar = Math.min(
+      MAXIMO_GERAR,
+      Math.max(MINIMO_GERAR, Math.ceil(duracao + transicao + FOLGA_GERAR)),
     );
     // O que foi dito na cena, já com os nomes corrigidos.
     const falou = palavras
@@ -98,6 +100,15 @@ export const verificarNarracao = (
     };
   });
 
+  // Cena mais longa do que um take do Higgsfield consegue cobrir.
+  const longas = cenas
+    .filter((c) => c.duracao + FOLGA_GERAR > MAXIMO_GERAR)
+    .map((c) => c.numero);
+  if (longas.length) {
+    avisos.push(
+      `A${longas.length > 1 ? "s cenas" : " cena"} ${longas.join(", ")} passa${longas.length > 1 ? "m" : ""} de ${MAXIMO_GERAR}s, o máximo do Higgsfield: gere ${longas.length > 1 ? "cada uma" : "ela"} em dois takes ou peça no Planejar para dividir em duas cenas.`,
+    );
+  }
   const diferentes = cenas.filter((c) => !c.confere).map((c) => c.numero);
   if (diferentes.length) {
     avisos.push(

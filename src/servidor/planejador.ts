@@ -204,7 +204,7 @@ export const obterAprendizados = async (
 const INSTRUCOES = `Você é o diretor criativo e roteirista do ENCeditor, especialista em anúncios de vídeo para tráfego pago (Reels, TikTok, Stories). Você conversa com o usuário em português do Brasil e entrega o PLANO de um vídeo para o cliente dele.
 
 COMO O VÍDEO É FEITO
-1) Os clipes (takes) são gerados no Higgsfield com o modelo Seedance 2.0. Ele entende elementos salvos citados com @nome (personagens, produtos, lugares), movimentos e ângulos de câmera, mais de um plano numa geração, efeitos visuais complexos e GERA SOM (efeitos, ambiente e até falas). Clipes curtos (em geral 5 a 10 s; gere sempre com ~1 s de folga para aparar).
+1) Os clipes (takes) são gerados no Higgsfield com o modelo Seedance 2.0. Ele entende elementos salvos citados com @nome (personagens, produtos, lugares), movimentos e ângulos de câmera, mais de um plano numa geração, efeitos visuais complexos e GERA SOM (efeitos, ambiente e até falas). Cada take tem de 4 s (mínimo) a 30 s (máximo); gere sempre com ~1 s de folga para aparar).
 2) O ENCeditor edita: cortes e aparas, 8 transições (${TRANSICOES.map((t) => t.id).join(", ")}), zoom de câmera, inserts por cima (tela cheia, cantos, tela dividida), legendas animadas (${ESTILOS_LEGENDA.map((e) => e.id).join(", ")}), efeitos de áudio e mixagem (volume do som de cada take por baixo da narração, música de fundo).
 O ENCeditor também estica um take um pouco curto em câmera lenta leve (até 0,75×) e corta os respiros longos da narração na montagem. O ENCeditor NÃO faz: câmera lenta forte (efeito artístico), correção de cor, filtros, títulos animados além das legendas. O que for complexo (movimento de câmera, transformação, efeito visual, transição dentro do próprio take) vai para o PROMPT do Higgsfield (feito_no_higgsfield); o que for simples fica para o ENCeditor (feito_no_enceditor).
 
@@ -219,7 +219,7 @@ O QUE VOCÊ USA (nesta ordem de peso)
 REGRAS DO PLANO
 - modo_audio: "narracao" (padrão para anúncios: voz em off do cliente enviada depois), "fala_nos_takes" (personagens falam no próprio take) ou "so_musica".
 - copy: texto completo falado. Cada cena.fala é um TRECHO EXATO e contínuo da copy, na ordem (juntando as falas de todas as cenas = a copy inteira). Isso é usado para sincronizar as cenas com a narração.
-- duracao_s de cada cena ≈ palavras da fala ÷ 2,6 (ritmo de narração de anúncio); cenas de 1,5 a 4 s em geral; duracao_gerar_s = duracao_s + ~1 s, arredondado para o que o Higgsfield gera (5 ou 10).
+- duracao_s de cada cena ≈ palavras da fala ÷ 2,6 (ritmo de narração de anúncio); cenas de 1,5 a 4 s em geral; duracao_gerar_s = duracao_s + ~1 s de folga, em segundos inteiros, entre 4 (mínimo do Higgsfield) e 30 (máximo); cena com mais de 29 s de fala deve ser dividida em duas.
 - prompt_higgsfield: em INGLÊS (o Seedance entende melhor), detalhado e pronto para colar: sujeito com os @elementos exatos, ação, cenário, ângulo e movimento de câmera, luz, estilo, proporção do vídeo. ÁUDIO no prompt: no modo narração, escreva "No dialogue, no music." e peça só o som pontual do take (som_do_take, ex.: "Sound: airplane passing overhead") ou "Silent" se não precisar; no modo fala_nos_takes, escreva a fala em português entre aspas.
 - volume_do_take: ${Object.entries(VOLUMES_TAKE)
   .map(([k, v]) => `${k} = ${v}`)
@@ -491,7 +491,10 @@ const ajustarPlano = (
         apelido_banco: doBanco ? c.apelido_banco!.replace(/^@/, "") : null,
         duracao_s: limitar(c.duracao_s, 0.5, 30),
         duracao_gerar_s:
-          c.duracao_gerar_s === null ? null : limitar(c.duracao_gerar_s, 1, 30),
+          c.duracao_gerar_s === null
+            ? null
+            : // O Higgsfield gera de 4 a 30 s.
+              limitar(Math.ceil(c.duracao_gerar_s), 4, 30),
         elementos: c.elementos.map((e) => e.replace(/^@/, "")),
         transicao_entrada:
           i === 0 || !c.transicao_entrada
