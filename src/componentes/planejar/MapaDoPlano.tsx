@@ -26,7 +26,7 @@ import {
   planoCompleto,
   StatusItem,
 } from "@/plano/pendencias";
-import { VOLUMES_TAKE } from "@/plano/tipos";
+import { ConferenciaTake, VOLUMES_TAKE } from "@/plano/tipos";
 import { UsoPlano } from "@/plano/usePlano";
 import { ConferenciaNarracao } from "./ConferenciaNarracao";
 import { GuiaDeGravacao } from "./GuiaDeGravacao";
@@ -205,6 +205,53 @@ const AcoesDoItem: React.FC<{
   );
 };
 
+// O que a IA achou do take enviado (informativo).
+const OlhadaDoTake: React.FC<{
+  conferencia: ConferenciaTake | null | undefined;
+  olhando: boolean;
+}> = ({ conferencia: c, olhando }) => {
+  if (olhando) {
+    return (
+      <p className="animate-pulse text-xs text-zinc-500">
+        👁 A IA está olhando o take…
+      </p>
+    );
+  }
+  if (!c) return null;
+  return (
+    <div
+      className={`space-y-1 border-l-4 py-1 pl-2 text-xs ${
+        c.confere ? "border-verde" : "border-amber-500"
+      }`}
+    >
+      <p>
+        <b className={c.confere ? "text-verde" : "text-amber-500"}>
+          {c.confere ? "✓ Confere com a cena:" : "⚠ Atenção:"}
+        </b>{" "}
+        {c.resumo}
+      </p>
+      {c.observacoes.length ? (
+        <ul className="list-disc pl-4 text-zinc-400">
+          {c.observacoes.map((o, i) => (
+            <li key={i}>{o}</li>
+          ))}
+        </ul>
+      ) : null}
+      {c.prompt_sugerido ? (
+        <div className="flex items-start gap-2 bg-zinc-900 p-2">
+          <span className="shrink-0 text-zinc-500">
+            Se quiser gerar de novo:
+          </span>
+          <code className="flex-1 font-mono text-[11px] whitespace-pre-wrap">
+            {c.prompt_sugerido}
+          </code>
+          <Copiar texto={c.prompt_sugerido} />
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const Chip: React.FC<{ status: StatusItem }> = ({ status }) => (
   <span
     className={`border-2 px-1.5 py-0.5 font-mono text-[10px] tracking-wider uppercase ${STATUS[status].cor}`}
@@ -244,6 +291,24 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
     plano.narracaoVerificada.doPlano === plano.geradoEm &&
     plano.narracaoVerificada.versao === VERSAO_CONFERENCIA;
   const conferida = useRef("");
+
+  // Takes enviados e já analisados: a IA dá uma olhada (um por vez) para
+  // dizer se batem com o que a cena pedia. Só informa; não trava nada.
+  const olhados = useRef(new Set<string>());
+  const proximoTake = itens.find(
+    (i) =>
+      i.tipo === "cena" &&
+      !i.doBanco &&
+      i.midia &&
+      i.midia.analise?.status === "pronta" &&
+      plano?.conferenciaTakes[i.chave]?.midiaId !== i.midia.id &&
+      !olhados.current.has(`${i.chave}:${i.midia.id}`),
+  );
+  useEffect(() => {
+    if (!proximoTake?.midia || uso.olhando) return;
+    olhados.current.add(`${proximoTake.chave}:${proximoTake.midia.id}`);
+    void uso.conferirTake(proximoTake.chave);
+  }, [proximoTake, uso]);
 
   // Narração transcrita e ainda não conferida: confere e ajusta os tempos
   // das cenas (antes de gerar os takes).
@@ -638,6 +703,16 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
                     </>
                   ) : null}
                 </dl>
+                <OlhadaDoTake
+                  conferencia={
+                    item.midia &&
+                    plano.conferenciaTakes[item.chave]?.midiaId ===
+                      item.midia.id
+                      ? plano.conferenciaTakes[item.chave]
+                      : null
+                  }
+                  olhando={uso.olhando === item.chave}
+                />
                 <AcoesDoItem
                   item={item}
                   biblioteca={biblioteca}

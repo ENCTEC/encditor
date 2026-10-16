@@ -219,6 +219,20 @@ export const verificacaoNarracaoSchema = z.object({
 });
 export type VerificacaoNarracao = z.infer<typeof verificacaoNarracaoSchema>;
 
+// Olhada da IA em cada take enviado (só informativa, não trava nada):
+// confere com o que a cena pedia?
+export const conferenciaTakeSchema = z.object({
+  // Arquivo olhado (outro arquivo = olhar de novo).
+  midiaId: z.string(),
+  em: z.number(),
+  confere: z.boolean(),
+  resumo: z.string(),
+  observacoes: z.array(z.string()),
+  // Prompt ajustado para gerar de novo (só quando não confere).
+  prompt_sugerido: z.string().nullable(),
+});
+export type ConferenciaTake = z.infer<typeof conferenciaTakeSchema>;
+
 export const planoSalvoSchema = z.object({
   briefing: briefingSchema,
   conversa: z.array(mensagemPlanoSchema),
@@ -230,6 +244,8 @@ export const planoSalvoSchema = z.object({
   musicaPulada: z.boolean(),
   montadoEm: z.number().nullable(),
   narracaoVerificada: verificacaoNarracaoSchema.nullable(),
+  // Chave do item ("cena:<apelido>") → olhada da IA no take enviado.
+  conferenciaTakes: z.record(z.string(), conferenciaTakeSchema),
   // Narração de exemplo (voz sintética) para o usuário copiar a entonação.
   vozTeste: z
     .object({
@@ -254,6 +270,7 @@ export const planoVazio = (): PlanoSalvo => ({
   musicaPulada: false,
   montadoEm: null,
   narracaoVerificada: null,
+  conferenciaTakes: {},
   vozTeste: null,
 });
 
@@ -299,6 +316,10 @@ export const lerPlanoSalvo = (bruto: unknown): PlanoSalvo => {
       .parse(b.vinculos ?? {}),
     musicaPulada: b.musicaPulada === true,
     montadoEm: typeof b.montadoEm === "number" ? b.montadoEm : null,
+    conferenciaTakes: z
+      .record(z.string(), conferenciaTakeSchema)
+      .catch({})
+      .parse(b.conferenciaTakes ?? {}),
     narracaoVerificada: verificacaoNarracaoSchema
       .nullable()
       .catch(null)

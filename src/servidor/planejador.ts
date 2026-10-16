@@ -261,7 +261,7 @@ const LIMITE_RESUMIDOS = 600;
 type ImagemEntrada = { titulo: string; dataUrl: string };
 
 // Imagem de referência reduzida (jpg 512 px) para a IA ver.
-const imagemParaIA = async (url: string): Promise<string | null> => {
+export const imagemParaIA = async (url: string): Promise<string | null> => {
   const temporaria = await mkdtemp(path.join(os.tmpdir(), "encditor-ref-"));
   try {
     const [quadro] = await extrairQuadros(
@@ -293,7 +293,7 @@ const analiseDe = async (
   }
 };
 
-const descreverAnalise = (a: Analise | null) => {
+export const descreverAnalise = (a: Analise | null) => {
   if (!a) return "(sem análise)";
   const visual = a.visual
     ? `${a.visual.resumo} Momentos: ${a.visual.momentos

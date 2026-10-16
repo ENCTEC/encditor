@@ -175,6 +175,30 @@ export const usePlano = () => {
     [projetoId],
   );
 
+  // Olhada da IA num take enviado (um por vez; só informativa).
+  const [olhando, setOlhando] = useState<string | null>(null);
+  const conferirTake = useCallback(
+    async (chave: string) => {
+      if (!projetoId) return;
+      setOlhando(chave);
+      try {
+        const r = await fetch(`/api/plano/conferir-take?projeto=${projetoId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chave }),
+        });
+        const d = (await r.json().catch(() => ({}))) as { plano?: unknown };
+        if (r.ok && d.plano) {
+          const salvo = lerPlanoSalvo(d.plano);
+          setPlano((p) => (p ? { ...salvo, briefing: p.briefing } : salvo));
+        }
+      } finally {
+        setOlhando(null);
+      }
+    },
+    [projetoId],
+  );
+
   // Salva o que faltar ao sair da página.
   useEffect(
     () => () => {
@@ -194,6 +218,8 @@ export const usePlano = () => {
     salvando,
     gerarVoz,
     gerandoVoz,
+    conferirTake,
+    olhando,
     erro,
     limparErro: () => setErro(null),
   };
