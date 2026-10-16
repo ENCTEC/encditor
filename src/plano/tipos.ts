@@ -96,7 +96,8 @@ export const cenaPlanoSchema = z.object({
   fala: z.string(),
   descricao: z.string(),
   duracao_s: z.number(),
-  // Duração para gerar no Higgsfield (com folga para aparar).
+  // Duração para gerar no Higgsfield (o mínimo que serve; ver
+  // verificarNarracao.ts — o ENCeditor estica em câmera lenta leve).
   duracao_gerar_s: z.number().nullable(),
   // Prompt pronto para o Higgsfield, com os @elementos.
   prompt_higgsfield: z.string().nullable(),

@@ -144,7 +144,8 @@ export const montarDoPlano = (
       quadros(precisa),
       Math.floor((disponivel / velocidade) * fps),
     );
-    if (velocidade < 1) {
+    // Até ~0,85× é o esperado (takes gerados sem folga, por economia).
+    if (velocidade < 0.84) {
       avisos.push(
         `Cena ${c.numero}: o take tem ${r2(disponivel)}s para ${r2(precisa)}s de fala; estiquei em câmera lenta (${velocidade.toFixed(2).replace(".", ",")}×).`,
       );

@@ -13,11 +13,15 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 
 // Sobe quando o jeito de conferir melhora: conferências antigas são
 // refeitas sozinhas. 2 = alinhamento palavra a palavra + nomes corrigidos;
-// 4 = narração inteira, sem cortar respiros sozinho.
-export const VERSAO_CONFERENCIA = 4;
+// 4 = narração inteira, sem cortar respiros sozinho; 5 = gerar sem folga
+// (economia: o take um pouco curto é esticado em câmera lenta leve).
+export const VERSAO_CONFERENCIA = 5;
 
-// Folga em cada take: aparar o começo (quadros "travados") e uma sobra.
-const FOLGA_GERAR = 1;
+// Custo-benefício: o Higgsfield cobra por segundo gerado. Em vez de gerar
+// com folga, gera ~85% do tempo que a cena fica na tela e o ENCeditor
+// estica em câmera lenta leve (0,85×, imperceptível; montagem aceita até
+// 0,75×). Ex.: cena de 5,6 s + 0,2 s de transição → gera 5 s (antes, 7 s).
+const APROVEITAMENTO = 0.85;
 // O Higgsfield gera takes de 4 s (mínimo) a 30 s (máximo).
 const MINIMO_GERAR = 4;
 const MAXIMO_GERAR = 30;
@@ -83,7 +87,10 @@ export const verificarNarracao = (
       proxima && proxima.tipo !== "corte" ? proxima.duracao_s : 0;
     const gerar = Math.min(
       MAXIMO_GERAR,
-      Math.max(MINIMO_GERAR, Math.ceil(duracao + transicao + FOLGA_GERAR)),
+      Math.max(
+        MINIMO_GERAR,
+        Math.ceil((duracao + transicao) * APROVEITAMENTO - 0.05),
+      ),
     );
     // O que foi dito na cena, já com os nomes corrigidos.
     const falou = palavras
@@ -103,7 +110,7 @@ export const verificarNarracao = (
 
   // Cena mais longa do que um take do Higgsfield consegue cobrir.
   const longas = cenas
-    .filter((c) => c.duracao + FOLGA_GERAR > MAXIMO_GERAR)
+    .filter((c) => c.duracao * APROVEITAMENTO > MAXIMO_GERAR)
     .map((c) => c.numero);
   if (longas.length) {
     avisos.push(
