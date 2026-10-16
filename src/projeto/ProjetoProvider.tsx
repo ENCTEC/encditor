@@ -39,7 +39,7 @@ export type MetaProjeto = {
 // Abre outro projeto (recarrega o app nele).
 export const abrirProjeto = (id: string) => {
   sessionStorage.setItem("encditor:projeto-id", id);
-  window.location.assign(`/?projeto=${id}`);
+  window.location.assign(`/timeline?projeto=${id}`);
 };
 
 const chaveLocal = (id: string) =>

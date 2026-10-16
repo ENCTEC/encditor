@@ -11,7 +11,6 @@ import { CirculoSpray, SublinhadoSpray } from "./Rabiscos";
 // Abas do projeto aberto. "Clientes" fica fora daqui: é a raiz do caminho
 // de pastas (Clientes › Cliente › Projeto), ao lado.
 const ABAS = [
-  { href: "/", rotulo: "Criar" },
   { href: "/timeline", rotulo: "Timeline" },
   { href: "/arquivos", rotulo: "Arquivos" },
   { href: "/estilos", rotulo: "Estilos" },
@@ -61,8 +60,7 @@ export const Cabecalho: React.FC = () => {
 
       <nav className="flex shrink-0 gap-0.5">
         {ABAS.map((aba) => {
-          const ativa =
-            aba.href === "/" ? caminho === "/" : caminho.startsWith(aba.href);
+          const ativa = caminho.startsWith(aba.href);
           return (
             <Link
               key={aba.href}

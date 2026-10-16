@@ -591,11 +591,7 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
                 <Link href="/timeline" className="text-spray underline">
                   Ver na Timeline
                 </Link>{" "}
-                ou{" "}
-                <Link href="/" className="text-spray underline">
-                  ajustar pelo chat
-                </Link>
-                .
+                e ajustar pelo chat ao lado.
               </p>
               {montagem.avisos.map((a, i) => (
                 <p key={i} className="text-xs text-zinc-400">

@@ -1,23 +1,16 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { Biblioteca } from "@/componentes/Biblioteca";
-import { PreviewPlayer } from "@/componentes/PreviewPlayer";
-import { useProjeto } from "@/projeto/ProjetoProvider";
-
-// Aba "Criar" (principal): o chat fica à esquerda (ele mora no layout, para
-// não sumir ao trocar de aba); aqui ficam o preview e a biblioteca.
-export default function PaginaCriar() {
-  const { projeto, carregado } = useProjeto();
-
-  if (!carregado) return null;
-
-  return (
-    <aside className="flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <PreviewPlayer timeline={projeto.timeline} className="aspect-video" />
-      <div>
-        <h2 className="rotulo-zine mb-2">Biblioteca</h2>
-        <Biblioteca biblioteca={projeto.biblioteca} />
-      </div>
-    </aside>
-  );
+// A aba "Criar" saiu (pedido de 2026-10-17): o chat já fica ao lado da
+// Timeline. O endereço raiz leva para a Timeline, mantendo ?projeto=.
+export default async function Inicio({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const parametros = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(await searchParams)) {
+    for (const v of [valor ?? []].flat()) parametros.append(chave, v);
+  }
+  const busca = parametros.toString();
+  redirect(`/timeline${busca ? `?${busca}` : ""}`);
 }
