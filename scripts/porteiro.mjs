@@ -61,16 +61,17 @@ const ligarApp = async () => {
     saida,
     `\n===== ${new Date().toLocaleString("pt-BR")} ligando o app =====\n`,
   );
+  // O Next roda direto pelo Node, sem cmd e sem console novo: herda o
+  // console invisível do porteiro. (Com "detached" ou pelo cmd, o Windows
+  // Terminal — padrão do Windows 11 — abre uma janela mesmo pedindo
+  // escondido.) A saída vai para o log; o Next 16 também grava o dele em
+  // .next/dev/logs/next-development.log.
+  const app = spawn(
+    process.execPath,
+    [path.join(PASTA, "node_modules", "next", "dist", "bin", "next"), "dev"],
+    { cwd: PASTA, windowsHide: true, stdio: ["ignore", saida, saida] },
+  );
   fs.closeSync(saida);
-  // Erros graves (se o app cair) vão para este log; o registro do dia a
-  // dia o Next 16 grava em .next/dev/logs/next-development.log.
-  const app = spawn(`npm run dev >> "${LOG}" 2>&1`, {
-    cwd: PASTA,
-    shell: true,
-    detached: true,
-    windowsHide: true,
-    stdio: "ignore",
-  });
   app.unref();
   console.log(`[porteiro] ligando o app (log em ${LOG})`);
 };
