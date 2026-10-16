@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { calcularClipes } from "@/timeline/calculos";
 import {
@@ -57,6 +57,9 @@ const ATALHOS: [string, string][] = [
   ["Esc", "limpar marcas e seleção"],
   ["Alt+← →", "empurrar o item 1 quadro (Shift: 10)"],
   ["Ctrl+Z / Ctrl+Y", "desfazer / refazer"],
+  ["Arrastar o fundo", "mover a visão (botão do meio: em qualquer lugar)"],
+  ["Ctrl+rodinha", "zoom onde está o mouse"],
+  ["Shift+rodinha", "rolar para os lados"],
 ];
 
 export const Trilhas: React.FC<{
@@ -72,6 +75,74 @@ export const Trilhas: React.FC<{
   const [marcas, setMarcas] = useState<Marcas>({ entrada: null, saida: null });
   const [ima, setIma] = useState(true);
   const [verAtalhos, setVerAtalhos] = useState(false);
+
+  // ---------- Navegar arrastando (mãozinha) e zoom com Ctrl+rodinha ----------
+  const area = useRef<HTMLDivElement>(null);
+  const [navegando, setNavegando] = useState(false);
+
+  // Arrastar o fundo (botão esquerdo) ou qualquer lugar (botão do meio)
+  // move a visão. Clique sem arrastar no fundo tira a seleção. Os
+  // ouvintes entram já no clique (um clique rápido solta antes de um
+  // efeito do React rodar).
+  const iniciarPanorama = (e: React.PointerEvent) => {
+    const el = area.current;
+    if (!el || (e.button !== 0 && e.button !== 1)) return;
+    e.preventDefault();
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    const esquerda = el.scrollLeft;
+    const topo = el.scrollTop;
+    let andou = false;
+    const mover = (ev: PointerEvent) => {
+      const dx = ev.clientX - x0;
+      const dy = ev.clientY - y0;
+      if (!andou && Math.abs(dx) + Math.abs(dy) > 3) {
+        andou = true;
+        setNavegando(true);
+      }
+      if (andou) {
+        el.scrollLeft = esquerda - dx;
+        el.scrollTop = topo - dy;
+      }
+    };
+    const soltar = () => {
+      window.removeEventListener("pointermove", mover);
+      window.removeEventListener("pointerup", soltar);
+      setNavegando(false);
+      if (!andou) aoSelecionar(null);
+    };
+    window.addEventListener("pointermove", mover);
+    window.addEventListener("pointerup", soltar);
+  };
+
+  // Ctrl+rodinha: zoom mantendo parado o ponto sob o mouse.
+  const ancora = useRef<{ tempo: number; x: number } | null>(null);
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    const aoRolar = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const x = e.clientX - el.getBoundingClientRect().left - LARGURA_ROTULO;
+      setPxPorSegundo((px) => {
+        const novo = Math.min(
+          200,
+          Math.max(10, Math.round(px * (e.deltaY < 0 ? 1.15 : 1 / 1.15))),
+        );
+        ancora.current = { tempo: (el.scrollLeft + x) / px, x };
+        return novo;
+      });
+    };
+    el.addEventListener("wheel", aoRolar, { passive: false });
+    return () => el.removeEventListener("wheel", aoRolar);
+  }, []);
+  useLayoutEffect(() => {
+    const el = area.current;
+    const a = ancora.current;
+    if (!el || !a) return;
+    el.scrollLeft = Math.max(0, a.tempo * pxPorSegundo - a.x);
+    ancora.current = null;
+  }, [pxPorSegundo]);
 
   const blocos = useMemo(
     () => calcularBlocos(timeline, biblioteca),
@@ -439,6 +510,9 @@ export const Trilhas: React.FC<{
 
   const iniciarArrasto = (e: React.PointerEvent, b: Bloco) => {
     e.stopPropagation();
+    // Botão do meio: navega mesmo em cima de um item.
+    if (e.button === 1) return iniciarPanorama(e);
+    if (e.button !== 0) return;
     aoSelecionar({ faixa: b.faixa, indice: b.indice });
     const ret = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - ret.left;
@@ -617,8 +691,13 @@ export const Trilhas: React.FC<{
       ) : null}
 
       <div
-        className="relative min-h-0 flex-1 overflow-auto select-none"
-        onPointerDown={() => aoSelecionar(null)}
+        ref={area}
+        className={`relative min-h-0 flex-1 overflow-auto select-none ${
+          navegando ? "cursor-grabbing" : "cursor-grab"
+        }`}
+        onPointerDown={iniciarPanorama}
+        // O botão do meio do Windows abre a "rolagem automática": não aqui.
+        onMouseDown={(e) => e.button === 1 && e.preventDefault()}
       >
         <div
           className="relative"
