@@ -38,10 +38,18 @@ const curvaVolume = (
 
 export const Audios: React.FC<{ audios: AudioFaixa[] }> = ({ audios }) => {
   const { fps } = useVideoConfig();
+  // Chave estável (arquivo + ponto do arquivo), não a posição na lista:
+  // quando um corte divide a narração, os outros áudios (a música) mudam
+  // de posição; com a posição como chave, o player trocava o arquivo das
+  // tags de áudio no meio da reprodução e o som parava.
+  const vistas = new Map<string, number>();
 
   return (
     <>
       {audios.map((audio, i) => {
+        const base = `${audio.url}@${audio.origemInicio}`;
+        const repeticao = vistas.get(base) ?? 0;
+        vistas.set(base, repeticao + 1);
         const de = segParaFrames(audio.inicio, fps);
         const duracao = segParaFrames(audio.fim, fps) - de;
         if (duracao <= 0) {
@@ -49,7 +57,7 @@ export const Audios: React.FC<{ audios: AudioFaixa[] }> = ({ audios }) => {
         }
         return (
           <Sequence
-            key={i}
+            key={`${base}#${repeticao}`}
             from={de}
             durationInFrames={duracao}
             name={`Áudio ${i + 1}`}
