@@ -236,6 +236,13 @@ REGRAS DO PLANO
 - GUIA DE GRAVAÇÃO (o usuário grava a narração imitando isso; uma voz sintética também lê seguindo estas indicações): em cada cena com fala, entonacao = como dizer, em poucas palavras e bem concreto (ex.: "urgente e animada, subindo no fim", "baixando a voz, em tom de segredo", "sorrindo, conversando com a amiga"); enfase = palavras EXATAS da fala que devem sair mais fortes: no máximo 2 por fala, cada uma com 1 a 3 palavras (ex.: "hoje", "125 e 90", "Trivitt") — ênfase demais perde o efeito; ritmo = lento, normal ou rapido; pausa_depois_s = respiro depois da frase (0 a 0.8; use 0.3–0.6 antes de revelar o preço ou de virar o assunto). narracao.orientacoes = tom geral da voz (quem fala, energia, como sorrir, velocidade média).
 - motivo de cada cena e aprendizados_aplicados: cite os dados que justificam (ex.: "versão X teve 12 vendas a R$ 2,80 por conversa com gancho de pergunta"). Não invente números.
 
+NARRAÇÃO JÁ GRAVADA (quando a seção "NARRAÇÃO GRAVADA" aparecer no contexto)
+- A gravação manda. NUNCA peça a transcrição ou o áudio: eles já estão no contexto.
+- copy = EXATAMENTE o texto gravado (não reescreva nem "corrija" o que foi dito; os nomes de marca já vêm corrigidos).
+- Cada cena.fala = trecho contínuo e EXATO do texto gravado, na ordem; juntando as falas = o texto gravado inteiro.
+- Ajuste quantidade, ordem e conteúdo das cenas ao que foi falado, mantendo as cenas obrigatórias; duracao_s = duração medida do trecho na gravação (use os tempos dados). Se um trecho passar de 29 s, divida em duas cenas.
+- Entonação/ênfase/pausa: descreva como foi gravado (não importa mais para gravar).
+
 CONVERSA
 - Se faltar informação essencial (o que vender/oferta e objetivo — sem ideia, objetivo nem texto pronto), faça até 3 perguntas curtas e devolva plano null.
 - Caso contrário, devolva o PLANO COMPLETO e, na mensagem, explique em poucas linhas as decisões principais e faça no máximo 2 perguntas de refinamento (opcionais).
@@ -400,6 +407,26 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
       : []),
   ];
 
+  // Narração já gravada e enviada: o texto (com os nomes corrigidos), os
+  // tempos e o que a conferência mediu de cada cena do plano atual.
+  const narracao = midias.find((m) => m.id === plano.vinculos.narracao);
+  const palavrasGravadas = narracao?.analise?.transcricao?.palavras ?? [];
+  const narracaoGravada = palavrasGravadas.length
+    ? [
+        "== NARRAÇÃO GRAVADA (já enviada pelo usuário; a gravação manda) ==",
+        `Duração: ${r1(palavrasGravadas[palavrasGravadas.length - 1].ate)}s. Texto gravado: ${narracao!.analise!.transcricao!.texto}`,
+        `Tempos (a cada frase): ${frasesComTempo(palavrasGravadas)}`,
+        plano.narracaoVerificada
+          ? `Conferência com as cenas do plano atual: ${plano.narracaoVerificada.cenas
+              .map(
+                (c) =>
+                  `cena ${c.numero}: ${c.inicio}s +${c.duracao}s “${c.falou}”`,
+              )
+              .join(" | ")}`
+          : "",
+      ].filter(Boolean)
+    : [];
+
   const secoes = [
     `CLIENTE: ${projeto.cliente.nome}. PROJETO: ${projeto.nome}.`,
     "== BRIEFING ==",
@@ -444,6 +471,7 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
           )
           .join("\n")
       : "(nenhuma ainda)",
+    ...narracaoGravada,
     "== BANCO DE MÍDIA DO CLIENTE (pode reaproveitar) ==",
     banco.length ? banco.join("\n") : "(vazio)",
   ];
@@ -453,6 +481,25 @@ const montarContexto = async (projetoId: string, plano: PlanoSalvo) => {
     elementos,
     midias,
   };
+};
+
+// Frases da narração com o tempo de cada uma (a partir das palavras, que
+// já têm os nomes corrigidos).
+const frasesComTempo = (
+  palavras: { de: number; ate: number; palavra: string }[],
+) => {
+  const frases: string[] = [];
+  let atual: typeof palavras = [];
+  palavras.forEach((p, i) => {
+    atual.push(p);
+    if (/[.!?…]$/.test(p.palavra) || i === palavras.length - 1) {
+      frases.push(
+        `${r1(atual[0].de)}–${r1(atual[atual.length - 1].ate)}s “${atual.map((x) => x.palavra).join(" ")}”`,
+      );
+      atual = [];
+    }
+  });
+  return frases.join(" | ");
 };
 
 // ---------- Ajustes no plano devolvido ----------
