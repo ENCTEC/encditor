@@ -10,7 +10,7 @@ import { caixaParaPosicao, ehTelaCheia } from "@/timeline/caixas";
 import { formatoPorId, mudarFormato } from "@/timeline/formatos";
 import { AudioFaixa, Clipe, Insert, Timeline, Zoom } from "@/timeline/schema";
 import { chaveCena, chaveInsert, itensDoPlano } from "./pendencias";
-import { momentoDaFrase, narracaoSemRespiros, temposDasCenas } from "./tempos";
+import { momentoDaFrase, palavrasDaNarracao, temposDasCenas } from "./tempos";
 import { CenaPlano, PlanoGerado, PlanoSalvo } from "./tipos";
 
 // Monta a edição a partir do plano, sem IA (determinístico e previsível):
@@ -76,14 +76,9 @@ export const montarDoPlano = (
 
   // ---------- Narração (base do tempo) e início de cada cena ----------
   const narracao = g.modo_audio === "narracao" ? midiaDe("narracao") : null;
-  // Sem os respiros longos: a narração entra em trechos colados.
-  const { palavras: palavrasNarracao, fala: falaCompactada } =
-    narracaoSemRespiros(narracao);
-  if (falaCompactada.respiros > 0 && falaCompactada.economizado >= 0.3) {
-    avisos.push(
-      `Cortei ${falaCompactada.respiros} respiro(s) longo(s) da narração (${falaCompactada.economizado.toFixed(1).replace(".", ",")}s a menos).`,
-    );
-  }
+  // A narração entra inteira, do jeito que foi gravada (cortes de
+  // respiros e trechos são pedidos depois pelo chat: cortar_trecho).
+  const palavrasNarracao = palavrasDaNarracao(narracao);
   const cenas = g.cenas;
   const tempos = temposDasCenas(cenas, palavrasNarracao);
   const inicios = tempos.inicios;
@@ -182,20 +177,15 @@ export const montarDoPlano = (
   // ---------- Áudio: narração e música ----------
   const audios: AudioFaixa[] = [];
   if (narracao) {
-    // Um item de áudio por trecho de fala (os respiros cortados somem).
-    for (const tr of falaCompactada.trechos) {
-      if (tr.inicio >= duracaoVideo) break;
-      audios.push({
-        url: narracao.url,
-        inicio: r2(tr.inicio),
-        fim: r2(Math.min(duracaoVideo, tr.inicio + (tr.ate - tr.de))),
-        origemInicio: tr.de,
-        volume: 1,
-        // Fade curtinho para o corte não estalar.
-        fadeEntrada: 0.02,
-        fadeSaida: 0.03,
-      });
-    }
+    audios.push({
+      url: narracao.url,
+      inicio: 0,
+      fim: r2(Math.min(narracao.duracao ?? duracaoVideo, duracaoVideo)),
+      origemInicio: 0,
+      volume: 1,
+      fadeEntrada: 0,
+      fadeSaida: 0.1,
+    });
   }
   const musica = g.musica.usar ? midiaDe("musica") : null;
   if (musica) {

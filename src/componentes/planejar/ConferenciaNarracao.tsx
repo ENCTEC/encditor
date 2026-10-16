@@ -19,12 +19,6 @@ export const ConferenciaNarracao: React.FC<{
       tempos das cenas e o quanto gerar de cada take (inclusive o número de
       segundos no prompt) foram ajustados à sua gravação.
     </p>
-    {v.respiros && v.respiros.quantos > 0 && v.respiros.segundos >= 0.3 ? (
-      <p className="text-xs text-zinc-400">
-        ✂ {v.respiros.quantos} respiro(s) longo(s) serão encurtados na edição (
-        {br(v.respiros.segundos)}s a menos).
-      </p>
-    ) : null}
     {v.avisos.map((a, i) => (
       <p key={i} className="text-xs text-zinc-400">
         ↻ {a}

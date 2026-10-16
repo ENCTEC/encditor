@@ -26,6 +26,47 @@ export const FAIXAS_VISUAIS: { faixa: Faixa; rotulo: string; cor: string }[] = [
   { faixa: "legendas", rotulo: "Legendas", cor: "bg-pink-700 border-pink-400" },
 ];
 
+// Linhas desenhadas na Timeline: uma por faixa, mas os áudios ganham uma
+// linha por ARQUIVO ("Áudio 1 — narração", "Áudio 2 — música"); os
+// pedaços do mesmo arquivo ficam na mesma linha.
+export type Linha = {
+  chave: string;
+  faixa: Faixa;
+  rotulo: string;
+  cor: string;
+  blocos: Bloco[];
+};
+
+const CORES_AUDIO = [
+  "bg-emerald-700 border-emerald-400",
+  "bg-teal-700 border-teal-400",
+  "bg-lime-800 border-lime-500",
+  "bg-green-800 border-green-500",
+];
+
+export const linhasDaTimeline = (
+  t: Timeline,
+  blocos: Record<Faixa, Bloco[]>,
+  biblioteca: Midia[],
+): Linha[] =>
+  FAIXAS_VISUAIS.flatMap(({ faixa, rotulo, cor }): Linha[] => {
+    if (faixa !== "audios" || !t.audios.length) {
+      return [{ chave: faixa, faixa, rotulo, cor, blocos: blocos[faixa] }];
+    }
+    const urls = [...new Set(t.audios.map((a) => a.url))];
+    return urls.map((url, n) => {
+      const midia = biblioteca.find((m) => m.url === url);
+      const nome = midia?.apelido ? `@${midia.apelido}` : (midia?.nome ?? "");
+      return {
+        chave: `audio:${url}`,
+        faixa,
+        rotulo: `Áudio ${n + 1}${nome ? ` — ${nome}` : ""}`,
+        cor: CORES_AUDIO[n % CORES_AUDIO.length],
+        blocos: blocos.audios.filter((b) => t.audios[b.indice].url === url),
+      };
+    });
+  });
+
 export const calcularBlocos = (
   t: Timeline,
   biblioteca: Midia[],
@@ -51,13 +92,18 @@ export const calcularBlocos = (
       fim: x.fim,
       rotulo: nomePorUrl(x.url) ?? `Insert ${i + 1}`,
     })),
-    audios: t.audios.map((x, i) => ({
-      faixa: "audios",
-      indice: i,
-      inicio: x.inicio,
-      fim: x.fim,
-      rotulo: nomePorUrl(x.url) ?? `Áudio ${i + 1}`,
-    })),
+    audios: t.audios.map((x, i) => {
+      const apelido = biblioteca.find((m) => m.url === x.url)?.apelido;
+      return {
+        faixa: "audios",
+        indice: i,
+        inicio: x.inicio,
+        fim: x.fim,
+        // O mesmo arquivo pode estar em vários pedaços: mostra de que
+        // segundo do arquivo cada um começa.
+        rotulo: `${apelido ? `@${apelido}` : (nomePorUrl(x.url) ?? `Áudio ${i + 1}`)} · desde ${x.origemInicio.toFixed(1)}s`,
+      };
+    }),
     zooms: t.zooms.map((x, i) => ({
       faixa: "zooms",
       indice: i,

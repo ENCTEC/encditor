@@ -11,12 +11,14 @@ import {
   atualizarItem,
   definirFormato,
   colocarCena,
+  cortarTrecho,
   dividirClipe,
   Faixa,
   moverClipe,
   removerItem,
   substituirNasLegendas,
   trocarUrl,
+  urlsDeMusica as musicasDaTimeline,
 } from "@/timeline/operacoes";
 import { EfeitoAudio, IDS_EFEITOS_AUDIO } from "@/catalogo/estilos";
 import { nomeDaUrl } from "@/servidor/armazenamento";
@@ -36,7 +38,6 @@ import {
   palavrasDaMidia,
   palavrasNoVideoFinal,
 } from "./conteudo";
-import { compactarFala } from "@/plano/respiros";
 import { buscarNoBanco } from "./busca-banco";
 import { resumoDoProjeto } from "./estado";
 import {
@@ -102,6 +103,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       calcularDuracaoTotal(calcularClipes(sessao.timeline)) /
         sessao.timeline.fps,
     );
+
+  const urlsDeMusica = (t: Timeline) => musicasDaTimeline(t, sessao.biblioteca);
 
   // Aceita o nome ("Insert 2"), o apelido ("@videolael" ou "videolael")
   // ou o nome original do arquivo.
@@ -513,9 +516,38 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     }),
 
     ferramenta({
+      name: "cortar_trecho",
+      description:
+        "Tira um trecho do vídeo final e FECHA O BURACO (ripple): cenas, narração, efeitos, inserts, zooms e legendas do trecho saem e tudo o que vem depois anda para trás. A música de fundo não é picotada: continua tocando e só termina mais cedo. Use para cortar respiros, gaguejadas, frases repetidas ou qualquer pedaço que o usuário pedir. Para vários cortes, chame do ÚLTIMO para o primeiro (assim os tempos dos outros não mudam) ou confira com ver_projeto entre um e outro.",
+      inputSchema: z.object({
+        de: z
+          .number()
+          .min(0)
+          .describe("Segundo do vídeo final onde o corte começa."),
+        ate: z
+          .number()
+          .min(0)
+          .describe("Segundo do vídeo final onde o corte termina."),
+      }),
+      run: (e) => {
+        if (e.ate - e.de < 0.02) {
+          throw new Error("O fim do corte precisa ser depois do começo.");
+        }
+        const total = duracaoTotal();
+        if (e.de >= total) {
+          throw new Error(`O vídeo tem só ${total}s.`);
+        }
+        return aplicar(
+          (t) => cortarTrecho(t, e.de, Math.min(e.ate, total), urlsDeMusica(t)),
+          `trecho ${s(e.de)}s–${s(Math.min(e.ate, total))}s cortado (o resto foi puxado para trás)`,
+        );
+      },
+    }),
+
+    ferramenta({
       name: "cortar_respiros",
       description:
-        "Encurta os silêncios longos (respiros) de uma narração/áudio da timeline sem cortar palavras: pausas maiores que pausa_maxima_s viram pausa_nova_s e o silêncio do começo sai (o áudio vira trechos colados). Depois disso as falas acontecem mais cedo: confira com ver_projeto e, se precisar, ajuste as cenas e refaça as legendas (legendar_automaticamente).",
+        "Encurta os silêncios longos (respiros) de uma narração da timeline sem cortar palavras. Cada pausa maior que pausa_maxima_s vira pausa_nova_s com cortar_trecho (fecha o buraco em todas as faixas: cenas, legendas e efeitos andam junto; a música só termina mais cedo). Só use quando o usuário pedir.",
       inputSchema: z.object({
         audio: z.number().int().min(1).describe("Número do áudio na timeline."),
         pausa_maxima_s: z
@@ -532,8 +564,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .describe("Pausa que fica no lugar. null = 0.35."),
       }),
       run: (e) => {
-        const indice = e.audio - 1;
-        const a = sessao.timeline.audios[indice];
+        const a = sessao.timeline.audios[e.audio - 1];
         if (!a) throw new Error(`Áudio ${e.audio} não existe.`);
         const midia = sessao.biblioteca.find((m) => m.url === a.url);
         const palavras = midia?.analise?.transcricao?.palavras ?? [];
@@ -542,38 +573,40 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
             "Esse áudio não tem fala transcrita (analise o arquivo antes).",
           );
         }
-        const fimNoArquivo = a.origemInicio + (a.fim - a.inicio);
-        const fala = compactarFala(
-          palavras.filter(
-            (p) =>
-              p.de >= a.origemInicio - 0.05 && p.ate <= fimNoArquivo + 0.05,
-          ),
-          {
-            pausaMaxima: e.pausa_maxima_s ?? 0.7,
-            pausaNova: e.pausa_nova_s ?? 0.35,
-          },
-        );
-        if (!fala.respiros || fala.economizado < 0.05) {
+        const pausaMaxima = e.pausa_maxima_s ?? 0.7;
+        const pausaNova = Math.min(e.pausa_nova_s ?? 0.35, pausaMaxima);
+        // Palavras deste trecho do áudio, no tempo do vídeo final.
+        const noVideo = palavras
+          .map((p) => ({
+            de: a.inicio + (p.de - a.origemInicio),
+            ate: a.inicio + (p.ate - a.origemInicio),
+          }))
+          .filter((p) => p.de >= a.inicio - 0.05 && p.ate <= a.fim + 0.05);
+        const cortes: { de: number; ate: number }[] = [];
+        for (let i = 1; i < noVideo.length; i++) {
+          const pausa = noVideo[i].de - noVideo[i - 1].ate;
+          if (pausa > pausaMaxima) {
+            const meio = pausaNova / 2;
+            cortes.push({
+              de: noVideo[i - 1].ate + meio,
+              ate: noVideo[i].de - meio,
+            });
+          }
+        }
+        if (!cortes.length) {
           return "OK: não há respiros longos para cortar nesse áudio.";
         }
-        const novos = fala.trechos.map((tr, i) => ({
-          ...a,
-          inicio: s(a.inicio + tr.inicio),
-          fim: s(a.inicio + tr.inicio + (tr.ate - tr.de)),
-          origemInicio: tr.de,
-          fadeEntrada: i === 0 ? a.fadeEntrada : 0.02,
-          fadeSaida: i === fala.trechos.length - 1 ? a.fadeSaida : 0.03,
-        }));
+        const economizado = cortes.reduce((n, c) => n + c.ate - c.de, 0);
+        // Do último para o primeiro: os tempos dos cortes que faltam não mudam.
         return aplicar(
-          (t) => ({
-            ...t,
-            audios: [
-              ...t.audios.slice(0, indice),
-              ...novos,
-              ...t.audios.slice(indice + 1),
-            ],
-          }),
-          `áudio ${e.audio}: ${fala.respiros} respiro(s) cortado(s), ${s(fala.economizado)}s a menos (agora em ${novos.length} trechos)`,
+          (t) =>
+            [...cortes]
+              .reverse()
+              .reduce(
+                (tl, c) => cortarTrecho(tl, c.de, c.ate, urlsDeMusica(tl)),
+                t,
+              ),
+          `áudio ${e.audio}: ${cortes.length} respiro(s) cortado(s), ${s(economizado)}s a menos (o resto do vídeo foi puxado junto)`,
         );
       },
     }),

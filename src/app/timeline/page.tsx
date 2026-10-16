@@ -52,7 +52,12 @@ export default function PaginaTimeline() {
   useEffect(() => {
     const aoTeclar = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest("input, textarea, select")) return;
-      if ((e.key === "Delete" || e.key === "Backspace") && selecao) {
+      // Shift+Delete é "remover trecho e fechar o buraco" (nas Trilhas).
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        !e.shiftKey &&
+        selecao
+      ) {
         e.preventDefault();
         if (aplicar((t) => removerItem(t, selecao.faixa, selecao.indice))) {
           setSelecao(null);

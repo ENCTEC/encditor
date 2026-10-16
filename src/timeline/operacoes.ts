@@ -1,3 +1,4 @@
+import { calcularClipes, inicioDosClipes } from "./calculos";
 import { mudarFormato } from "./formatos";
 import { AudioFaixa, Clipe, Insert, Legenda, Timeline, Zoom } from "./schema";
 
@@ -250,3 +251,231 @@ export const trocarUrl = (t: Timeline, de: string, para: string): Timeline => {
     audios: troca(t.audios),
   };
 };
+
+// ---------- Cortar um trecho do vídeo (puxando o resto) ----------
+// Tira o intervalo [de, ate) do vídeo final em TODAS as faixas e puxa tudo
+// o que vem depois para trás, fechando o buraco — como o "ripple delete"
+// dos editores. Faixas de áudio contínuas (música de fundo) não são
+// cortadas no meio: só ficam mais curtas no fim, sem pulo no som.
+
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+
+// Encaixa um intervalo [inicio, fim) depois do corte. null = some.
+const encaixar = (inicio: number, fim: number, de: number, ate: number) => {
+  const d = ate - de;
+  if (fim <= de) return { inicio, fim, cortadoNoComeco: 0 };
+  if (inicio >= ate) {
+    return { inicio: inicio - d, fim: fim - d, cortadoNoComeco: 0 };
+  }
+  if (inicio >= de && fim <= ate) return null;
+  return {
+    inicio: inicio < de ? inicio : de,
+    fim: fim > ate ? fim - d : de,
+    // Quanto do começo do item caiu dentro do corte.
+    cortadoNoComeco: inicio >= de ? ate - inicio : 0,
+  };
+};
+
+export const cortarTrecho = (
+  t: Timeline,
+  de: number,
+  ate: number,
+  // Arquivos de áudio contínuos (música): só encurtam no fim.
+  urlsContinuas: string[] = [],
+): Timeline => {
+  if (ate - de < 0.02) throw new Error("Trecho curto demais para cortar.");
+  const d = ate - de;
+  const fps = t.fps;
+
+  // Cenas: cada cena "é dona" do seu tempo, menos a transição de entrada
+  // (que pertence à cena anterior). O corte tira o pedaço de cada dona.
+  const calculados = calcularClipes(t);
+  const inicios = inicioDosClipes(calculados).map((f) => f / fps);
+  const clipes: Clipe[] = [];
+  t.clipes.forEach((c, i) => {
+    const vel = c.velocidade ?? 1;
+    const ini = inicios[i];
+    const fim = ini + calculados[i].duracaoFrames / fps;
+    const dono = i === 0 ? ini : ini + calculados[i].transicaoFrames / fps;
+    const a = Math.max(de, dono);
+    const b = Math.min(ate, fim);
+    if (b <= a + 0.001) {
+      clipes.push(c);
+      return;
+    }
+    if (a <= dono + 0.001 && b >= fim - 0.001) return; // cena inteira some
+    if (a <= dono + 0.001) {
+      // corte no começo da cena (depois da transição de entrada)
+      clipes.push({ ...c, inicio: r3(c.inicio + (b - dono) * vel) });
+      return;
+    }
+    if (b >= fim - 0.001) {
+      // corte no fim da cena
+      clipes.push({ ...c, fim: r3(c.fim - (b - a) * vel) });
+      return;
+    }
+    // corte no meio: a cena vira duas, coladas com corte seco
+    clipes.push({ ...c, fim: r3(c.inicio + (a - ini) * vel) });
+    clipes.push({
+      ...c,
+      inicio: r3(c.inicio + (b - ini) * vel),
+      transicao: "corte",
+      direcao: undefined,
+      duracaoTransicao: undefined,
+    });
+  });
+
+  const audios: AudioFaixa[] = [];
+  t.audios.forEach((x) => {
+    if (urlsContinuas.includes(x.url) && x.fim > de && x.inicio < ate) {
+      // Música: continua igual, sem pulo no som, só termina mais cedo.
+      const inicio = Math.min(x.inicio, de);
+      const fim = x.fim > ate ? x.fim - d : de;
+      if (fim - inicio > 0.05) {
+        audios.push({ ...x, inicio: r3(inicio), fim: r3(fim) });
+      }
+      return;
+    }
+    if (x.fim <= de) {
+      audios.push(x);
+      return;
+    }
+    if (x.inicio >= ate) {
+      audios.push({ ...x, inicio: r3(x.inicio - d), fim: r3(x.fim - d) });
+      return;
+    }
+    // O áudio atravessa o corte: a parte de antes fica, a de depois é
+    // puxada para o ponto do corte (pulando o trecho cortado do arquivo).
+    if (x.inicio < de) {
+      audios.push({
+        ...x,
+        fim: r3(de),
+        fadeSaida: Math.min(x.fadeSaida, 0.03),
+      });
+    }
+    if (x.fim > ate) {
+      audios.push({
+        ...x,
+        inicio: r3(de),
+        fim: r3(x.fim - d),
+        // pula o que já tocou antes do corte e o trecho cortado
+        origemInicio: r3(x.origemInicio + (ate - x.inicio)),
+        fadeEntrada: x.inicio < de ? 0.02 : x.fadeEntrada,
+      });
+    }
+  });
+
+  const inserts: Insert[] = [];
+  for (const x of t.inserts) {
+    const e = encaixar(x.inicio, x.fim, de, ate);
+    if (!e || e.fim - e.inicio < 0.05) continue;
+    inserts.push({
+      ...x,
+      inicio: r3(e.inicio),
+      fim: r3(e.fim),
+      origemInicio:
+        x.tipo === "video"
+          ? r3(x.origemInicio + e.cortadoNoComeco)
+          : x.origemInicio,
+    });
+  }
+
+  const zooms: Zoom[] = [];
+  for (const z of t.zooms) {
+    const e = encaixar(z.inicio, z.fim, de, ate);
+    if (e && e.fim - e.inicio >= 0.1) {
+      zooms.push({ ...z, inicio: r3(e.inicio), fim: r3(e.fim) });
+    }
+  }
+
+  // Legendas: as palavras ditas dentro do corte saem; as de depois andam
+  // junto com a fala.
+  const legendas: Legenda[] = [];
+  for (const l of t.legendas) {
+    const e = encaixar(l.inicio, l.fim, de, ate);
+    if (!e) continue;
+    const atravessa = l.inicio < ate && l.fim > de;
+    if (!l.palavras?.length || !atravessa) {
+      if (e.fim - e.inicio >= 0.1) {
+        legendas.push({ ...l, inicio: r3(e.inicio), fim: r3(e.fim) });
+      }
+      continue;
+    }
+    const palavras = l.palavras
+      .map((p) => ({
+        texto: p.texto,
+        de: l.inicio + p.de,
+        ate: l.inicio + p.ate,
+      }))
+      .filter((p) => p.de < de || p.de >= ate)
+      .map((p) => (p.de >= ate ? { ...p, de: p.de - d, ate: p.ate - d } : p));
+    if (!palavras.length) continue;
+    const inicio = Math.min(e.inicio, palavras[0].de);
+    legendas.push({
+      ...l,
+      texto: palavras.map((p) => p.texto).join(" "),
+      inicio: r3(inicio),
+      fim: r3(Math.max(e.fim, palavras[palavras.length - 1].ate)),
+      palavras: palavras.map((p) => ({
+        texto: p.texto,
+        de: r3(p.de - inicio),
+        ate: r3(p.ate - inicio),
+      })),
+    });
+  }
+
+  return { ...t, clipes, audios, inserts, zooms, legendas };
+};
+
+// Divide um áudio, insert ou zoom num ponto do vídeo final (o cursor).
+export const dividirItemNoTempo = (
+  t: Timeline,
+  faixa: "audios" | "inserts" | "zooms",
+  indice: number,
+  tempo: number,
+): Timeline => {
+  conferirIndice(t, faixa, indice);
+  const item = t[faixa][indice];
+  if (tempo <= item.inicio + 0.05 || tempo >= item.fim - 0.05) {
+    throw new Error("Ponha o cursor dentro do item para dividir.");
+  }
+  const andou = tempo - item.inicio;
+  let primeira: typeof item = { ...item, fim: r3(tempo) };
+  let segunda: typeof item = { ...item, inicio: r3(tempo) };
+  if (faixa === "audios") {
+    const a = item as AudioFaixa;
+    primeira = { ...a, fim: r3(tempo), fadeSaida: 0 };
+    segunda = {
+      ...a,
+      inicio: r3(tempo),
+      origemInicio: r3(a.origemInicio + andou),
+      fadeEntrada: 0,
+    };
+  } else if (faixa === "inserts" && (item as Insert).tipo === "video") {
+    const x = item as Insert;
+    segunda = {
+      ...x,
+      inicio: r3(tempo),
+      origemInicio: r3(x.origemInicio + andou),
+    };
+  }
+  const itens = [...t[faixa]] as (typeof item)[];
+  itens.splice(indice, 1, primeira, segunda);
+  return { ...t, [faixa]: itens };
+};
+
+// Música de fundo (sem fala transcrita e longa): num corte não é
+// picotada, só termina mais cedo.
+export const urlsDeMusica = (
+  t: Timeline,
+  biblioteca: {
+    url: string;
+    analise?: { transcricao?: { palavras?: unknown[] } | null } | null;
+  }[],
+) =>
+  t.audios
+    .filter((a) => {
+      const m = biblioteca.find((x) => x.url === a.url);
+      return !m?.analise?.transcricao?.palavras?.length && a.fim - a.inicio > 8;
+    })
+    .map((a) => a.url);

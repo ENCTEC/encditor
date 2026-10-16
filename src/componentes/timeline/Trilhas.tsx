@@ -2,8 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useProjeto } from "@/projeto/ProjetoProvider";
-import { atualizarItem, Faixa } from "@/timeline/operacoes";
-import { Bloco, calcularBlocos, FAIXAS_VISUAIS } from "./blocos";
+import { calcularClipes } from "@/timeline/calculos";
+import {
+  atualizarItem,
+  cortarTrecho,
+  dividirClipe,
+  dividirItemNoTempo,
+  Faixa,
+  urlsDeMusica,
+} from "@/timeline/operacoes";
+import { Bloco, calcularBlocos, linhasDaTimeline } from "./blocos";
 
 export type Selecao = { faixa: Faixa; indice: number } | null;
 
@@ -15,7 +23,7 @@ type Arrasto = {
   delta: number;
 };
 
-const LARGURA_ROTULO = 96;
+const LARGURA_ROTULO = 150;
 const ALTURA_FAIXA = 40;
 const BORDA_APARAR = 8;
 const MINIMO = 0.1;
@@ -37,6 +45,81 @@ export const Trilhas: React.FC<{
     () => calcularBlocos(timeline, biblioteca),
     [timeline, biblioteca],
   );
+
+  const linhas = useMemo(
+    () => linhasDaTimeline(timeline, blocos, biblioteca),
+    [timeline, blocos, biblioteca],
+  );
+
+  const blocoSelecionado = selecao
+    ? blocos[selecao.faixa].find((b) => b.indice === selecao.indice)
+    : undefined;
+
+  // ✂ Divide o item selecionado no cursor de reprodução.
+  const dividirNoCursor = () => {
+    const b = blocoSelecionado;
+    if (!b || b.faixa === "legendas") return;
+    const tempo = segundoAtual;
+    if (tempo <= b.inicio + 0.05 || tempo >= b.fim - 0.05) {
+      aplicar(() => {
+        throw new Error(
+          "Ponha o cursor (linha vermelha) dentro do item para dividir.",
+        );
+      });
+      return;
+    }
+    const { faixa, indice, inicio } = b;
+    const ok = aplicar((t) =>
+      faixa === "clipes"
+        ? dividirClipe(t, indice, tempo - inicio)
+        : dividirItemNoTempo(t, faixa, indice, tempo),
+    );
+    // Fica selecionada a segunda parte (a que começa no cursor).
+    if (ok) aoSelecionar({ faixa: b.faixa, indice: b.indice + 1 });
+  };
+
+  // Remove o tempo do item selecionado do vídeo e fecha o buraco em todas
+  // as faixas (a música de fundo só termina mais cedo).
+  const removerTrecho = () => {
+    const b = blocoSelecionado;
+    if (!b) return;
+    let de = b.inicio;
+    if (b.faixa === "clipes") {
+      // A transição de entrada é da cena anterior.
+      de += calcularClipes(timeline)[b.indice].transicaoFrames / timeline.fps;
+    }
+    const total = Math.max(...blocos.clipes.map((c) => c.fim), 0);
+    if (
+      b.fim - de > total * 0.5 &&
+      !window.confirm(
+        `Isso tira ${(b.fim - de).toFixed(1)}s do vídeo (mais da metade). Continuar?`,
+      )
+    ) {
+      return;
+    }
+    if (
+      aplicar((t) => cortarTrecho(t, de, b.fim, urlsDeMusica(t, biblioteca)))
+    ) {
+      aoSelecionar(null);
+    }
+  };
+
+  // S = dividir no cursor; Shift+Delete = remover trecho e fechar o buraco.
+  useEffect(() => {
+    const aoTeclar = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement).closest("input, textarea, select")) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() === "s" && !e.shiftKey) {
+        e.preventDefault();
+        dividirNoCursor();
+      } else if (e.shiftKey && (e.key === "Delete" || e.key === "Backspace")) {
+        e.preventDefault();
+        removerTrecho();
+      }
+    };
+    window.addEventListener("keydown", aoTeclar);
+    return () => window.removeEventListener("keydown", aoTeclar);
+  });
 
   const duracaoVisivel =
     Math.max(
@@ -159,7 +242,27 @@ export const Trilhas: React.FC<{
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-3 border-b border-zinc-800 px-3 py-1.5 text-xs text-zinc-400">
-        <span>Arraste as pontas para aparar; o meio para mover.</span>
+        <button
+          type="button"
+          onClick={dividirNoCursor}
+          disabled={!blocoSelecionado || blocoSelecionado.faixa === "legendas"}
+          className="border border-zinc-600 px-2 py-0.5 text-zinc-200 hover:border-white disabled:opacity-40"
+          title="Divide o item selecionado na linha vermelha (tecla S)"
+        >
+          ✂ Dividir no cursor (S)
+        </button>
+        <button
+          type="button"
+          onClick={removerTrecho}
+          disabled={!blocoSelecionado}
+          className="border border-zinc-600 px-2 py-0.5 text-zinc-200 hover:border-white disabled:opacity-40"
+          title="Tira o tempo do item selecionado do vídeo e puxa o resto para trás, em todas as trilhas (Shift+Delete)"
+        >
+          Remover trecho e fechar o buraco (Shift+Del)
+        </button>
+        <span className="hidden xl:inline">
+          Arraste as pontas para aparar; o meio para mover.
+        </span>
         <label className="ml-auto flex items-center gap-2">
           Zoom
           <input
@@ -212,20 +315,21 @@ export const Trilhas: React.FC<{
             </div>
           </div>
 
-          {FAIXAS_VISUAIS.map(({ faixa, rotulo, cor }) => (
+          {linhas.map(({ chave, faixa, rotulo, cor, blocos: daLinha }) => (
             <div
-              key={faixa}
+              key={chave}
               className="flex border-b border-zinc-800/70"
               style={{ height: ALTURA_FAIXA }}
             >
               <div
-                className="sticky left-0 z-30 flex shrink-0 items-center bg-zinc-900 px-3 text-xs text-zinc-400"
+                className="sticky left-0 z-30 flex shrink-0 items-center truncate bg-zinc-900 px-3 text-xs text-zinc-400"
                 style={{ width: LARGURA_ROTULO }}
+                title={rotulo}
               >
                 {rotulo}
               </div>
               <div className="relative flex-1">
-                {blocos[faixa].map((original) => {
+                {daLinha.map((original) => {
                   const b = posicaoVisual(original);
                   const selecionado =
                     selecao?.faixa === faixa && selecao.indice === b.indice;

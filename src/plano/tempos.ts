@@ -1,7 +1,6 @@
 import { buscarFala, PalavraFinal } from "@/ia/conteudo";
 import { Midia } from "@/projeto/tipos";
 import { cenasDaFala } from "./alinhamento";
-import { compactarFala } from "./respiros";
 import { CenaPlano } from "./tipos";
 
 // Tempos das cenas a partir da NARRAÇÃO gravada: cada cena começa quando a
@@ -18,21 +17,6 @@ export const palavrasDaNarracao = (narracao: Midia | null): PalavraFinal[] =>
     palavra: p.palavra,
     fonte: "narração",
   }));
-
-// Narração SEM os respiros longos: os trechos de áudio que entram no vídeo
-// e o tempo de cada palavra já no vídeo final.
-export const narracaoSemRespiros = (narracao: Midia | null) => {
-  const brutas = palavrasDaNarracao(narracao);
-  const fala = compactarFala(brutas);
-  return {
-    fala,
-    palavras: brutas.map((p) => ({
-      ...p,
-      de: Math.round(fala.mapear(p.de) * 100) / 100,
-      ate: Math.round(fala.mapear(p.ate) * 100) / 100,
-    })),
-  };
-};
 
 // Momento em que uma frase é dita, a partir de "desde".
 export const momentoDaFrase = (

@@ -1,6 +1,6 @@
 import { corrigirComRoteiro, fichas, parecido } from "./alinhamento";
 import { Midia } from "@/projeto/tipos";
-import { narracaoSemRespiros, temposDasCenas } from "./tempos";
+import { palavrasDaNarracao, temposDasCenas } from "./tempos";
 import { PlanoGerado, PlanoSalvo, VerificacaoNarracao } from "./tipos";
 
 // Confere a narração gravada ANTES de gerar os takes: acha onde cada fala
@@ -12,8 +12,9 @@ import { PlanoGerado, PlanoSalvo, VerificacaoNarracao } from "./tipos";
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 // Sobe quando o jeito de conferir melhora: conferências antigas são
-// refeitas sozinhas. 2 = alinhamento palavra a palavra + nomes corrigidos.
-export const VERSAO_CONFERENCIA = 3;
+// refeitas sozinhas. 2 = alinhamento palavra a palavra + nomes corrigidos;
+// 4 = narração inteira, sem cortar respiros sozinho.
+export const VERSAO_CONFERENCIA = 4;
 
 // Folga em cada take: aparar o começo (quadros "travados") e uma sobra.
 const FOLGA_GERAR = 1;
@@ -61,7 +62,7 @@ export const verificarNarracao = (
 } => {
   const g = plano.gerado;
   if (!g) throw new Error("Ainda não há plano.");
-  const { palavras, fala } = narracaoSemRespiros(narracao);
+  const palavras = palavrasDaNarracao(narracao);
   if (!palavras.length) {
     throw new Error("A narração ainda não foi transcrita (ou não tem fala).");
   }
@@ -143,7 +144,6 @@ export const verificarNarracao = (
     palavrasCorrigidas,
     verificacao: {
       versao: VERSAO_CONFERENCIA,
-      respiros: { quantos: fala.respiros, segundos: fala.economizado },
       midiaId: narracao.id,
       doPlano: plano.geradoEm,
       duracao: total,
