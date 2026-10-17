@@ -122,7 +122,7 @@ export const proximoNome = (biblioteca: Midia[], papel: PapelMidia) =>
 const analisesEmAndamento = new Map<string, Promise<Analise>>();
 let filaDeAnalises: Promise<void> = Promise.resolve();
 
-// Só arquivos enviados ao ENCeditor (não links externos) e não "frios".
+// Só arquivos enviados ao encEditor (não links externos) e não "frios".
 export const podeAnalisar = (midia: Midia) =>
   midia.url.startsWith("/api/midia/") && midia.usarIA !== false;
 

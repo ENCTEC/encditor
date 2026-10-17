@@ -49,13 +49,16 @@ export const Cabecalho: React.FC = () => {
 
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 border-b-[3px] border-tinta px-4">
-      {/* Logo: letras condensadas pretas + assinatura em spray vermelho. */}
-      <span className="relative flex items-baseline gap-1.5 pr-2">
-        <span className="font-display text-3xl leading-none tracking-tight text-tinta">
-          ENCeditor
+      {/* Logo "encEditor": o destaque é o EDITOR (letras condensadas
+          grandes, sublinhado em spray); "enc" vem pequeno, em máquina. */}
+      <span className="relative flex items-baseline pr-2" title="encEditor">
+        <span className="mr-0.5 font-mono text-sm font-bold tracking-wider text-zinc-500">
+          enc
         </span>
-        <span className="-rotate-6 font-marca text-sm text-spray">edit!</span>
-        <SublinhadoSpray className="-bottom-2 left-0 h-3 w-32" />
+        <span className="relative font-display text-4xl leading-none tracking-tight text-tinta">
+          Editor
+          <SublinhadoSpray className="-bottom-2 left-0 h-3 w-full" />
+        </span>
       </span>
 
       <nav className="flex shrink-0 gap-0.5">

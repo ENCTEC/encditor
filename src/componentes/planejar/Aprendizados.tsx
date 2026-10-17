@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Aprendizados as Dados } from "@/servidor/planejador";
 
-// O que o ENCeditor aprendeu com os resultados (números) e as opiniões
+// O que o encEditor aprendeu com os resultados (números) e as opiniões
 // sobre o visual dos vídeos já exportados deste cliente.
 
 export const Aprendizados: React.FC<{ clienteId: string | null }> = ({

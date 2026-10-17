@@ -18,7 +18,7 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
 export const VERSAO_CONFERENCIA = 5;
 
 // Custo-benefício: o Higgsfield cobra por segundo gerado. Em vez de gerar
-// com folga, gera ~85% do tempo que a cena fica na tela e o ENCeditor
+// com folga, gera ~85% do tempo que a cena fica na tela e o encEditor
 // estica em câmera lenta leve (0,85×, imperceptível; montagem aceita até
 // 0,75×). Ex.: cena de 5,6 s + 0,2 s de transição → gera 5 s (antes, 7 s).
 const APROVEITAMENTO = 0.85;

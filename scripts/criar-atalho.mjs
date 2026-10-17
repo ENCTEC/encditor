@@ -1,5 +1,5 @@
 /* global process, console -- script do Node */
-// Cria o atalho "ENCeditor" na área de trabalho: clique duplo liga tudo
+// Cria o atalho "encEditor" na área de trabalho: clique duplo liga tudo
 // escondido (sem janela de terminal) e abre o app no navegador. Nada sobe
 // com o Windows: o app só liga quando você abre o atalho.
 //
@@ -24,7 +24,10 @@ const powershell = (comando) =>
     encoding: "utf8",
   }).trim();
 const areaDeTrabalho = powershell("[Environment]::GetFolderPath('Desktop')");
-const atalho = path.join(areaDeTrabalho, "ENCeditor.lnk");
+const atalho = path.join(areaDeTrabalho, "encEditor.lnk");
+// Nome antigo (o Windows não diferencia maiúsculas: apaga para o novo
+// nome valer).
+fs.rmSync(path.join(areaDeTrabalho, "ENCeditor.lnk"), { force: true });
 
 powershell(
   [
@@ -35,14 +38,14 @@ powershell(
     "$s.Arguments = '\"" + LANCADOR + "\"'",
     "$s.WorkingDirectory = '" + PASTA + "'",
     "$s.IconLocation = '" + ICONE + ",0'",
-    "$s.Description = 'Abre o ENCeditor (liga em segundo plano, sem janela)'",
+    "$s.Description = 'Abre o encEditor (liga em segundo plano, sem janela)'",
     "$s.Save()",
   ].join("; "),
 );
 
 // Limpa versões antigas: o atalho de link (.url) e a inicialização com o
 // Windows (não é mais usada).
-fs.rmSync(path.join(areaDeTrabalho, "ENCeditor.url"), { force: true });
+fs.rmSync(path.join(areaDeTrabalho, "encEditor.url"), { force: true });
 fs.rmSync(
   path.join(
     process.env.APPDATA ?? "",
@@ -51,7 +54,7 @@ fs.rmSync(
     "Start Menu",
     "Programs",
     "Startup",
-    "ENCeditor-porteiro.vbs",
+    "encEditor-porteiro.vbs",
   ),
   { force: true },
 );

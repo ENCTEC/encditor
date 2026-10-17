@@ -65,7 +65,7 @@ export const ConferenciaNarracao: React.FC<{
     <p className="text-[11px] text-zinc-500">
       “Gerar” já está entre 4 s (mínimo do Higgsfield) e 30 s (máximo) e é o
       mínimo que serve: para economizar, o take sai um pouco mais curto que a
-      cena e o ENCeditor estica em câmera lenta leve (~0,85×, não aparece).
+      cena e o encEditor estica em câmera lenta leve (~0,85×, não aparece).
     </p>
   </div>
 );

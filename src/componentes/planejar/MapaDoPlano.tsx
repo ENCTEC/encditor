@@ -33,7 +33,7 @@ import { GuiaDeGravacao } from "./GuiaDeGravacao";
 
 // O plano gerado, como um mapa: cada take com o prompt do Higgsfield e o
 // status (falta enviar / chegou), a narração e a música. Quando tudo
-// chega, o ENCeditor monta a edição sozinho.
+// chega, o encEditor monta a edição sozinho.
 
 const STATUS: Record<StatusItem, { rotulo: string; cor: string }> = {
   pendente: { rotulo: "falta enviar", cor: "border-spray text-spray" },
@@ -684,7 +684,7 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
                   ) : null}
                   {c.feito_no_enceditor ? (
                     <>
-                      <dt className="text-zinc-500">No ENCeditor</dt>
+                      <dt className="text-zinc-500">No encEditor</dt>
                       <dd>
                         {c.feito_no_enceditor}
                         {c.transicao_entrada

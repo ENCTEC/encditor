@@ -267,7 +267,7 @@ export const ModalResultado: React.FC<{
 
         <label className="mt-3 block">
           <span className="mb-1 block text-xs text-zinc-400">
-            Opinião sobre o visual dos clipes (o ENCeditor aprende com isso nos
+            Opinião sobre o visual dos clipes (o encEditor aprende com isso nos
             próximos roteiros)
           </span>
           <textarea

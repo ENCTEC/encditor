@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     nome = nomeDaUrl(corpo.data.url);
   } catch {
     return falha(
-      "Só arquivos enviados ao ENCeditor podem ser analisados.",
+      "Só arquivos enviados ao encEditor podem ser analisados.",
       400,
     );
   }

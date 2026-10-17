@@ -30,7 +30,7 @@ const mono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ENCeditor",
+  title: "encEditor",
   description: "Editor de vídeo com IA",
 };
 

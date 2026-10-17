@@ -97,13 +97,13 @@ export const cenaPlanoSchema = z.object({
   descricao: z.string(),
   duracao_s: z.number(),
   // Duração para gerar no Higgsfield (o mínimo que serve; ver
-  // verificarNarracao.ts — o ENCeditor estica em câmera lenta leve).
+  // verificarNarracao.ts — o encEditor estica em câmera lenta leve).
   duracao_gerar_s: z.number().nullable(),
   // Prompt pronto para o Higgsfield, com os @elementos.
   prompt_higgsfield: z.string().nullable(),
   elementos: z.array(z.string()),
   // O que é feito na geração (movimentos de câmera, efeitos complexos) e
-  // o que fica para o ENCeditor (cortes, zoom, transição, legenda).
+  // o que fica para o encEditor (cortes, zoom, transição, legenda).
   feito_no_higgsfield: z.string(),
   feito_no_enceditor: z.string(),
   // Som pedido no prompt (ex.: "barulho de avião passando") e como ele

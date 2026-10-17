@@ -3,7 +3,7 @@ import { lerCliente } from "@/servidor/banco";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
 import { obterAprendizados } from "@/servidor/planejador";
 
-// O que o ENCeditor aprendeu com os resultados e opiniões dos vídeos do
+// O que o encEditor aprendeu com os resultados e opiniões dos vídeos do
 // cliente (resumido pela IA; só refaz quando algum resultado muda).
 
 type Contexto = { params: Promise<{ id: string }> };

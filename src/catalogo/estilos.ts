@@ -116,7 +116,7 @@ export const ESTILOS_LEGENDA: ItemCatalogo<EstiloLegenda>[] = [
     nome: "Spray",
     descricao:
       "Texto pintado à mão em vermelho, que se desenha da esquerda para a direita.",
-    quandoUsar: "Estética urbana/zine, combina com a cara do ENCeditor.",
+    quandoUsar: "Estética urbana/zine, combina com a cara do encEditor.",
   },
   {
     id: "maquina",

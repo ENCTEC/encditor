@@ -1,7 +1,7 @@
-' Abre o ENCeditor sem nenhuma janela de terminal:
+' Abre o encEditor sem nenhuma janela de terminal:
 ' liga o porteiro escondido (se ja estiver ligado, ele mesmo sai) e abre o
 ' navegador em http://enceditor.localhost. O porteiro liga o app (tambem
-' escondido) e mostra "Ligando o ENCeditor..." ate ficar pronto.
+' escondido) e mostra "Ligando o encEditor..." ate ficar pronto.
 ' Usado pelo atalho da area de trabalho (node scripts/criar-atalho.mjs).
 Set shell = CreateObject("WScript.Shell")
 pasta = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)

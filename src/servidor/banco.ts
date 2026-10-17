@@ -4,7 +4,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Elemento } from "@/plano/elementos";
 
-// Banco de dados do ENCeditor: um arquivo SQLite (padrão dados/encditor.db),
+// Banco de dados do encEditor: um arquivo SQLite (padrão dados/encditor.db),
 // usando o SQLite que já vem no Node — sem serviço externo nem custo.
 //
 // Organização: CLIENTES (pastas) → PROJETOS (vídeos) + BANCO DE MÍDIA do

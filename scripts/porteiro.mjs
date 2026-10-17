@@ -1,10 +1,10 @@
 /* global process, console -- script do Node */
-// "Porteiro" do ENCeditor: programa levíssimo que fica sempre ligado (sobe
+// "Porteiro" do encEditor: programa levíssimo que fica sempre ligado (sobe
 // junto com o Windows) e atende em http://enceditor.localhost (porta 80).
 // - App ligado: repassa tudo para ele (porta 3000), inclusive o websocket
 //   de recarga do modo de desenvolvimento.
 // - App desligado: liga o app escondido (npm run dev) e mostra a tela
-//   "Ligando o ENCeditor…", que entra sozinha quando ele estiver pronto.
+//   "Ligando o encEditor…", que entra sozinha quando ele estiver pronto.
 // Assim basta abrir o endereço; não precisa do VS Code nem de terminal.
 //
 // Rodar na mão: node scripts/porteiro.mjs
@@ -77,18 +77,19 @@ const ligarApp = async () => {
 };
 
 const TELA_LIGANDO = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
-<title>Ligando o ENCeditor…</title><link rel="icon" href="data:,">
+<title>Ligando o encEditor…</title><link rel="icon" href="data:,">
 <style>
   body{margin:0;height:100vh;display:grid;place-items:center;background:#ebe8e1;color:#111110;font-family:Arial,sans-serif}
   .cartao{border:4px solid #111110;box-shadow:8px 8px 0 #111110;background:#ebe8e1;padding:32px 40px;text-align:center}
-  h1{font:900 44px/1 Impact,'Arial Narrow',sans-serif;text-transform:uppercase;margin:0;letter-spacing:.5px}
+  h1{font:900 48px/1 Impact,'Arial Narrow',sans-serif;margin:0;letter-spacing:.5px;border-bottom:6px solid #e1251b;display:inline-block}
+  h1 small{font:700 16px monospace;color:#777;letter-spacing:.1em;margin-right:2px}
   p{font:12px monospace;letter-spacing:.15em;text-transform:uppercase;color:#555;margin:14px 0 0}
   .spray{color:#e1251b;font-style:italic;transform:rotate(-6deg);display:inline-block;font-weight:700}
   .barra{margin-top:18px;height:10px;border:3px solid #111110;overflow:hidden}
   .barra i{display:block;height:100%;width:30%;background:#e1251b;animation:anda 1.1s infinite ease-in-out}
   @keyframes anda{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
 </style></head><body><div class="cartao">
-<h1>ENCeditor <span class="spray">edit!</span></h1>
+<h1><small>enc</small>Editor</h1>
 <p>Ligando o app… entra sozinho em alguns segundos</p>
 <div class="barra"><i></i></div></div>
 <script>
@@ -133,7 +134,7 @@ const servidor = http.createServer(async (pedido, resposta) => {
     resposta.end(
       pagina
         ? TELA_LIGANDO
-        : JSON.stringify({ erro: "O ENCeditor está ligando." }),
+        : JSON.stringify({ erro: "O encEditor está ligando." }),
     );
   });
   pedido.pipe(ida);
