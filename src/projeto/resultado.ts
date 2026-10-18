@@ -13,8 +13,10 @@ export const pagoSchema = z.object({
   tipo: z.enum(["conversas", "cliques"]),
   resultados: numero,
   ctr: numero, // %
-  custoPorResultado: numero, // R$ por conversa/clique
+  custoPorResultado: numero, // por conversa/clique, na moeda abaixo
   vendas: numero,
+  // Moeda da conta de anúncios (ISO 4217: "BRL", "USD"). Sem valor = BRL.
+  moeda: z.string().optional(),
 });
 
 export const organicoRedeSchema = z.object({
@@ -158,13 +160,25 @@ export const temPago = (p: ResultadoPago) =>
 export const temOrganico = (o: ResultadoOrganico) =>
   Object.values(o).some((v) => v !== null);
 
+// Valor em dinheiro na moeda da conta de anúncios ("R$ 1,50", "US$ 1.50").
+export const dinheiro = (valor: number, moeda = "BRL") => {
+  try {
+    return valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: moeda,
+    });
+  } catch {
+    return `${moeda} ${br(valor, 2)}`;
+  }
+};
+
 export const resumoPago = (p: ResultadoPago) => {
   const singular = p.tipo === "conversas" ? "conversa" : "clique";
   return [
     p.resultados !== null && `${br(p.resultados)} ${p.tipo}`,
     p.ctr !== null && `CTR ${br(p.ctr, 2)}%`,
     p.custoPorResultado !== null &&
-      `R$ ${br(p.custoPorResultado, 2)} por ${singular}`,
+      `${dinheiro(p.custoPorResultado, p.moeda)} por ${singular}`,
     p.vendas !== null && `${br(p.vendas)} venda${p.vendas === 1 ? "" : "s"}`,
   ]
     .filter(Boolean)

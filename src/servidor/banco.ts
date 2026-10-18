@@ -25,7 +25,7 @@ const global = globalThis as unknown as {
 
 // Suba este número ao criar tabelas/colunas: a conexão guardada (em
 // desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
-const VERSAO_ESQUEMA = 2;
+const VERSAO_ESQUEMA = 3;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -43,6 +43,14 @@ const migrar = (db: DatabaseSync) => {
   ]) {
     if (!existentes.includes(coluna)) {
       db.exec(`ALTER TABLE projetos ADD COLUMN ${coluna} ${tipo}`);
+    }
+  }
+
+  // Versão exportada ligada ao post/anúncio dela (métricas automáticas).
+  const deExportacoes = colunas(db, "exportacoes");
+  for (const coluna of ["vinculos", "metricas"]) {
+    if (!deExportacoes.includes(coluna)) {
+      db.exec(`ALTER TABLE exportacoes ADD COLUMN ${coluna} TEXT`);
     }
   }
 
@@ -149,6 +157,15 @@ const banco = () => {
       fonte TEXT NOT NULL,
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS conexoes (
+      cliente_id TEXT NOT NULL,
+      plataforma TEXT NOT NULL,
+      segredo TEXT NOT NULL,
+      info TEXT NOT NULL,
+      criado_em INTEGER NOT NULL,
+      atualizado_em INTEGER NOT NULL,
+      PRIMARY KEY (cliente_id, plataforma)
     );
   `);
   migrar(db);
@@ -412,12 +429,28 @@ export const salvarProxy = (original: string, proxy: string) => {
 // Cada função apaga as linhas do banco e devolve os nomes dos arquivos em
 // disco que ficaram sem uso (quem chama remove-os do armazenamento).
 
+// O MP4 de cada versão e as miniaturas guardadas ao ligá-la ao post/anúncio.
 const arquivosExportados = (onde: string, valor: string) =>
   (
     banco()
-      .prepare(`SELECT arquivo FROM exportacoes WHERE ${onde} = ?`)
-      .all(valor) as { arquivo: string }[]
-  ).map((l) => l.arquivo);
+      .prepare(`SELECT arquivo, vinculos FROM exportacoes WHERE ${onde} = ?`)
+      .all(valor) as { arquivo: string; vinculos: string | null }[]
+  ).flatMap((l) => {
+    const v = l.vinculos
+      ? (JSON.parse(l.vinculos) as {
+          instagram?: { miniatura?: string | null } | null;
+          anuncios?: { miniatura?: string | null }[];
+        })
+      : null;
+    const miniaturas = [
+      v?.instagram?.miniatura,
+      ...(v?.anuncios ?? []).map((a) => a.miniatura),
+    ]
+      .filter((u): u is string => !!u?.startsWith("/api/midia/"))
+      .map((u) => u.split("?")[0].split("/").pop() ?? "")
+      .filter(Boolean);
+    return [l.arquivo, ...miniaturas];
+  });
 
 const emTransacao = <T>(fazer: () => T): T => {
   const db = banco();
@@ -507,6 +540,7 @@ export const apagarCliente = (id: string) =>
     for (const p of projetos) apagarPlano.run(p);
     db.prepare("DELETE FROM elementos WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM aprendizados WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM conexoes WHERE cliente_id = ?").run(id);
     const apagarAnalise = db.prepare("DELETE FROM analises WHERE arquivo = ?");
     const apagarProxy = db.prepare(
       "DELETE FROM proxies WHERE original = ? OR proxy = ?",
@@ -536,6 +570,10 @@ export type Exportacao = {
   duracao: number;
   criadoEm: number;
   resultado: unknown;
+  // Post/anúncio em que a versão foi publicada (src/conexoes/vinculos.ts)
+  // e a última leitura automática das métricas.
+  vinculos: unknown;
+  metricas: unknown;
 };
 
 type LinhaExportacao = {
@@ -547,6 +585,8 @@ type LinhaExportacao = {
   duracao: number;
   criado_em: number;
   resultado: string | null;
+  vinculos: string | null;
+  metricas: string | null;
 };
 
 const paraExportacao = (l: LinhaExportacao): Exportacao => ({
@@ -558,6 +598,8 @@ const paraExportacao = (l: LinhaExportacao): Exportacao => ({
   duracao: l.duracao,
   criadoEm: l.criado_em,
   resultado: l.resultado ? JSON.parse(l.resultado) : null,
+  vinculos: l.vinculos ? JSON.parse(l.vinculos) : null,
+  metricas: l.metricas ? JSON.parse(l.metricas) : null,
 });
 
 export const registrarExportacao = (e: {
@@ -591,7 +633,7 @@ export const listarExportacoesDoCliente = (clienteId: string) =>
   (
     banco()
       .prepare(
-        `SELECT id, projeto_id, cliente_id, nome, arquivo, duracao, criado_em, resultado
+        `SELECT id, projeto_id, cliente_id, nome, arquivo, duracao, criado_em, resultado, vinculos, metricas
          FROM exportacoes WHERE cliente_id = ? ORDER BY criado_em DESC`,
       )
       .all(clienteId) as LinhaExportacao[]
@@ -607,7 +649,7 @@ export const contarExportacoes = (projetoId: string) =>
 export const lerExportacao = (id: string) => {
   const l = banco()
     .prepare(
-      `SELECT id, projeto_id, cliente_id, nome, arquivo, duracao, criado_em, resultado
+      `SELECT id, projeto_id, cliente_id, nome, arquivo, duracao, criado_em, resultado, vinculos, metricas
        FROM exportacoes WHERE id = ?`,
     )
     .get(id) as LinhaExportacao | undefined;
@@ -616,8 +658,20 @@ export const lerExportacao = (id: string) => {
 
 export const atualizarExportacao = (
   id: string,
-  mudancas: { nome?: string; resultado?: unknown },
+  mudancas: {
+    nome?: string;
+    resultado?: unknown;
+    vinculos?: unknown;
+    metricas?: unknown;
+  },
 ) => {
+  for (const coluna of ["vinculos", "metricas"] as const) {
+    const valor = mudancas[coluna];
+    if (valor === undefined) continue;
+    banco()
+      .prepare(`UPDATE exportacoes SET ${coluna} = ? WHERE id = ?`)
+      .run(valor === null ? null : JSON.stringify(valor), id);
+  }
   if (mudancas.nome !== undefined) {
     banco()
       .prepare("UPDATE exportacoes SET nome = ? WHERE id = ?")
@@ -768,3 +822,90 @@ export const salvarAprendizados = (
     )
     .run(clienteId, fonte, JSON.stringify(dados), Date.now());
 };
+
+// ---------- Conexões (contas do cliente para ler métricas) ----------
+// O segredo (token) chega aqui JÁ criptografado (src/servidor/segredos.ts);
+// "info" é o que pode aparecer na tela (nome, contas achadas, permissões).
+
+export type LinhaConexao = {
+  clienteId: string;
+  plataforma: string;
+  segredo: string;
+  info: unknown;
+  criadoEm: number;
+  atualizadoEm: number;
+};
+
+export const lerConexao = (
+  clienteId: string,
+  plataforma: string,
+): LinhaConexao | null => {
+  const l = banco()
+    .prepare("SELECT * FROM conexoes WHERE cliente_id = ? AND plataforma = ?")
+    .get(clienteId, plataforma) as
+    | {
+        cliente_id: string;
+        plataforma: string;
+        segredo: string;
+        info: string;
+        criado_em: number;
+        atualizado_em: number;
+      }
+    | undefined;
+  return l
+    ? {
+        clienteId: l.cliente_id,
+        plataforma: l.plataforma,
+        segredo: l.segredo,
+        info: JSON.parse(l.info),
+        criadoEm: l.criado_em,
+        atualizadoEm: l.atualizado_em,
+      }
+    : null;
+};
+
+export const salvarConexao = (
+  clienteId: string,
+  plataforma: string,
+  segredo: string,
+  info: unknown,
+) => {
+  const agora = Date.now();
+  banco()
+    .prepare(
+      `INSERT INTO conexoes (cliente_id, plataforma, segredo, info, criado_em, atualizado_em)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(cliente_id, plataforma) DO UPDATE SET
+         segredo = excluded.segredo, info = excluded.info, atualizado_em = excluded.atualizado_em`,
+    )
+    .run(clienteId, plataforma, segredo, JSON.stringify(info), agora, agora);
+};
+
+export const atualizarInfoDaConexao = (
+  clienteId: string,
+  plataforma: string,
+  info: unknown,
+) => {
+  banco()
+    .prepare(
+      "UPDATE conexoes SET info = ?, atualizado_em = ? WHERE cliente_id = ? AND plataforma = ?",
+    )
+    .run(JSON.stringify(info), Date.now(), clienteId, plataforma);
+};
+
+export const apagarConexao = (clienteId: string, plataforma: string) => {
+  banco()
+    .prepare("DELETE FROM conexoes WHERE cliente_id = ? AND plataforma = ?")
+    .run(clienteId, plataforma);
+};
+
+// Todas as conexões de uma plataforma (manutenção em segundo plano).
+export const listarConexoes = (plataforma: string) =>
+  (
+    banco()
+      .prepare("SELECT cliente_id, info FROM conexoes WHERE plataforma = ?")
+      .all(plataforma) as { cliente_id: string; info: string }[]
+  ).map((l) => ({
+    clienteId: l.cliente_id,
+    info: JSON.parse(l.info) as unknown,
+  }));

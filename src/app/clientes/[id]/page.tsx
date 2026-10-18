@@ -33,6 +33,8 @@ type Exportacao = {
   duracao: number;
   criadoEm: number;
   resultado: Resultado | null;
+  // Campos que a Meta preenche (versão ligada a post/anúncio).
+  metricas?: { automaticos?: { pago: string[]; instagram: string[] } } | null;
 };
 
 type Dados = {
@@ -410,6 +412,23 @@ export default function PaginaCliente() {
           </div>
         </section>
 
+        <section className="cartao-zine flex flex-wrap items-center gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="rotulo-zine mb-1">Resultados automáticos</h2>
+            <p className="text-sm text-zinc-500">
+              Ligue o Instagram e os anúncios da Meta deste cliente: os números
+              de cada vídeo entram sozinhos na aba Resultados (passo a passo,
+              sem aprovação da Meta).
+            </p>
+          </div>
+          <a
+            href={`/conectar?cliente=${id}`}
+            className="botao-spray !px-3 !py-1.5 !text-sm"
+          >
+            Conectar Instagram e anúncios
+          </a>
+        </section>
+
         <section>
           <h2 className="rotulo-zine mb-1">Banco de mídia ({banco.length})</h2>
           <p className="mb-3 text-sm text-zinc-500">
@@ -472,6 +491,9 @@ export default function PaginaCliente() {
         <ModalResultado
           nomeProjeto={`${nomeDoProjeto(resultadoDe.projetoId)} › ${resultadoDe.nome}`}
           atual={resultadoDe.resultado}
+          automatico={
+            resultadoDe.metricas?.automaticos ?? { pago: [], instagram: [] }
+          }
           aoSalvar={(r) => void salvarResultado(resultadoDe, r)}
           aoFechar={() => setResultadoDe(null)}
         />

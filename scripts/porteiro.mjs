@@ -68,7 +68,13 @@ const ligarApp = async () => {
   // .next/dev/logs/next-development.log.
   const app = spawn(
     process.execPath,
-    [path.join(PASTA, "node_modules", "next", "dist", "bin", "next"), "dev"],
+    // -H 127.0.0.1: o app só atende este computador (sem login ainda).
+    [
+      path.join(PASTA, "node_modules", "next", "dist", "bin", "next"),
+      "dev",
+      "-H",
+      "127.0.0.1",
+    ],
     { cwd: PASTA, windowsHide: true, stdio: ["ignore", saida, saida] },
   );
   fs.closeSync(saida);
@@ -168,8 +174,19 @@ servidor.on("error", (e) => {
   );
   process.exit(1);
 });
-servidor.listen(PORTA_PORTEIRO, () =>
+// Só no endereço local (IPv4 e IPv6): ninguém da rede chega ao encEditor,
+// que ainda não tem login.
+servidor.listen(PORTA_PORTEIRO, "127.0.0.1", () =>
   console.log(
     `[porteiro] atendendo em http://enceditor.localhost (app na porta ${PORTA_APP})`,
   ),
 );
+const servidorV6 = http.createServer((pedido, resposta) =>
+  servidor.emit("request", pedido, resposta),
+);
+servidorV6.on("upgrade", (pedido, socket, inicio) =>
+  servidor.emit("upgrade", pedido, socket, inicio),
+);
+// Sem IPv6 na máquina: tudo bem, o IPv4 basta.
+servidorV6.on("error", () => undefined);
+servidorV6.listen(PORTA_PORTEIRO, "::1");

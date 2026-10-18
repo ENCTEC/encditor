@@ -43,11 +43,16 @@ const CampoNumero: React.FC<{
   valor: number | null;
   aoMudar: (n: number | null) => void;
   dica?: string;
-}> = ({ rotulo, valor, aoMudar, dica }) => {
+  // Preenchido sozinho pela Meta: não se edita aqui.
+  daMeta?: boolean;
+}> = ({ rotulo, valor, aoMudar, dica, daMeta }) => {
   const [texto, setTexto] = useState(paraTexto(valor));
   return (
     <label className="block">
-      <span className="mb-1 block text-xs text-zinc-400">{rotulo}</span>
+      <span className="mb-1 block text-xs text-zinc-400">
+        {rotulo}
+        {daMeta ? <span className="text-verde"> · da Meta</span> : null}
+      </span>
       <input
         value={texto}
         onChange={(e) => {
@@ -56,10 +61,25 @@ const CampoNumero: React.FC<{
         }}
         inputMode="decimal"
         placeholder={dica}
-        className={campo}
+        disabled={daMeta}
+        title={daMeta ? "Vem sozinho da Meta" : undefined}
+        className={`${campo} disabled:opacity-60`}
       />
     </label>
   );
+};
+
+// Símbolo da moeda da conta de anúncios ("R$", "US$").
+const simboloDa = (moeda = "BRL") => {
+  try {
+    return (
+      new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda })
+        .formatToParts(0)
+        .find((p) => p.type === "currency")?.value ?? "R$"
+    );
+  } catch {
+    return "R$";
+  }
 };
 
 const Marcador: React.FC<{ ligado: boolean }> = ({ ligado }) =>
@@ -72,7 +92,12 @@ export const ModalResultado: React.FC<{
   atual: Resultado | null;
   aoSalvar: (resultado: Resultado | null) => void;
   aoFechar: () => void;
-}> = ({ nomeProjeto, atual, aoSalvar, aoFechar }) => {
+  // Campos preenchidos sozinhos pela Meta (versão ligada a post/anúncio).
+  automatico?: { pago: string[]; instagram: string[] };
+}> = ({ nomeProjeto, atual, aoSalvar, aoFechar, automatico }) => {
+  const daMetaPago = (campo: string) => !!automatico?.pago.includes(campo);
+  const daMetaInstagram = (campo: string) =>
+    !!automatico?.instagram.includes(campo);
   const [r, setR] = useState<Resultado>(atual ?? resultadoVazio());
   const [secao, setSecao] = useState<"pago" | "organico">(
     atual &&
@@ -93,6 +118,8 @@ export const ModalResultado: React.FC<{
     }));
   const singular = r.pago.tipo === "conversas" ? "conversa" : "clique";
   const o = r.organico[rede];
+  const daMetaNaRede = (campo: string) =>
+    rede === "instagram" && daMetaInstagram(campo);
 
   return (
     <div
@@ -108,6 +135,15 @@ export const ModalResultado: React.FC<{
         <p className="mt-1 font-mono text-[11px] tracking-wider text-zinc-500 uppercase">
           {nomeProjeto}
         </p>
+        {automatico &&
+        (automatico.pago.length || automatico.instagram.length) ? (
+          <p className="mt-3 border-l-4 border-verde pl-2 text-xs">
+            Os campos marcados “da Meta” são preenchidos sozinhos e não se
+            editam aqui. Os outros — como Vendas quando o anúncio não rastreia
+            compras e Seguidores de reel —, a avaliação, a anotação, o visual e
+            o TikTok são seus.
+          </p>
+        ) : null}
 
         <p className="rotulo-zine mt-5 mb-2">Esse vídeo deu resultado?</p>
         <div className="grid grid-cols-3 gap-2">
@@ -163,6 +199,7 @@ export const ModalResultado: React.FC<{
                 {(["conversas", "cliques"] as const).map((t) => (
                   <button
                     key={t}
+                    disabled={daMetaPago("tipo")}
                     onClick={() => mudarPago({ tipo: t })}
                     className={`border-2 border-tinta px-2 py-0.5 font-mono uppercase ${
                       r.pago.tipo === t ? "bg-tinta text-papel" : ""
@@ -178,24 +215,28 @@ export const ModalResultado: React.FC<{
                   rotulo={r.pago.tipo === "conversas" ? "Conversas" : "Cliques"}
                   valor={r.pago.resultados}
                   aoMudar={(n) => mudarPago({ resultados: n })}
+                  daMeta={daMetaPago("resultados")}
                 />
                 <CampoNumero
                   rotulo="CTR (%)"
                   valor={r.pago.ctr}
                   aoMudar={(n) => mudarPago({ ctr: n })}
                   dica="ex.: 1,8"
+                  daMeta={daMetaPago("ctr")}
                 />
                 <CampoNumero
                   key={`custo-${r.pago.tipo}`}
-                  rotulo={`Custo por ${singular} (R$)`}
+                  rotulo={`Custo por ${singular} (${simboloDa(r.pago.moeda)})`}
                   valor={r.pago.custoPorResultado}
                   aoMudar={(n) => mudarPago({ custoPorResultado: n })}
                   dica="ex.: 3,20"
+                  daMeta={daMetaPago("custoPorResultado")}
                 />
                 <CampoNumero
                   rotulo="Vendas"
                   valor={r.pago.vendas}
                   aoMudar={(n) => mudarPago({ vendas: n })}
+                  daMeta={daMetaPago("vendas")}
                 />
               </div>
             </div>
@@ -219,31 +260,37 @@ export const ModalResultado: React.FC<{
                   rotulo="Visualizações"
                   valor={o.visualizacoes}
                   aoMudar={(n) => mudarRede({ visualizacoes: n })}
+                  daMeta={daMetaNaRede("visualizacoes")}
                 />
                 <CampoNumero
                   rotulo="Curtidas"
                   valor={o.curtidas}
                   aoMudar={(n) => mudarRede({ curtidas: n })}
+                  daMeta={daMetaNaRede("curtidas")}
                 />
                 <CampoNumero
                   rotulo="Comentários"
                   valor={o.comentarios}
                   aoMudar={(n) => mudarRede({ comentarios: n })}
+                  daMeta={daMetaNaRede("comentarios")}
                 />
                 <CampoNumero
                   rotulo="Compartilhamentos"
                   valor={o.compartilhamentos}
                   aoMudar={(n) => mudarRede({ compartilhamentos: n })}
+                  daMeta={daMetaNaRede("compartilhamentos")}
                 />
                 <CampoNumero
                   rotulo="Salvamentos"
                   valor={o.salvamentos}
                   aoMudar={(n) => mudarRede({ salvamentos: n })}
+                  daMeta={daMetaNaRede("salvamentos")}
                 />
                 <CampoNumero
                   rotulo="Seguidores ganhos"
                   valor={o.seguidores}
                   aoMudar={(n) => mudarRede({ seguidores: n })}
+                  daMeta={daMetaNaRede("seguidores")}
                 />
               </div>
             </div>

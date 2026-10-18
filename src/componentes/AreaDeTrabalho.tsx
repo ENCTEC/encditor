@@ -15,8 +15,8 @@ export const AreaDeTrabalho: React.FC<{ children: React.ReactNode }> = ({
   const caminho = usePathname();
   // Telas de clientes e de resultados não editam o vídeo; o Planejar tem a
   // sua própria conversa (com a IA planejadora).
-  const semChat = ["/clientes", "/planejar", "/resultados"].some((p) =>
-    caminho.startsWith(p),
+  const semChat = ["/clientes", "/planejar", "/resultados", "/conectar"].some(
+    (p) => caminho.startsWith(p),
   );
   const { carregado } = useProjeto();
   const [chatAberto, setChatAberto] = useState(true);
