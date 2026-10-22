@@ -18,6 +18,7 @@ export type PassoTutorial = {
   minutos: number;
   // "Pule se…" (quando já está feito).
   pule?: string;
+  // "{app}" na url = ID do app (passo 7); sem ele, abre a lista de apps.
   links: { rotulo: string; url: string }[];
   // O que fazer, em ordem.
   fazer: string[];
@@ -26,6 +27,24 @@ export type PassoTutorial = {
   problemas: { sintoma: string; solucao: string }[];
   // Passo especial que mostra o formulário de colar a chave.
   formulario?: boolean;
+  // Textos para copiar com um clique ({nomeApp}, {appId}).
+  copiar?: { rotulo: string; valor: string }[];
+  // Mostra o campo para guardar o ID do app (usado nos links dos próximos).
+  pedirIdDoApp?: boolean;
+};
+
+// Nome sugerido para o app: sem acentos e sem as palavras que a Meta recusa.
+export const nomeDoApp = (marca: string) => {
+  const limpo = marca
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/face|book|insta|gram/gi, "")
+    .replace(/[^A-Za-z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 24)
+    .trim();
+  return `Metricas ${limpo || "Marca"}`;
 };
 
 const PORTFOLIO_CERTO =
@@ -166,6 +185,14 @@ export const PASSOS_META: PassoTutorial[] = [
     pule: "as três já aparecem nas listas de Contas do portfólio da marca.",
     links: [
       {
+        rotulo: "Páginas",
+        url: "https://business.facebook.com/settings/pages",
+      },
+      {
+        rotulo: "Contas de anúncios",
+        url: "https://business.facebook.com/settings/ad-accounts",
+      },
+      {
         rotulo: "Configurações do negócio",
         url: "https://business.facebook.com/settings",
       },
@@ -245,6 +272,8 @@ export const PASSOS_META: PassoTutorial[] = [
     ],
     confira:
       "Abre o painel do app, com o ID do app (App ID) no topo. É normal NÃO ver a chave Desenvolvimento/Ao vivo.",
+    copiar: [{ rotulo: "Nome do app", valor: "{nomeApp}" }],
+    pedirIdDoApp: true,
     problemas: [
       {
         sintoma: "Aparece limite de apps.",
@@ -264,7 +293,10 @@ export const PASSOS_META: PassoTutorial[] = [
       "É ela que libera a leitura dos anúncios e permite criar a chave do usuário do sistema (vale também para ler o Instagram).",
     minutos: 3,
     links: [
-      { rotulo: "Meus apps", url: "https://developers.facebook.com/apps" },
+      {
+        rotulo: "Painel do seu app",
+        url: "https://developers.facebook.com/apps/{app}/dashboard/",
+      },
     ],
     fazer: [
       "No painel do app → Adicionar produto (Add product) → API de Marketing (Marketing API) → Configurar (Set up).",
@@ -287,7 +319,10 @@ export const PASSOS_META: PassoTutorial[] = [
     porque: "Libera as permissões de ler os posts e as métricas do Instagram.",
     minutos: 3,
     links: [
-      { rotulo: "Meus apps", url: "https://developers.facebook.com/apps" },
+      {
+        rotulo: "Painel do seu app",
+        url: "https://developers.facebook.com/apps/{app}/dashboard/",
+      },
     ],
     fazer: [
       "No painel do app → Adicionar produto → Instagram → Configurar → “Configuração da API com login do Facebook” (API setup with Facebook login).",
@@ -310,7 +345,16 @@ export const PASSOS_META: PassoTutorial[] = [
     porque:
       "Publicar, pedir análise ou verificar a empresa só é exigido de apps que acessam contas de OUTRAS empresas.",
     minutos: 2,
-    links: [],
+    links: [
+      {
+        rotulo: "Configurações avançadas do app",
+        url: "https://developers.facebook.com/apps/{app}/settings/advanced/",
+      },
+      {
+        rotulo: "Chave secreta (Básico)",
+        url: "https://developers.facebook.com/apps/{app}/settings/basic/",
+      },
+    ],
     fazer: [
       "NÃO clique em Publicar / Ficar ao vivo (Publish / Go live), Enviar para análise (Submit for review), Verificação da empresa nem Acesso avançado.",
       "Não precisa preencher política de privacidade, ícone nem categoria.",
@@ -333,6 +377,10 @@ export const PASSOS_META: PassoTutorial[] = [
     minutos: 2,
     links: [
       {
+        rotulo: "Apps do portfólio",
+        url: "https://business.facebook.com/settings/apps",
+      },
+      {
         rotulo: "Configurações do negócio",
         url: "https://business.facebook.com/settings",
       },
@@ -347,6 +395,7 @@ export const PASSOS_META: PassoTutorial[] = [
     ],
     confira: "O app aparece em Contas → Apps do portfólio da marca.",
     problemas: [],
+    copiar: [{ rotulo: "ID do app", valor: "{appId}" }],
   },
   {
     id: "usuario-do-sistema",
@@ -369,6 +418,7 @@ export const PASSOS_META: PassoTutorial[] = [
     ],
     confira:
       "O usuário encEditor aparece na lista de Usuários do sistema, como Funcionário.",
+    copiar: [{ rotulo: "Nome", valor: "encEditor" }],
     problemas: [
       {
         sintoma: "O botão Adicionar não aparece ou está cinza.",
@@ -418,7 +468,19 @@ export const PASSOS_META: PassoTutorial[] = [
         rotulo: "Usuários do sistema",
         url: "https://business.facebook.com/settings/system-users",
       },
+      {
+        rotulo: "Depurador de token (conferir)",
+        url: "https://developers.facebook.com/tools/debug/accesstoken/",
+      },
     ],
+    copiar: [
+      "ads_read",
+      "business_management",
+      "pages_show_list",
+      "pages_read_engagement",
+      "instagram_basic",
+      "instagram_manage_insights",
+    ].map((p) => ({ rotulo: p, valor: p })),
     fazer: [
       "ℹ A página dos usuários do sistema mostra um aviso dizendo que eles só geram chaves para permissões aprovadas na Análise do App (System Users can only generate access tokens for permissions their app has been granted through App Review). Ele aparece para todo mundo: ignore e NÃO envie o app para análise.",
       "⚠ Use só o botão desta página. Os botões de gerar token do painel do app (Ferramentas / Tools) e o Explorador da API dão chaves PESSOAIS, que vencem.",

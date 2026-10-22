@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   FormularioChave,
   ResumoConexao,
   useConexaoMeta,
 } from "@/componentes/conexoes/ConexaoMeta";
+import { DemoAnimada } from "@/componentes/conexoes/DemoAnimada";
+import { DEMOS_META } from "@/conexoes/demosMeta";
 import {
   ANTES_DE_COMECAR,
+  nomeDoApp,
   PASSOS_META,
   PassoTutorial,
   PROBLEMAS_COMUNS,
@@ -17,11 +20,13 @@ import { useProjeto } from "@/projeto/ProjetoProvider";
 
 // Passo a passo, do zero, para ligar o Instagram e os anúncios da Meta ao
 // encEditor com um app do próprio cliente (sem análise da Meta). Vale para
-// o cliente do projeto aberto, ou outro por ?cliente=<id>. Os passos
-// marcados ficam guardados neste navegador.
+// o cliente do projeto aberto, ou outro por ?cliente=<id>. Cada passo tem
+// um desenho animado mostrando onde clicar (DemoAnimada). Os passos
+// marcados e o ID do app ficam guardados neste navegador.
 
 const chaveDoProgresso = (cliente: string) =>
   `encditor:tutorial-meta:${cliente}`;
+const chaveDoApp = (cliente: string) => `encditor:tutorial-meta:${cliente}:app`;
 
 const lerProgresso = (cliente: string): string[] => {
   try {
@@ -30,6 +35,90 @@ const lerProgresso = (cliente: string): string[] => {
   } catch {
     return [];
   }
+};
+
+const lerIdDoApp = (cliente: string) => {
+  try {
+    return localStorage.getItem(chaveDoApp(cliente)) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+// ID do app completo o bastante para montar links.
+const idValido = (id: string) => /^\d{6,25}$/.test(id);
+
+// Endereços da Meta e "passo N" viram links no texto.
+const PADRAO_LINKS =
+  /((?:[a-z]+\.)*(?:facebook|instagram)\.com(?:\/[\w\-/]*)?)|\bpasso (\d{1,2})\b/g;
+
+const ComLinks: React.FC<{
+  texto: string;
+  irParaPasso: (id: string) => void;
+}> = ({ texto, irParaPasso }) => {
+  const partes: React.ReactNode[] = [];
+  let ultimo = 0;
+  for (const m of texto.matchAll(PADRAO_LINKS)) {
+    const i = m.index ?? 0;
+    partes.push(texto.slice(ultimo, i));
+    const passo = m[2] ? PASSOS_META[Number(m[2]) - 1] : null;
+    partes.push(
+      m[1] ? (
+        <a
+          key={i}
+          href={`https://${m[1]}`}
+          target="_blank"
+          rel="noreferrer"
+          className="text-spray underline"
+        >
+          {m[1]}
+        </a>
+      ) : passo ? (
+        <button
+          key={i}
+          type="button"
+          onClick={() => irParaPasso(passo.id)}
+          className="text-spray underline"
+        >
+          {m[0]}
+        </button>
+      ) : (
+        m[0]
+      ),
+    );
+    ultimo = i + m[0].length;
+  }
+  partes.push(texto.slice(ultimo));
+  return (
+    <>
+      {partes.map((p, i) => (
+        <Fragment key={i}>{p}</Fragment>
+      ))}
+    </>
+  );
+};
+
+const BotaoCopiar: React.FC<{ rotulo: string; valor: string }> = ({
+  rotulo,
+  valor,
+}) => {
+  const [copiado, setCopiado] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard.writeText(valor).then(() => {
+          setCopiado(true);
+          setTimeout(() => setCopiado(false), 1500);
+        });
+      }}
+      className="border-2 border-tinta bg-papel px-2 py-0.5 font-mono text-[11px] hover:bg-tinta hover:text-papel"
+      title={`Copiar ${valor}`}
+    >
+      {rotulo === valor ? valor : `${rotulo}: ${valor}`}{" "}
+      {copiado ? "✓ copiado" : "⧉"}
+    </button>
+  );
 };
 
 const Passo: React.FC<{
@@ -42,6 +131,11 @@ const Passo: React.FC<{
   children?: React.ReactNode;
   // Ajusta links internos (ex.: Resultados do cliente certo).
   link: (url: string) => string;
+  irParaPasso: (id: string) => void;
+  // Valores dos marcadores dos desenhos e dos textos de copiar.
+  valores: Record<string, string>;
+  idDoApp: string;
+  aoMudarIdDoApp: (id: string) => void;
 }> = ({
   numero,
   passo,
@@ -51,98 +145,218 @@ const Passo: React.FC<{
   aoMarcar,
   children,
   link,
-}) => (
-  <article
-    id={`passo-${passo.id}`}
-    className={`cartao-zine scroll-mt-4 ${feito ? "opacity-70" : ""}`}
-  >
-    <header className="flex items-start gap-3 p-3">
-      <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center border-2 border-tinta font-display text-xl ${
-          feito ? "bg-verde text-papel" : "bg-papel"
-        }`}
-      >
-        {feito ? "✓" : numero}
-      </span>
-      <button onClick={aoAlternar} className="min-w-0 flex-1 text-left">
-        <h2 className="font-display text-2xl leading-none uppercase">
-          {passo.titulo}
-        </h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          ~{passo.minutos} min · {passo.porque}
-        </p>
-      </button>
-      <label className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] uppercase">
-        <input
-          type="checkbox"
-          checked={feito}
-          onChange={(e) => aoMarcar(e.target.checked)}
-        />
-        feito
-      </label>
-    </header>
-    {aberto ? (
-      <div className="space-y-3 border-t-2 border-tinta p-4">
-        {passo.pule ? (
-          <p className="text-sm text-zinc-500">
-            <b>Pule este passo se</b> {passo.pule}
+  irParaPasso,
+  valores,
+  idDoApp,
+  aoMudarIdDoApp,
+}) => {
+  const demo = DEMOS_META[passo.id];
+  const [itemAtual, setItemAtual] = useState<number | null>(null);
+  const [pedido, setPedido] = useState<{ item: number; vez: number } | null>(
+    null,
+  );
+  const comDesenho = new Set(demo?.map((q) => q.item));
+  const temId = idValido(idDoApp);
+  const urlDe = (url: string) =>
+    url.includes("{app}")
+      ? temId
+        ? url.replace("{app}", idDoApp)
+        : "https://developers.facebook.com/apps/"
+      : link(url);
+  const precisaDoId = passo.links.some((l) => l.url.includes("{app}"));
+  const copiaveis = (passo.copiar ?? [])
+    .map((c) => ({
+      rotulo: c.rotulo,
+      valor:
+        c.valor === "{appId}" && !temId
+          ? ""
+          : c.valor.replace(/\{(\w+)\}/g, (m, k: string) => valores[k] ?? m),
+    }))
+    .filter((c) => c.valor);
+
+  return (
+    <article
+      id={`passo-${passo.id}`}
+      className={`cartao-zine scroll-mt-4 ${feito ? "opacity-70" : ""}`}
+    >
+      <header className="flex items-start gap-3 p-3">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center border-2 border-tinta font-display text-xl ${
+            feito ? "bg-verde text-papel" : "bg-papel"
+          }`}
+        >
+          {feito ? "✓" : numero}
+        </span>
+        <button onClick={aoAlternar} className="min-w-0 flex-1 text-left">
+          <h2 className="font-display text-2xl leading-none uppercase">
+            {passo.titulo}
+          </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            ~{passo.minutos} min · {passo.porque}
+            {demo ? " · ▶ com desenho de onde clicar" : ""}
           </p>
-        ) : null}
-        {passo.links.length ? (
-          <div className="flex flex-wrap gap-2">
-            {passo.links.map((l) => (
-              <a
-                key={l.url}
-                href={link(l.url)}
-                target={l.url.startsWith("/") ? undefined : "_blank"}
-                rel="noreferrer"
-                className="border-2 border-tinta px-2 py-1 font-mono text-[11px] uppercase hover:bg-tinta hover:text-papel"
-              >
-                ↗ {l.rotulo}
-              </a>
-            ))}
-          </div>
-        ) : null}
-        <ol className="list-decimal space-y-1.5 pl-5 text-sm">
-          {passo.fazer.map((f, i) =>
-            // Alerta (⚠) e explicação (ℹ) não são ações: sem número
-            // ("block" tira o item da contagem da lista).
-            f.startsWith("⚠") || f.startsWith("ℹ") ? (
-              <li
-                key={i}
-                className={`-ml-5 block list-none border-l-4 py-1 pr-2 pl-2 ${
-                  f.startsWith("⚠")
-                    ? "border-spray bg-spray/10"
-                    : "border-zinc-500 bg-zinc-900/40"
-                }`}
-              >
-                {f}
-              </li>
-            ) : (
-              <li key={i}>{f}</li>
-            ),
-          )}
-        </ol>
-        {children}
-        <p className="border-l-4 border-verde pl-3 text-sm">
-          <b>Deu certo se:</b> {passo.confira}
-        </p>
-        {passo.problemas.length ? (
-          <div className="space-y-1">
-            <p className="rotulo-zine">Se der errado</p>
-            <ul className="space-y-1 text-sm">
-              {passo.problemas.map((p, i) => (
-                <li key={i}>
-                  <b>{p.sintoma}</b> {p.solucao}
+        </button>
+        <label className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] uppercase">
+          <input
+            type="checkbox"
+            checked={feito}
+            onChange={(e) => aoMarcar(e.target.checked)}
+          />
+          feito
+        </label>
+      </header>
+      {aberto ? (
+        <div className="space-y-3 border-t-2 border-tinta p-4">
+          {passo.pule ? (
+            <p className="text-sm text-zinc-500">
+              <b>Pule este passo se</b>{" "}
+              <ComLinks texto={passo.pule} irParaPasso={irParaPasso} />
+            </p>
+          ) : null}
+          {passo.links.length ? (
+            <div className="space-y-1">
+              <div className="flex flex-wrap gap-2">
+                {passo.links.map((l, i) => (
+                  <a
+                    key={l.url}
+                    href={urlDe(l.url)}
+                    target={l.url.startsWith("/") ? undefined : "_blank"}
+                    rel="noreferrer"
+                    className={
+                      i === 0
+                        ? "botao-spray !px-3 !py-1.5 !text-sm"
+                        : "border-2 border-tinta px-3 py-1.5 font-mono text-[11px] uppercase hover:bg-tinta hover:text-papel"
+                    }
+                  >
+                    Abrir {l.rotulo} ↗
+                  </a>
+                ))}
+              </div>
+              {precisaDoId && !temId ? (
+                <p className="text-xs text-zinc-500">
+                  Dica: cole o ID do app no{" "}
+                  <button
+                    type="button"
+                    onClick={() => irParaPasso("criar-app")}
+                    className="text-spray underline"
+                  >
+                    passo 7
+                  </button>{" "}
+                  e este botão abre direto a tela do SEU app (sem ele, abre a
+                  lista de apps).
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          {demo ? (
+            <div className="space-y-1">
+              <p className="flex flex-wrap items-baseline justify-between gap-x-3">
+                <span className="rotulo-zine">Veja onde clicar</span>
+                <span className="text-[11px] text-zinc-500">
+                  desenho simplificado — a tela da Meta pode estar um pouco
+                  diferente
+                </span>
+              </p>
+              <DemoAnimada
+                quadros={demo}
+                valores={valores}
+                pedido={pedido}
+                aoMudarItem={setItemAtual}
+              />
+            </div>
+          ) : null}
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm">
+            {passo.fazer.map((f, i) => {
+              const noDesenho = itemAtual === i;
+              const verNoDesenho = comDesenho.has(i) ? (
+                <button
+                  type="button"
+                  onClick={() => setPedido({ item: i, vez: Date.now() })}
+                  className="ml-1.5 font-mono text-[10px] text-spray uppercase underline"
+                  title="Mostrar esta ação no desenho"
+                >
+                  ▶ ver
+                </button>
+              ) : null;
+              // Alerta (⚠) e explicação (ℹ) não são ações: sem número
+              // ("block" tira o item da contagem da lista).
+              return f.startsWith("⚠") || f.startsWith("ℹ") ? (
+                <li
+                  key={i}
+                  className={`-ml-5 block list-none border-l-4 py-1 pr-2 pl-2 ${
+                    f.startsWith("⚠")
+                      ? "border-spray bg-spray/10"
+                      : "border-zinc-500 bg-zinc-900/40"
+                  } ${noDesenho ? "outline-2 outline-spray" : ""}`}
+                >
+                  <ComLinks texto={f} irParaPasso={irParaPasso} />
+                  {verNoDesenho}
                 </li>
+              ) : (
+                <li
+                  key={i}
+                  className={`-mx-1 px-1 transition-colors ${
+                    noDesenho ? "bg-spray/15 outline-2 outline-spray" : ""
+                  }`}
+                >
+                  <ComLinks texto={f} irParaPasso={irParaPasso} />
+                  {verNoDesenho}
+                </li>
+              );
+            })}
+          </ol>
+          {copiaveis.length ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rotulo-zine">Copiar</span>
+              {copiaveis.map((c) => (
+                <BotaoCopiar key={c.rotulo} rotulo={c.rotulo} valor={c.valor} />
               ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-    ) : null}
-  </article>
-);
+            </div>
+          ) : null}
+          {passo.pedirIdDoApp ? (
+            <label className="block space-y-1 border-2 border-dashed border-tinta p-3 text-sm">
+              <b>ID do app (App ID)</b> — fica no topo do painel do app. Cole
+              aqui: os botões dos próximos passos passam a abrir direto as telas
+              do SEU app.
+              <span className="flex flex-wrap items-center gap-2">
+                <input
+                  value={idDoApp}
+                  onChange={(e) =>
+                    aoMudarIdDoApp(e.target.value.replace(/\D/g, ""))
+                  }
+                  inputMode="numeric"
+                  placeholder="ex.: 1234567890123456"
+                  className="w-64 border-2 border-tinta bg-papel px-2 py-1 font-mono text-sm"
+                />
+                {temId ? (
+                  <span className="text-xs text-verde">✓ guardado</span>
+                ) : null}
+              </span>
+            </label>
+          ) : null}
+          {children}
+          <p className="border-l-4 border-verde pl-3 text-sm">
+            <b>Deu certo se:</b>{" "}
+            <ComLinks texto={passo.confira} irParaPasso={irParaPasso} />
+          </p>
+          {passo.problemas.length ? (
+            <div className="space-y-1">
+              <p className="rotulo-zine">Se der errado</p>
+              <ul className="space-y-1 text-sm">
+                {passo.problemas.map((p, i) => (
+                  <li key={i}>
+                    <b>{p.sintoma}</b>{" "}
+                    <ComLinks texto={p.solucao} irParaPasso={irParaPasso} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </article>
+  );
+};
 
 export default function PaginaConectar() {
   const { carregado, meta } = useProjeto();
@@ -151,6 +365,7 @@ export default function PaginaConectar() {
   const [feitos, setFeitos] = useState<string[]>([]);
   const [abertos, setAbertos] = useState<string[] | null>(null);
   const [trocando, setTrocando] = useState(false);
+  const [idDoApp, setIdDoApp] = useState("");
 
   // ?cliente=<id> (vindo da página do cliente) ou o do projeto aberto.
   useEffect(() => {
@@ -171,8 +386,32 @@ export default function PaginaConectar() {
   }, [clienteId, doEndereco, meta]);
 
   useEffect(() => {
-    if (clienteId) setFeitos(lerProgresso(clienteId));
+    if (!clienteId) return;
+    setFeitos(lerProgresso(clienteId));
+    setIdDoApp(lerIdDoApp(clienteId));
   }, [clienteId]);
+
+  const mudarIdDoApp = (id: string) => {
+    setIdDoApp(id);
+    if (!clienteId) return;
+    try {
+      localStorage.setItem(chaveDoApp(clienteId), id);
+    } catch {
+      // sem armazenamento local: o ID só não fica guardado
+    }
+  };
+
+  // Marcadores dos desenhos: a marca do cliente (a pasta padrão não tem).
+  const marca =
+    clienteId === "geral" || !nomeCliente ? "Sua Marca" : nomeCliente;
+  const valores = useMemo(
+    () => ({
+      marca,
+      nomeApp: nomeDoApp(marca),
+      appId: idValido(idDoApp) ? idDoApp : "1234567890",
+    }),
+    [marca, idDoApp],
+  );
 
   const { situacao, setSituacao } = useConexaoMeta(clienteId);
   const conectado = !!situacao?.conectado && !situacao.ilegivel;
@@ -350,6 +589,12 @@ export default function PaginaConectar() {
           <p>
             <b>Tempo:</b> {ANTES_DE_COMECAR.tempo}
           </p>
+          <p className="border-l-4 border-spray pl-3">
+            <b>Como usar esta página:</b> abra o passo, clique no botão vermelho
+            “Abrir… ↗” (a tela da Meta abre em outra aba) e siga o desenho, que
+            mostra onde clicar. Terminou? Marque “feito” e o próximo passo abre
+            sozinho.
+          </p>
           <div>
             <b>Separe:</b>
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
@@ -359,7 +604,10 @@ export default function PaginaConectar() {
             </ul>
           </div>
           <p className="border-l-4 border-spray pl-3">
-            {ANTES_DE_COMECAR.agencia}
+            <ComLinks
+              texto={ANTES_DE_COMECAR.agencia}
+              irParaPasso={irParaPasso}
+            />
           </p>
           <p className="text-zinc-500">{ANTES_DE_COMECAR.idioma}</p>
         </section>
@@ -375,6 +623,10 @@ export default function PaginaConectar() {
               aoAlternar={() => alternar(p.id)}
               aoMarcar={(f) => marcar(p.id, f)}
               link={link}
+              irParaPasso={irParaPasso}
+              valores={valores}
+              idDoApp={idDoApp}
+              aoMudarIdDoApp={mudarIdDoApp}
             >
               {p.formulario ? formulario : null}
             </Passo>
@@ -386,7 +638,8 @@ export default function PaginaConectar() {
           <ul className="space-y-2 text-sm">
             {PROBLEMAS_COMUNS.map((p) => (
               <li key={p.sintoma}>
-                <b>{p.sintoma}</b> {p.solucao}
+                <b>{p.sintoma}</b>{" "}
+                <ComLinks texto={p.solucao} irParaPasso={irParaPasso} />
               </li>
             ))}
           </ul>

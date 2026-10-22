@@ -121,3 +121,50 @@ body {
     @apply font-mono text-[11px] tracking-[0.18em] text-zinc-500 uppercase;
   }
 }
+
+/* Tutorial da Meta: desenho animado "onde clicar" (DemoAnimada). */
+@keyframes demo-clique {
+  from {
+    transform: scale(0.3);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+.demo-clique {
+  animation: demo-clique 600ms ease-out forwards;
+}
+@keyframes demo-janela {
+  from {
+    opacity: 0;
+  }
+}
+.demo-janela {
+  animation: demo-janela 220ms ease-out;
+}
+@keyframes demo-pulsa {
+  50% {
+    outline-color: transparent;
+  }
+}
+.demo-pulsa {
+  animation: demo-pulsa 700ms ease-in-out infinite;
+}
+@keyframes demo-caret {
+  50% {
+    opacity: 0;
+  }
+}
+.demo-caret {
+  animation: demo-caret 800ms step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-clique,
+  .demo-janela,
+  .demo-pulsa,
+  .demo-caret {
+    animation: none;
+  }
+}
