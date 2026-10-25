@@ -39,7 +39,6 @@ export const Efeitos: React.FC<{
   const { fps, width, height } = useVideoConfig();
   const t = frame / fps;
   const ativos = efeitos.filter((e) => t >= e.inicio && t < e.fim);
-  if (!ativos.length) return <AbsoluteFill>{children}</AbsoluteFill>;
 
   const menor = Math.min(width, height);
   const filtros: string[] = [];
@@ -218,13 +217,19 @@ export const Efeitos: React.FC<{
   const folga =
     1 + (2 * (Math.abs(dx) + Math.abs(dy))) / menor + Math.abs(giro) * 0.012;
 
+  // Mesma estrutura com ou sem efeito (só o estilo muda): se o conteúdo
+  // mudasse de lugar, o React recriaria os vídeos e o preview piscaria.
   return (
     <AbsoluteFill>
       <AbsoluteFill
-        style={{
-          transform: `translate(${dx}px, ${dy}px) rotate(${giro}deg) scale(${escala * folga})`,
-          filter: filtros.length ? filtros.join(" ") : undefined,
-        }}
+        style={
+          ativos.length === 0
+            ? undefined
+            : {
+                transform: `translate(${dx}px, ${dy}px) rotate(${giro}deg) scale(${escala * folga})`,
+                filter: filtros.length ? filtros.join(" ") : undefined,
+              }
+        }
       >
         {children}
       </AbsoluteFill>

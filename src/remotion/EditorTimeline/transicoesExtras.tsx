@@ -8,9 +8,12 @@ import { Direcao } from "../../timeline/schema";
 
 // Transições próprias do encEditor, no mesmo formato das do
 // @remotion/transitions (servem na trilha principal e nos exemplos da aba
-// Estilos). Regra de todas: "saindo" com progresso 0 e "entrando" com
-// progresso 1 desenham o quadro normal, sem nenhum estilo — fora da
-// transição a cena fica idêntica ao vídeo.
+// Estilos). Regras de todas:
+// - "saindo" com progresso 0 e "entrando" com progresso 1 desenham o quadro
+//   normal, sem nenhum estilo (fora da transição a cena fica idêntica);
+// - a ESTRUTURA é sempre a mesma (Camada), só o estilo muda: se o conteúdo
+//   mudasse de lugar na árvore, o React recriaria os vídeos no começo e no
+//   fim da transição e o preview "piscaria".
 
 type Props = { direcao?: Direcao };
 type PropsDoEfeito = TransitionPresentationComponentProps<Props>;
@@ -31,20 +34,26 @@ export const aleatorio = (semente: number) => {
   return x - Math.floor(x);
 };
 
-const Quadro: React.FC<{
+// Sempre: fora > dentro > conteúdo (+ uma camada por cima, opcional).
+const Camada: React.FC<{
+  fora?: React.CSSProperties;
   estilo?: React.CSSProperties;
+  porCima?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ estilo, children }) => (
-  <AbsoluteFill style={estilo}>{children}</AbsoluteFill>
+}> = ({ fora, estilo, porCima, children }) => (
+  <AbsoluteFill style={fora}>
+    <AbsoluteFill style={estilo}>{children}</AbsoluteFill>
+    {porCima ?? null}
+  </AbsoluteFill>
 );
 
 // Mergulho: a cena que sai aproxima e desfoca; a que entra vem de perto e
 // foca.
 const Mergulho: React.FC<PropsDoEfeito> = (props) => {
   const { children, presentationProgress: p } = props;
-  if (emRepouso(props)) return <Quadro>{children}</Quadro>;
-  const estilo: React.CSSProperties =
-    props.presentationDirection === "exiting"
+  const estilo: React.CSSProperties | undefined = emRepouso(props)
+    ? undefined
+    : props.presentationDirection === "exiting"
       ? {
           transform: `scale(${1 + p * 1.4})`,
           filter: `blur(${p * 14}px)`,
@@ -55,7 +64,7 @@ const Mergulho: React.FC<PropsDoEfeito> = (props) => {
           filter: `blur(${(1 - p) * 14}px)`,
           opacity: interpolate(p, [0, 0.45], [0, 1], LIMITE),
         };
-  return <Quadro estilo={estilo}>{children}</Quadro>;
+  return <Camada estilo={estilo}>{children}</Camada>;
 };
 
 // Chicote (whip pan): as duas cenas correm juntas para o lado, borradas.
@@ -67,51 +76,46 @@ const VETOR: Record<Direcao, [number, number]> = {
 };
 const Chicote: React.FC<PropsDoEfeito> = (props) => {
   const { children, presentationProgress: p, passedProps } = props;
-  if (emRepouso(props)) return <Quadro>{children}</Quadro>;
   const [vx, vy] = VETOR[passedProps.direcao ?? "direita"];
   // A cena nova entra do lado "direcao"; a antiga sai pelo lado oposto.
   const desloc =
     props.presentationDirection === "exiting" ? -p * 100 : (1 - p) * 100;
-  const borrao = Math.sin(Math.PI * p) * 22;
-  return (
-    <Quadro
-      estilo={{
+  const estilo: React.CSSProperties | undefined = emRepouso(props)
+    ? undefined
+    : {
         transform: `translate(${vx * desloc}%, ${vy * desloc}%) scale(1.04)`,
-        filter: `blur(${borrao}px)`,
-      }}
-    >
-      {children}
-    </Quadro>
-  );
+        filter: `blur(${Math.sin(Math.PI * p) * 22}px)`,
+      };
+  return <Camada estilo={estilo}>{children}</Camada>;
 };
 
 // Clarão: a cena antiga estoura de brilho, um flash branco cobre a troca e
 // a nova aparece clareando.
 const Clarao: React.FC<PropsDoEfeito> = (props) => {
   const { children, presentationProgress: p } = props;
-  if (emRepouso(props)) return <Quadro>{children}</Quadro>;
+  if (emRepouso(props)) return <Camada>{children}</Camada>;
   if (props.presentationDirection === "exiting") {
     return (
-      <Quadro estilo={{ filter: `brightness(${1 + p * 3})` }}>
+      <Camada estilo={{ filter: `brightness(${1 + p * 3})` }}>
         {children}
-      </Quadro>
+      </Camada>
     );
   }
   const flash = 1 - Math.min(1, Math.abs(p - 0.5) / 0.5);
   return (
-    <AbsoluteFill>
-      <Quadro
-        estilo={{
-          opacity: interpolate(p, [0.42, 0.55], [0, 1], LIMITE),
-          filter: `brightness(${1 + (1 - p) * 2.5})`,
-        }}
-      >
-        {children}
-      </Quadro>
-      <AbsoluteFill
-        style={{ backgroundColor: "white", opacity: flash * flash }}
-      />
-    </AbsoluteFill>
+    <Camada
+      estilo={{
+        opacity: interpolate(p, [0.42, 0.55], [0, 1], LIMITE),
+        filter: `brightness(${1 + (1 - p) * 2.5})`,
+      }}
+      porCima={
+        <AbsoluteFill
+          style={{ backgroundColor: "white", opacity: flash * flash }}
+        />
+      }
+    >
+      {children}
+    </Camada>
   );
 };
 
@@ -148,7 +152,7 @@ export const FaixasDeGlitch: React.FC<{ semente: number; forca: number }> = ({
 // meio, com faixas coloridas por cima.
 const Falha: React.FC<PropsDoEfeito> = (props) => {
   const { children, presentationProgress: p } = props;
-  if (emRepouso(props)) return <Quadro>{children}</Quadro>;
+  if (emRepouso(props)) return <Camada>{children}</Camada>;
   const forca = Math.max(0, 1 - Math.abs(p - 0.5) / 0.3);
   const passo = Math.floor(p * props.presentationDurationInFrames * 0.5);
   const entrando = props.presentationDirection === "entering";
@@ -157,42 +161,43 @@ const Falha: React.FC<PropsDoEfeito> = (props) => {
   const dx = (aleatorio(passo + 1) - 0.5) * 8 * forca;
   const inclinacao = (aleatorio(passo + 2) - 0.5) * 10 * forca;
   return (
-    <AbsoluteFill style={{ opacity: visivel ? 1 : 0 }}>
-      <Quadro
-        estilo={{
-          transform: `translateX(${dx}%) skewX(${inclinacao}deg)`,
-          filter: `hue-rotate(${aleatorio(passo + 3) * 90 * forca}deg) saturate(${1 + forca}) contrast(${1 + forca * 0.5})`,
-        }}
-      >
-        {children}
-      </Quadro>
-      {entrando && forca > 0 ? (
-        <FaixasDeGlitch semente={passo} forca={forca} />
-      ) : null}
-    </AbsoluteFill>
+    <Camada
+      fora={{ opacity: visivel ? 1 : 0 }}
+      estilo={{
+        transform: `translateX(${dx}%) skewX(${inclinacao}deg)`,
+        filter: `hue-rotate(${aleatorio(passo + 3) * 90 * forca}deg) saturate(${1 + forca}) contrast(${1 + forca * 0.5})`,
+      }}
+      porCima={
+        entrando && forca > 0 ? (
+          <FaixasDeGlitch semente={passo} forca={forca} />
+        ) : null
+      }
+    >
+      {children}
+    </Camada>
   );
 };
 
 // Borrão: a cena antiga desfoca; a nova surge entrando em foco.
 const Borrao: React.FC<PropsDoEfeito> = (props) => {
   const { children, presentationProgress: p } = props;
-  if (emRepouso(props)) return <Quadro>{children}</Quadro>;
-  const estilo: React.CSSProperties =
-    props.presentationDirection === "exiting"
+  const estilo: React.CSSProperties | undefined = emRepouso(props)
+    ? undefined
+    : props.presentationDirection === "exiting"
       ? { filter: `blur(${p * 20}px) brightness(${1 + p * 0.15})` }
       : {
           opacity: p,
           filter: `blur(${(1 - p) * 20}px) brightness(${1 + (1 - p) * 0.15})`,
         };
-  return <Quadro estilo={estilo}>{children}</Quadro>;
+  return <Camada estilo={estilo}>{children}</Camada>;
 };
 
 // Giro: a cena antiga gira e aproxima até sumir; a nova chega girando.
 const Giro: React.FC<PropsDoEfeito> = (props) => {
   const { children, presentationProgress: p } = props;
-  if (emRepouso(props)) return <Quadro>{children}</Quadro>;
-  const estilo: React.CSSProperties =
-    props.presentationDirection === "exiting"
+  const estilo: React.CSSProperties | undefined = emRepouso(props)
+    ? undefined
+    : props.presentationDirection === "exiting"
       ? {
           transform: `rotate(${p * 120}deg) scale(${1 + p * 1.6})`,
           filter: `blur(${p * 8}px)`,
@@ -203,7 +208,7 @@ const Giro: React.FC<PropsDoEfeito> = (props) => {
           filter: `blur(${(1 - p) * 8}px)`,
           opacity: interpolate(p, [0, 0.5], [0, 1], LIMITE),
         };
-  return <Quadro estilo={estilo}>{children}</Quadro>;
+  return <Camada estilo={estilo}>{children}</Camada>;
 };
 
 const EFEITOS = {
