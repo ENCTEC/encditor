@@ -88,6 +88,36 @@ const SONS = [
     expr: `${ruido}*(exp(-120*t)+0.7*exp(-120*abs(t-0.07)))`,
     filtros: "bandpass=f=3000:width_type=o:width=3,volume=2.2",
   },
+  {
+    id: "carimbo",
+    d: 0.35,
+    // Baque grave + "toc" de madeira + estalo de ruído no ataque.
+    expr: `0.9*sin(2*PI*(120*t-90*t*t))*exp(-22*t)+0.4*sin(2*PI*420*t)*exp(-40*t)+0.7*${ruido}*exp(-70*t)`,
+    filtros: "lowpass=f=1800,volume=1.8",
+  },
+  {
+    id: "maquina",
+    d: 1.6,
+    // Teclas em ritmo irregular (o tempo "balança" com um seno) e o sino
+    // do fim da linha.
+    expr: `(0.8*${ruido}+0.5*sin(2*PI*190*t))*exp(-240*mod(t+0.02*sin(23*t)\\,0.105))*(0.65+0.35*sin(9*t)*sin(9*t))*lt(t\\,1.35)+0.3*sin(2*PI*2093*(t-1.4))*exp(-6*(t-1.4))*gte(t\\,1.4)`,
+    filtros: "highpass=f=150,volume=1.5",
+  },
+  {
+    id: "sirene",
+    d: 2.6,
+    // Tom que sobe e desce entre ~520 e ~1.280 Hz (frequência modulada),
+    // com um harmônico para soar como sirene, entrando e saindo suave.
+    expr: "(0.55*sin(2*PI*900*t-(380/0.75)*cos(2*PI*0.75*t-PI/2))+0.2*sin(2*(2*PI*900*t-(380/0.75)*cos(2*PI*0.75*t-PI/2))))*min(1\\,t*4)*min(1\\,(2.6-t)*2.5)",
+    filtros: "highpass=f=300,lowpass=f=4000,aecho=0.8:0.6:60:0.3,volume=1.2",
+  },
+  {
+    id: "tique-taque",
+    d: 2,
+    // Um "tique" a cada meio segundo, alternando agudo e grave.
+    expr: `(0.7*sin(2*PI*(2600+900*mod(floor(t*2)\\,2))*t)+0.5*${ruido})*exp(-180*mod(t\\,0.5))`,
+    filtros: "bandpass=f=2800:width_type=o:width=2,volume=1.6",
+  },
 ];
 
 for (const som of SONS) {

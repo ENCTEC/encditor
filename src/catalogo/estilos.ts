@@ -125,7 +125,14 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
   // O que vai em "texto" e em "detalhe".
   campos: string;
   // Exemplo usado na aba Estilos e na Timeline ("+ Motion").
-  exemplo: { texto: string; detalhe?: string };
+  exemplo: {
+    texto: string;
+    detalhe?: string;
+    x?: number;
+    y?: number;
+    x2?: number;
+    y2?: number;
+  };
   // Som que combina (adicionado junto pela IA e pela montagem).
   som: IdSom;
 })[] = [
@@ -232,6 +239,95 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
     campos: "texto = rótulo (opcional); x/y = centro (% da tela).",
     exemplo: { texto: "" },
     som: "clique",
+  },
+  // Kit "investigação": quadro de cortiça e perícia. Combina com inserts em
+  // moldura polaroid com alfinete (acabamento_do_insert) e com uma imagem
+  // de quadro de cortiça como cena de fundo.
+  {
+    id: "carimbo",
+    tag: "#carimbo",
+    nome: "Carimbo",
+    descricao: "Carimbo torto que bate na tela, com a tinta falhada.",
+    quandoUsar:
+      "'CONFIDENCIAL', 'CASO ENCERRADO', 'APROVADO', 'ESGOTADO', veredito.",
+    campos:
+      "texto = o carimbo (curto); detalhe = linha pequena embaixo (opcional); x/y = centro.",
+    exemplo: { texto: "Confidencial", detalhe: "Caso nº 150", x: 50, y: 50 },
+    som: "carimbo",
+  },
+  {
+    id: "fita",
+    tag: "#fita",
+    nome: "Fita de isolamento",
+    descricao: "Duas fitas zebradas amarelas cruzando a tela com o texto.",
+    quandoUsar: "Abertura de 'investigação', 'PARA TUDO', área proibida.",
+    campos:
+      "texto = o que vem escrito na fita (sem valor: NÃO ULTRAPASSE); posicao ou y = altura.",
+    exemplo: { texto: "Não ultrapasse" },
+    som: "swoosh",
+  },
+  {
+    id: "fio",
+    tag: "#fio",
+    nome: "Fio vermelho",
+    descricao:
+      "Fio de quadro de investigação esticado entre dois alfinetes, com etiqueta no meio.",
+    quandoUsar:
+      "Ligar duas provas (fotos, notas) no quadro: 'problema → solução'.",
+    campos:
+      "x/y = primeiro alfinete; x2/y2 = segundo alfinete (% da tela); texto = etiqueta do meio (opcional).",
+    exemplo: { texto: "ligação", x: 22, y: 28, x2: 76, y2: 66 },
+    som: "clique",
+  },
+  {
+    id: "nota",
+    tag: "#nota",
+    nome: "Nota presa",
+    descricao: "Bilhete amarelo preso por alfinete, escrito à mão, balançando.",
+    quandoUsar: "Pistas, lembretes, 'VÍTIMA: cabelo seco', observações.",
+    campos:
+      "texto = o bilhete (curto); detalhe = linha pequena de cima (opcional); x/y = alfinete.",
+    exemplo: { texto: "olha o *preço*", detalhe: "Pista nº 2", x: 50, y: 34 },
+    som: "clique",
+  },
+  {
+    id: "ficha",
+    tag: "#ficha",
+    nome: "Ficha datilografada",
+    descricao:
+      "Ficha de arquivo com carimbo CONFIDENCIAL; as linhas vão sendo datilografadas.",
+    quandoUsar: "Abrir um 'caso', ficha do produto, dados do suspeito.",
+    campos:
+      "detalhe = cabeçalho ('CASO Nº 150'); texto = linhas 'CAMPO: valor' separadas por |; posicao ou y = topo.",
+    exemplo: {
+      texto: "LOCAL: Linnda Cosméticos|SUSPEITO: kit Trivitt",
+      detalhe: "Caso nº 150",
+    },
+    som: "maquina",
+  },
+  {
+    id: "vigilancia",
+    tag: "#vigilancia",
+    nome: "Câmera de segurança",
+    descricao:
+      "Moldura de câmera de vigilância: cantos, ● REC piscando, nome da câmera e relógio.",
+    quandoUsar:
+      "Cena como 'flagrante', bastidores, depoimento; combina com #pb e #grao.",
+    campos:
+      "texto = nome da câmera ('CAM 02'); detalhe = local ou data (opcional). Dure a cena toda.",
+    exemplo: { texto: "CAM 02", detalhe: "Loja · 25/10/2026" },
+    som: "falha",
+  },
+  {
+    id: "marcador",
+    tag: "#marcador",
+    nome: "Marcador de perícia",
+    descricao: "Plaquinha amarela numerada de cena de crime, em pé no chão.",
+    quandoUsar: "Marcar 'provas' na imagem: produto, detalhe, preço.",
+    campos:
+      "texto = número ou letra; detalhe = legenda embaixo (opcional); x/y = onde a plaquinha pisa.",
+    exemplo: { texto: "1", detalhe: "prova", x: 50, y: 72 },
+    som: "pop",
   },
 ];
 
@@ -443,6 +539,42 @@ export const SONS = [
     quandoUsar: "Flash, 'foto', antes/depois.",
     duracao: 0.25,
     volume: 0.5,
+  },
+  {
+    id: "carimbo",
+    tag: "#som-carimbo",
+    nome: "Carimbo",
+    descricao: "Batida seca de carimbo na mesa.",
+    quandoUsar: "Carimbo, veredito, 'aprovado', 'caso encerrado'.",
+    duracao: 0.35,
+    volume: 0.55,
+  },
+  {
+    id: "maquina",
+    tag: "#som-maquina",
+    nome: "Máquina de escrever",
+    descricao: "Teclas de máquina de escrever batendo.",
+    quandoUsar: "Texto sendo digitado, ficha, relatório, legenda #maquina.",
+    duracao: 1.6,
+    volume: 0.35,
+  },
+  {
+    id: "sirene",
+    tag: "#som-sirene",
+    nome: "Sirene",
+    descricao: "Sirene de polícia subindo e descendo.",
+    quandoUsar: "Abertura de 'investigação', 'PARA TUDO', alerta.",
+    duracao: 2.6,
+    volume: 0.22,
+  },
+  {
+    id: "tique-taque",
+    tag: "#som-tique-taque",
+    nome: "Tique-taque",
+    descricao: "Relógio marcando os segundos.",
+    quandoUsar: "'Por tempo limitado', contagem, suspense.",
+    duracao: 2,
+    volume: 0.45,
   },
 ] as const satisfies readonly (ItemCatalogo<string> & {
   duracao: number;

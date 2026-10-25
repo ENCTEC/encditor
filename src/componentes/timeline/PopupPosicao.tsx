@@ -315,12 +315,14 @@ export const PopupPosicao: React.FC<{
                 ["borda", "Borda branca"],
                 ["cantos", "Cantos arredondados"],
                 ["sombra", "Sombra"],
+                ["polaroid", "Foto polaroid"],
+                ["alfinete", "Alfinete (quadro de cortiça)"],
               ] as const
             ).map(([chave, rotulo]) => (
               <label key={chave} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
-                  checked={acabamento[chave]}
+                  checked={!!acabamento[chave]}
                   onChange={(e) =>
                     setAcabamento({ ...acabamento, [chave]: e.target.checked })
                   }

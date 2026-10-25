@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition } from "@remotion/renderer";
@@ -37,19 +38,43 @@ export type Trabalho = {
 const global = globalThis as unknown as {
   trabalhosExportar?: Map<string, Trabalho>;
   filaExportar?: Promise<void>;
-  pacoteRemotion?: Promise<string>;
+  pacoteRemotion?: { impressao: number; caminho: Promise<string> };
 };
 const trabalhos = (global.trabalhosExportar ??= new Map());
 
-// Empacota a composição do Remotion uma vez por execução do servidor.
-const pacote = () =>
-  (global.pacoteRemotion ??= bundle({
+// Pastas de onde vem o código da composição. Se algum arquivo mudou (no
+// desenvolvimento), o pacote antigo não serve: o vídeo sairia sem as
+// novidades até reiniciar o servidor.
+const PASTAS_DA_COMPOSICAO = ["src/remotion", "src/timeline", "src/catalogo"];
+const impressaoDoCodigo = () =>
+  Math.max(
+    ...PASTAS_DA_COMPOSICAO.flatMap((pasta) =>
+      fs
+        .readdirSync(path.resolve(pasta), {
+          recursive: true,
+          withFileTypes: true,
+        })
+        .filter((f) => f.isFile())
+        .map((f) => fs.statSync(path.join(f.parentPath, f.name)).mtimeMs),
+    ),
+  );
+
+// Empacota a composição do Remotion uma vez (e de novo se o código dela
+// mudou).
+const pacote = () => {
+  const impressao = impressaoDoCodigo();
+  const atual = global.pacoteRemotion;
+  if (atual?.impressao === impressao && atual.caminho) return atual.caminho;
+  const caminho = bundle({
     entryPoint: path.resolve("src/remotion/index.ts"),
     webpackOverride: (config) => config,
   }).catch((e) => {
     global.pacoteRemotion = undefined;
     throw e;
-  }));
+  });
+  global.pacoteRemotion = { impressao, caminho };
+  return caminho;
+};
 
 // As URLs da mídia no app são relativas ("/api/midia/x.mp4"); o
 // renderizador precisa do endereço completo do servidor.

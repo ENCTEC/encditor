@@ -10,6 +10,7 @@ import {
 } from "remotion";
 import { Motion } from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
+import { Alfinete } from "./Alfinete";
 import { FONTES } from "./fontes";
 
 // Motion graphics: textos e grafismos animados por cima do vídeo (acima
@@ -858,6 +859,612 @@ const Circulo: React.FC<{ c: Ctx }> = ({ c }) => {
   );
 };
 
+// ---------- kit "investigação" (quadro de cortiça, perícia) ----------
+
+// Textura de tinta falhada do carimbo (ruído usado como máscara).
+const MASCARA_CARIMBO = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='f'><feTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' seed='4'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  6 0 0 0 -1.7'/></filter><rect width='100%' height='100%' filter='url(#f)'/></svg>",
+)}")`;
+
+// Carimbo que bate na tela em (x, y), torto, com a tinta falhada.
+const Carimbo: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, frame, motion, largura, altura } = c;
+  const texto = semAsteriscos(motion.texto);
+  const s = entrada(c, 0, 420, 19);
+  const escala = interpolate(s, [0, 1], [2.4, 1]);
+  const n = texto.length;
+  const letra = u * (n <= 8 ? 8.5 : n <= 14 ? 6.6 : n <= 20 ? 5.4 : 4.5);
+  return (
+    <AbsoluteFill style={{ opacity: c.saida }}>
+      <div
+        style={{
+          position: "absolute",
+          left: ((motion.x ?? 50) / 100) * largura,
+          top: ((motion.y ?? 45) / 100) * altura,
+          transform: `translate(-50%, -50%) rotate(-12deg) scale(${escala})`,
+          opacity: interpolate(frame, [0, 3], [0, 0.93], LIMITE),
+          color: c.cor,
+          border: `${u * 0.9}px solid ${c.cor}`,
+          padding: u * 0.7,
+          maskImage: MASCARA_CARIMBO,
+          WebkitMaskImage: MASCARA_CARIMBO,
+          maskSize: `${u * 22}px`,
+          WebkitMaskSize: `${u * 22}px`,
+        }}
+      >
+        <div
+          style={{
+            border: `${u * 0.35}px solid ${c.cor}`,
+            padding: `${u * 0.9}px ${u * 2.2}px`,
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONTES.condensada,
+              fontSize: letra,
+              lineHeight: 1,
+              letterSpacing: u * 0.3,
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {texto}
+          </div>
+          {motion.detalhe?.trim() ? (
+            <div
+              style={{
+                fontFamily: FONTES.mono,
+                fontWeight: 700,
+                fontSize: u * 2.6,
+                letterSpacing: u * 0.3,
+                marginTop: u * 0.6,
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {semAsteriscos(motion.detalhe)}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Fita zebrada de isolamento: duas faixas cruzando a tela com o texto
+// repetido.
+const Fita: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, frame, motion, largura, altura } = c;
+  const texto = (semAsteriscos(motion.texto).trim() || "NÃO ULTRAPASSE")
+    .toUpperCase()
+    .concat("   ✕   ");
+  const centro =
+    motion.y !== undefined
+      ? motion.y / 100
+      : motion.posicao === "topo"
+        ? 0.26
+        : motion.posicao === "base"
+          ? 0.68
+          : 0.46;
+  const comprimento = Math.hypot(largura, altura) * 1.2;
+  const faixas = [
+    { angulo: -11, dy: 0, lado: -1, atraso: 0 },
+    { angulo: 8, dy: altura * 0.08, lado: 1, atraso: 5 },
+  ];
+  return (
+    <AbsoluteFill style={{ opacity: c.saida }}>
+      {faixas.map((f, i) => {
+        const s = entrada(c, f.atraso, 150, 18);
+        const tremula = Math.sin((frame + i * 9) / 7) * 0.3;
+        return (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              left: largura / 2 - comprimento / 2,
+              top: altura * centro + f.dy - u * 3.6,
+              width: comprimento,
+              height: u * 7.2,
+              transform: `rotate(${f.angulo + tremula}deg) translateX(${(1 - s) * f.lado * 105}%)`,
+              backgroundColor: AMARELO,
+              borderTop: `${u * 0.55}px solid ${TINTA}`,
+              borderBottom: `${u * 0.55}px solid ${TINTA}`,
+              boxShadow: `0 ${u * 0.7}px ${u * 1.6}px rgba(0,0,0,0.5)`,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: FONTES.condensada,
+                fontSize: u * 4.3,
+                letterSpacing: u * 0.35,
+                color: TINTA,
+                whiteSpace: "nowrap",
+                transform: `translateX(${-((frame * u * 0.5 * (i ? -1 : 1)) % (u * 60)) - u * 30}px)`,
+              }}
+            >
+              {texto.repeat(12)}
+            </div>
+          </div>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+// Fio vermelho de quadro de investigação, de (x, y) até (x2, y2), preso por
+// alfinetes nas pontas e com uma etiqueta no meio (texto, opcional).
+const Fio: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, frame, motion, largura, altura } = c;
+  const x1 = ((motion.x ?? 25) / 100) * largura;
+  const y1 = ((motion.y ?? 30) / 100) * altura;
+  const x2 = ((motion.x2 ?? 75) / 100) * largura;
+  const y2 = ((motion.y2 ?? 60) / 100) * altura;
+  // Fio frouxo: faz uma barriga para baixo.
+  const barriga = Math.hypot(x2 - x1, y2 - y1) * 0.07;
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2 + barriga * 2;
+  const caminho = `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+  const desenho = interpolate(frame, [3, 15], [1, 0], {
+    ...LIMITE,
+    easing: Easing.inOut(Easing.cubic),
+  });
+  const etiqueta = entrada(c, 13);
+  const texto = motion.texto.trim();
+  return (
+    <AbsoluteFill style={{ opacity: c.saida }}>
+      <svg
+        width={largura}
+        height={altura}
+        style={{ position: "absolute", inset: 0 }}
+      >
+        {[
+          { cor: "rgba(0,0,0,0.35)", d: u * 0.8, largura: u * 0.55 },
+          { cor: c.cor, d: 0, largura: u * 0.5 },
+        ].map((l, i) => (
+          <path
+            key={i}
+            d={caminho}
+            transform={`translate(${l.d * 0.6} ${l.d})`}
+            fill="none"
+            stroke={l.cor}
+            strokeWidth={l.largura}
+            strokeLinecap="round"
+            pathLength={1}
+            strokeDasharray={1}
+            strokeDashoffset={desenho}
+          />
+        ))}
+      </svg>
+      <Alfinete x={x1} y={y1} tamanho={u * 3.6} escala={entrada(c, 0, 260, 11)} />
+      <Alfinete
+        x={x2}
+        y={y2}
+        tamanho={u * 3.6}
+        escala={entrada(c, 13, 260, 11)}
+      />
+      {texto ? (
+        <div
+          style={{
+            position: "absolute",
+            left: (x1 + 2 * mx + x2) / 4,
+            top: (y1 + 2 * my + y2) / 4,
+            transform: `translate(-50%, -50%) rotate(-4deg) scale(${etiqueta})`,
+            backgroundColor: PAPEL,
+            color: TINTA,
+            fontFamily: FONTES.spray,
+            fontSize: tamanhoPeloTexto(texto, 4.8, u),
+            lineHeight: 1.1,
+            padding: `${u * 0.6}px ${u * 1.6}px`,
+            boxShadow: `0 ${u * 0.4}px ${u * 1.2}px rgba(0,0,0,0.45)`,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {comDestaque(texto, c.cor)}
+        </div>
+      ) : null}
+    </AbsoluteFill>
+  );
+};
+
+// Bilhete amarelo preso por um alfinete em (x, y), escrito à mão; detalhe
+// = linha pequena de cima ("PISTA Nº 2").
+const Nota: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, frame, fps, motion, largura, altura } = c;
+  const x = ((motion.x ?? 50) / 100) * largura;
+  const y = ((motion.y ?? 40) / 100) * altura;
+  const s = entrada(c, 0, 200, 14);
+  // Balança no alfinete depois de cair e vai parando.
+  const balanco =
+    -4 + Math.sin((frame / fps) * 7) * 5 * Math.exp(-frame / (fps * 0.5));
+  const larguraNota = u * 34;
+  return (
+    <AbsoluteFill style={{ opacity: c.saida }}>
+      <div
+        style={{
+          position: "absolute",
+          left: x - larguraNota / 2,
+          top: y - u * 1.6,
+          width: larguraNota,
+          transformOrigin: `50% ${u * 1.6}px`,
+          transform: `translateY(${(1 - s) * -u * 14}px) rotate(${balanco + (1 - s) * 12}deg)`,
+          opacity: Math.min(1, s * 2),
+          background: "linear-gradient(180deg, #F9E784 0%, #F2D85E 100%)",
+          padding: `${u * 3.2}px ${u * 2.6}px ${u * 2.6}px`,
+          boxShadow: `0 ${u * 1}px ${u * 2.2}px rgba(0,0,0,0.45)`,
+        }}
+      >
+        {motion.detalhe?.trim() ? (
+          <div
+            style={{
+              fontFamily: FONTES.mono,
+              fontWeight: 700,
+              fontSize: u * 2.6,
+              letterSpacing: u * 0.25,
+              color: TINTA,
+              opacity: 0.75,
+              borderBottom: `${u * 0.25}px solid rgba(17,17,16,0.5)`,
+              paddingBottom: u * 0.5,
+              marginBottom: u * 1,
+              textTransform: "uppercase",
+            }}
+          >
+            {semAsteriscos(motion.detalhe)}
+          </div>
+        ) : null}
+        <div
+          style={{
+            fontFamily: FONTES.spray,
+            fontSize: tamanhoPeloTexto(motion.texto, 6.4, u),
+            lineHeight: 1.15,
+            color: TINTA,
+          }}
+        >
+          {comDestaque(motion.texto, c.cor)}
+        </div>
+      </div>
+      <Alfinete x={x} y={y} tamanho={u * 3.6} escala={entrada(c, 5, 260, 11)} />
+    </AbsoluteFill>
+  );
+};
+
+// Clipe de papel (desenho) da ficha.
+const ClipeDePapel: React.FC<{ u: number }> = ({ u }) => (
+  <svg
+    viewBox="0 0 40 100"
+    width={u * 4}
+    height={u * 10}
+    style={{ position: "absolute", left: u * 5, top: -u * 3.4 }}
+  >
+    <path
+      d="M12 70 V18 a8 8 0 0 1 16 0 V78 a12 12 0 0 1 -24 0 V30"
+      fill="none"
+      stroke="#8A8F96"
+      strokeWidth={4.5}
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
+// Ficha de arquivo policial: cabeçalho (detalhe) e linhas "CAMPO: valor"
+// (texto, separadas por |) datilografadas uma letra por vez.
+const Ficha: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, frame, fps, motion, altura } = c;
+  const linhas = semAsteriscos(motion.texto)
+    .split("|")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const s = entrada(c, 0, 190, 16);
+  const digitadas = Math.max(0, ((frame - 8) * 26) / fps);
+  const total = linhas.reduce((n, l) => n + l.length, 0);
+  // Quantas letras vêm antes de cada linha (a digitação segue em ordem).
+  const anteriores = linhas.map((_, i) =>
+    linhas.slice(0, i).reduce((n, l) => n + l.length, 0),
+  );
+  const cursor = Math.floor(frame / (fps * 0.4)) % 2 === 0;
+  const cartao = (
+    <div
+      style={{
+        position: "relative",
+        width: "88%",
+        transform: `translateY(${(1 - s) * u * 10}px) rotate(-1.5deg)`,
+        opacity: Math.min(1, s * 2),
+        background: "linear-gradient(175deg, #EFE5CB 0%, #E2D5B4 100%)",
+        padding: `${u * 2.6}px ${u * 3.2}px ${u * 2.8}px`,
+        boxShadow: `0 ${u * 1.2}px ${u * 2.6}px rgba(0,0,0,0.5)`,
+        color: TINTA,
+      }}
+    >
+      <ClipeDePapel u={u} />
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: u * 2,
+          borderBottom: `${u * 0.35}px dashed rgba(17,17,16,0.55)`,
+          paddingBottom: u * 1,
+          marginBottom: u * 1.4,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: FONTES.condensada,
+            fontSize: u * 6.4,
+            lineHeight: 1,
+            textTransform: "uppercase",
+          }}
+        >
+          {semAsteriscos(motion.detalhe?.trim() || "Arquivo")}
+        </div>
+        <div
+          style={{
+            fontFamily: FONTES.condensada,
+            fontSize: u * 2.8,
+            letterSpacing: u * 0.3,
+            color: c.cor,
+            border: `${u * 0.35}px solid ${c.cor}`,
+            padding: `${u * 0.3}px ${u * 1}px`,
+            transform: "rotate(-6deg)",
+            maskImage: MASCARA_CARIMBO,
+            WebkitMaskImage: MASCARA_CARIMBO,
+            maskSize: `${u * 14}px`,
+            WebkitMaskSize: `${u * 14}px`,
+          }}
+        >
+          CONFIDENCIAL
+        </div>
+      </div>
+      {linhas.map((linha, i) => {
+        const antes = anteriores[i];
+        const visiveis = Math.max(
+          0,
+          Math.min(linha.length, Math.floor(digitadas - antes)),
+        );
+        const digitando =
+          digitadas >= antes && digitadas < antes + linha.length;
+        const ultima = i === linhas.length - 1 && digitadas >= total;
+        const parte = linha.slice(0, visiveis);
+        const doisPontos = linha.indexOf(":");
+        const rotulo = doisPontos >= 0 ? parte.slice(0, doisPontos + 1) : "";
+        const valor = doisPontos >= 0 ? parte.slice(doisPontos + 1) : parte;
+        return (
+          <div
+            key={i}
+            style={{
+              fontFamily: FONTES.mono,
+              fontSize: u * 3.3,
+              lineHeight: 1.45,
+              minHeight: u * 3.3 * 1.45,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>{rotulo}</span>
+            <span style={{ opacity: 0.85 }}>{valor}</span>
+            {digitando || (ultima && cursor) ? (
+              <span style={{ color: c.cor }}>▌</span>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+  // y = onde fica o topo da ficha (% da altura); sem y, usa a posição.
+  if (motion.y !== undefined) {
+    return (
+      <AbsoluteFill style={{ opacity: c.saida, alignItems: "center" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: (motion.y / 100) * altura,
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          {cartao}
+        </div>
+      </AbsoluteFill>
+    );
+  }
+  return (
+    <Lugar posicao={motion.posicao} padrao="topo" estilo={{ opacity: c.saida }}>
+      {cartao}
+    </Lugar>
+  );
+};
+
+const doisDigitos = (n: number) => String(Math.floor(n)).padStart(2, "0");
+
+// Moldura de câmera de segurança: cantos, "● REC" piscando, nome da câmera
+// (texto), local/data (detalhe) e o relógio correndo.
+const Vigilancia: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, frame, fps, motion } = c;
+  // Liga piscando, como monitor.
+  const liga = [0, 1, 0.25, 1][Math.min(3, Math.floor(frame / 2))];
+  const pisca = Math.floor(frame / (fps * 0.5)) % 2 === 0;
+  const segundos = 21 * 3600 + 47 * 60 + 3 + frame / fps;
+  const relogio = `${doisDigitos(segundos / 3600)}:${doisDigitos((segundos / 60) % 60)}:${doisDigitos(segundos % 60)}:${doisDigitos(frame % fps)}`;
+  const margem = u * 5;
+  const perna = u * 8;
+  const traco = u * 0.6;
+  const textoHud: React.CSSProperties = {
+    position: "absolute",
+    fontFamily: FONTES.mono,
+    fontWeight: 700,
+    fontSize: u * 3.2,
+    letterSpacing: u * 0.2,
+    color: BRANCO,
+    textShadow: `0 0 ${u * 0.6}px rgba(0,0,0,0.9)`,
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
+  };
+  const canto = (
+    estilo: React.CSSProperties,
+    bordas: Partial<Record<"top" | "bottom" | "left" | "right", boolean>>,
+  ) => (
+    <div
+      style={{
+        position: "absolute",
+        width: perna,
+        height: perna,
+        borderTop: bordas.top ? `${traco}px solid ${BRANCO}` : undefined,
+        borderBottom: bordas.bottom ? `${traco}px solid ${BRANCO}` : undefined,
+        borderLeft: bordas.left ? `${traco}px solid ${BRANCO}` : undefined,
+        borderRight: bordas.right ? `${traco}px solid ${BRANCO}` : undefined,
+        filter: `drop-shadow(0 0 ${u * 0.4}px rgba(0,0,0,0.8))`,
+        ...estilo,
+      }}
+    />
+  );
+  return (
+    <AbsoluteFill style={{ opacity: c.saida * liga }}>
+      {/* Linhas de varredura do monitor. */}
+      <AbsoluteFill
+        style={{
+          backgroundImage: `repeating-linear-gradient(0deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) ${u * 0.25}px, transparent ${u * 0.25}px, transparent ${u * 0.6}px)`,
+        }}
+      />
+      {canto({ left: margem, top: margem }, { top: true, left: true })}
+      {canto({ right: margem, top: margem }, { top: true, right: true })}
+      {canto({ left: margem, bottom: margem }, { bottom: true, left: true })}
+      {canto({ right: margem, bottom: margem }, { bottom: true, right: true })}
+      <div
+        style={{
+          ...textoHud,
+          left: margem + perna * 0.4,
+          top: margem + perna * 0.35,
+          display: "flex",
+          alignItems: "center",
+          gap: u * 1.2,
+        }}
+      >
+        <span
+          style={{
+            width: u * 2.6,
+            height: u * 2.6,
+            borderRadius: "50%",
+            backgroundColor: VERMELHO,
+            opacity: pisca ? 1 : 0.15,
+          }}
+        />
+        REC
+      </div>
+      <div
+        style={{
+          ...textoHud,
+          right: margem + perna * 0.4,
+          top: margem + perna * 0.35,
+        }}
+      >
+        {semAsteriscos(motion.texto.trim() || "CAM 01")}
+      </div>
+      {motion.detalhe?.trim() ? (
+        <div
+          style={{
+            ...textoHud,
+            left: margem + perna * 0.4,
+            bottom: margem + perna * 0.35,
+            fontSize: u * 2.7,
+          }}
+        >
+          {semAsteriscos(motion.detalhe)}
+        </div>
+      ) : null}
+      <div
+        style={{
+          ...textoHud,
+          right: margem + perna * 0.4,
+          bottom: margem + perna * 0.35,
+          fontSize: u * 2.7,
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {relogio}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Plaquinha amarela de perícia (com número) "em pé" no ponto (x, y).
+const Marcador: React.FC<{ c: Ctx }> = ({ c }) => {
+  const { u, motion, largura, altura } = c;
+  const s = entrada(c, 0, 240, 11);
+  const alto = u * 13;
+  const texto = semAsteriscos(motion.texto).trim() || "1";
+  return (
+    <AbsoluteFill style={{ opacity: c.saida }}>
+      <div
+        style={{
+          position: "absolute",
+          left: ((motion.x ?? 50) / 100) * largura - alto * 0.45,
+          top: ((motion.y ?? 70) / 100) * altura - alto,
+          width: alto * 0.9,
+          height: alto,
+          transformOrigin: "50% 100%",
+          transform: `scaleY(${s}) scaleX(${0.6 + 0.4 * s})`,
+        }}
+      >
+        <svg
+          viewBox="0 0 90 100"
+          width="100%"
+          height="100%"
+          style={{ position: "absolute", inset: 0, overflow: "visible" }}
+        >
+          <ellipse cx={50} cy={98} rx={48} ry={5} fill="rgba(0,0,0,0.4)" />
+          {/* Lado (mais escuro) e frente da plaquinha. */}
+          <polygon points="62,8 86,96 74,98 58,12" fill="#C9A300" />
+          <polygon
+            points="22,8 62,8 74,98 6,98"
+            fill={AMARELO}
+            stroke={TINTA}
+            strokeWidth={3}
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: alto * 0.14,
+            top: alto * 0.22,
+            textAlign: "center",
+            fontFamily: FONTES.condensada,
+            fontSize: alto * (texto.length > 2 ? 0.32 : 0.5),
+            lineHeight: 1,
+            color: TINTA,
+          }}
+        >
+          {texto}
+        </div>
+      </div>
+      {motion.detalhe?.trim() ? (
+        <div
+          style={{
+            position: "absolute",
+            left: ((motion.x ?? 50) / 100) * largura,
+            top: ((motion.y ?? 70) / 100) * altura + u * 1.4,
+            transform: `translateX(-50%) scale(${s})`,
+            fontFamily: FONTES.mono,
+            fontWeight: 700,
+            fontSize: u * 2.8,
+            color: BRANCO,
+            backgroundColor: "rgba(17,17,16,0.8)",
+            padding: `${u * 0.4}px ${u * 1.2}px`,
+            textTransform: "uppercase",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {semAsteriscos(motion.detalhe)}
+        </div>
+      ) : null}
+    </AbsoluteFill>
+  );
+};
+
 const MODELOS: Record<Motion["modelo"], React.FC<{ c: Ctx }>> = {
   frase: Frase,
   preco: Preco,
@@ -869,6 +1476,13 @@ const MODELOS: Record<Motion["modelo"], React.FC<{ c: Ctx }>> = {
   selo: Selo,
   seta: Seta,
   circulo: Circulo,
+  carimbo: Carimbo,
+  fita: Fita,
+  fio: Fio,
+  nota: Nota,
+  ficha: Ficha,
+  vigilancia: Vigilancia,
+  marcador: Marcador,
 };
 
 // Um motion, com o tempo contado do começo dele.

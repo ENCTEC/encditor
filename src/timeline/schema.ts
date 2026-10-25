@@ -77,10 +77,22 @@ export const insertSchema = z.object({
       altura: z.number().min(1).max(100),
     })
     .optional(),
-  // Acabamento da janela (quando não é tela cheia).
+  // Acabamento da janela (quando não é tela cheia). polaroid = moldura de
+  // foto instantânea (branca, faixa de baixo maior; ignora borda e cantos);
+  // alfinete = preso por um alfinete vermelho no topo (quadro de cortiça).
   acabamento: z
-    .object({ borda: z.boolean(), cantos: z.boolean(), sombra: z.boolean() })
+    .object({
+      borda: z.boolean(),
+      cantos: z.boolean(),
+      sombra: z.boolean(),
+      polaroid: z.boolean().optional(),
+      alfinete: z.boolean().optional(),
+    })
     .optional(),
+  // Inclinação da janela em graus (positivo = sentido horário).
+  rotacao: z.number().min(-45).max(45).optional(),
+  // Texto escrito à mão na faixa de baixo da moldura polaroid.
+  rotulo: z.string().optional(),
 });
 
 // Música, narração ou efeito sonoro.
@@ -151,6 +163,7 @@ export const aparenciaLegendasSchema = z.object({
 
 // Motion graphics: textos e grafismos animados por cima do vídeo (acima
 // das cenas e inserts, abaixo das legendas). Ver src/catalogo/estilos.ts.
+// Os de baixo formam o kit "investigação" (quadro de cortiça, perícia).
 export const modeloMotionSchema = z.enum([
   "frase",
   "preco",
@@ -162,6 +175,13 @@ export const modeloMotionSchema = z.enum([
   "selo",
   "seta",
   "circulo",
+  "carimbo",
+  "fita",
+  "fio",
+  "nota",
+  "ficha",
+  "vigilancia",
+  "marcador",
 ]);
 
 export const motionSchema = z.object({
@@ -174,9 +194,13 @@ export const motionSchema = z.object({
   // rodape, chamada) ou os itens da lista separados por "|".
   detalhe: z.string().optional(),
   posicao: z.enum(["topo", "centro", "base"]).optional(),
-  // Ponto (em % da tela) para onde a seta aponta ou que o círculo marca.
+  // Ponto (em % da tela) para onde a seta aponta, que o círculo marca ou
+  // onde fica o carimbo, a nota, o marcador e o começo do fio.
   x: z.number().min(0).max(100).optional(),
   y: z.number().min(0).max(100).optional(),
+  // Segundo ponto (% da tela): onde o fio termina.
+  x2: z.number().min(0).max(100).optional(),
+  y2: z.number().min(0).max(100).optional(),
   // Cor de destaque (#rrggbb). Sem valor = vermelho do encEditor.
   cor: z.string().optional(),
 });

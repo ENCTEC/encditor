@@ -8,6 +8,9 @@ export type AcabamentoCaixa = {
   borda: boolean;
   cantos: boolean;
   sombra: boolean;
+  // Moldura de foto polaroid e alfinete do quadro de cortiça.
+  polaroid?: boolean;
+  alfinete?: boolean;
 };
 
 export const POSICOES = [

@@ -51,6 +51,10 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       ate: x.fim,
       posicao: x.posicao,
       ...(x.caixa ? { caixa_percent: x.caixa } : {}),
+      ...(x.acabamento?.polaroid ? { moldura: "polaroid" } : {}),
+      ...(x.acabamento?.alfinete ? { alfinete: true } : {}),
+      ...(x.rotacao ? { inclinacao_graus: x.rotacao } : {}),
+      ...(x.rotulo ? { rotulo: x.rotulo } : {}),
       comeca_no_segundo_do_arquivo: x.origemInicio,
       volume: x.volume,
     })),
@@ -91,6 +95,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       ate: x.fim,
       ...(x.posicao ? { posicao: x.posicao } : {}),
       ...(x.x !== undefined ? { x: x.x, y: x.y } : {}),
+      ...(x.x2 !== undefined ? { x2: x.x2, y2: x.y2 } : {}),
       ...(x.cor ? { cor: x.cor } : {}),
     })),
     efeitos: (t.efeitos ?? []).map((x, i) => ({

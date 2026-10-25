@@ -64,6 +64,7 @@ import {
 import { buscarNoBanco } from "./busca-banco";
 import { resumoDoProjeto } from "./estado";
 import {
+  caixaPadrao,
   caixaParaPosicao,
   ehTelaCheia,
   LAYOUTS,
@@ -143,7 +144,11 @@ const duracaoPadraoDoMotion = (modelo: Motion["modelo"], itens: number) =>
       ? 1.8
       : modelo === "contador"
         ? 2.6
-        : 2.5;
+        : modelo === "ficha" || modelo === "vigilancia"
+          ? 4
+          : modelo === "fio" || modelo === "nota" || modelo === "fita"
+            ? 3
+            : 2.5;
 
 export const criarFerramentas = (sessao: SessaoEdicao) => {
   const duracaoTotal = () =>
@@ -340,6 +345,83 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
               posicao: ehTelaCheia(caixa) ? "tela-cheia" : "janela",
             }),
           `insert ${e.numero} em ${e.posicao}${e.tamanho ? ` (${e.tamanho})` : ""}: ${caixa.largura}% × ${caixa.altura}% da tela`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "acabamento_do_insert",
+      description:
+        "Muda o acabamento de um insert em janela (não tela cheia): moldura de foto polaroid (com um texto escrito à mão embaixo), alfinete vermelho no topo (foto presa num quadro de cortiça — entra 'assentando' no quadro), inclinação, ou o visual comum (borda branca, cantos arredondados, sombra). Para um 'quadro de investigação': imagem de cortiça como cena de fundo, inserts polaroid com alfinete e motions fio/nota/carimbo/ficha. Campos null não mudam.",
+      inputSchema: z.object({
+        numero: z.number().int().min(1),
+        moldura: z
+          .enum(["polaroid", "janela", "sem-moldura"])
+          .nullable()
+          .describe(
+            "polaroid = foto instantânea; janela = borda branca, cantos arredondados e sombra; sem-moldura = só a imagem.",
+          ),
+        alfinete: z.boolean().nullable(),
+        inclinacao_graus: z
+          .number()
+          .min(-45)
+          .max(45)
+          .nullable()
+          .describe("Positivo = sentido horário. Fotos num quadro: -8 a 8."),
+        rotulo: z
+          .string()
+          .nullable()
+          .describe(
+            "Texto à mão na faixa de baixo da polaroid (curto). \"\" = sem texto.",
+          ),
+      }),
+      run: (e) => {
+        const indice = e.numero - 1;
+        const insert = sessao.timeline.inserts[indice];
+        if (!insert) {
+          throw new Error(`Insert ${e.numero} não existe.`);
+        }
+        const atual = insert.acabamento ?? {
+          borda: true,
+          cantos: true,
+          sombra: true,
+        };
+        const acabamento = {
+          ...atual,
+          ...(e.moldura === "polaroid"
+            ? { polaroid: true }
+            : e.moldura === "janela"
+              ? { polaroid: false, borda: true, cantos: true, sombra: true }
+              : e.moldura === "sem-moldura"
+                ? { polaroid: false, borda: false, cantos: false, sombra: false }
+                : {}),
+          ...(e.alfinete !== null ? { alfinete: e.alfinete } : {}),
+        };
+        const caixa = insert.caixa ?? caixaPadrao(insert.posicao);
+        if (ehTelaCheia(caixa)) {
+          throw new Error(
+            `Insert ${e.numero} está em tela cheia: acabamento só vale para janela. Use posicionar_insert antes.`,
+          );
+        }
+        return aplicar(
+          (t) =>
+            atualizarItem(t, "inserts", indice, {
+              acabamento,
+              ...(e.inclinacao_graus !== null
+                ? { rotacao: e.inclinacao_graus || undefined }
+                : {}),
+              ...(e.rotulo !== null
+                ? { rotulo: e.rotulo.trim() || undefined }
+                : {}),
+            }),
+          `insert ${e.numero}: ${[
+            acabamento.polaroid ? "polaroid" : null,
+            acabamento.alfinete ? "com alfinete" : null,
+            e.inclinacao_graus !== null ? `${e.inclinacao_graus}°` : null,
+            e.rotulo ? `"${e.rotulo}"` : null,
+          ]
+            .filter(Boolean)
+            .join(", ") || "acabamento alterado"}`,
         );
       },
     }),
@@ -819,7 +901,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_motion",
       description:
-        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
+        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
       inputSchema: z.object({
         modelo: modeloMotionSchema,
         de: z
@@ -846,13 +928,29 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .min(0)
           .max(100)
           .nullable()
-          .describe("seta/circulo/selo: ponto em % da largura."),
+          .describe(
+            "seta/circulo/selo/carimbo/nota/marcador/fio: ponto em % da largura.",
+          ),
         y: z
           .number()
           .min(0)
           .max(100)
           .nullable()
-          .describe("seta/circulo/selo: ponto em % da altura."),
+          .describe(
+            "seta/circulo/selo/carimbo/nota/marcador/fio: ponto em % da altura; fita/ficha: altura.",
+          ),
+        x2: z
+          .number()
+          .min(0)
+          .max(100)
+          .nullable()
+          .describe("Só fio: ponta final em % da largura."),
+        y2: z
+          .number()
+          .min(0)
+          .max(100)
+          .nullable()
+          .describe("Só fio: ponta final em % da altura."),
         cor: z
           .string()
           .nullable()
@@ -877,6 +975,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           ...(e.posicao ? { posicao: e.posicao } : {}),
           ...(e.x !== null ? { x: e.x } : {}),
           ...(e.y !== null ? { y: e.y } : {}),
+          ...(e.x2 !== null ? { x2: e.x2 } : {}),
+          ...(e.y2 !== null ? { y2: e.y2 } : {}),
           ...(e.cor ? { cor: e.cor } : {}),
         };
         const som = e.com_som ? somDoMotion(motion) : null;
@@ -936,7 +1036,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_som",
       description:
-        "Coloca um EFEITO SONORO do encEditor (whoosh, swoosh, pop, clique, boom, ding, caixa, subida, falha, obturador) no vídeo final. 'no_segundo' é o momento em que o som ACONTECE: o auge do whoosh/swoosh, a batida do boom, o fim da subida (riser). Entra como áudio (na linha 'Sons' da Timeline).",
+        "Coloca um EFEITO SONORO do encEditor (whoosh, swoosh, pop, clique, boom, ding, caixa, subida, falha, obturador, carimbo, maquina, sirene, tique-taque) no vídeo final. 'no_segundo' é o momento em que o som ACONTECE: o auge do whoosh/swoosh, a batida do boom, o fim da subida (riser). Entra como áudio (na linha 'Sons' da Timeline).",
       inputSchema: z.object({
         som: z.enum(IDS_SONS),
         no_segundo: z.number().min(0),
@@ -1028,6 +1128,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         posicao_do_motion: z.enum(["topo", "centro", "base"]).nullable(),
         x: z.number().min(0).max(100).nullable().describe("Só motion."),
         y: z.number().min(0).max(100).nullable().describe("Só motion."),
+        x2: z.number().min(0).max(100).nullable().describe("Só motion fio."),
+        y2: z.number().min(0).max(100).nullable().describe("Só motion fio."),
         cor: z
           .string()
           .nullable()
@@ -1058,6 +1160,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           detalhe: e.detalhe,
           x: e.x,
           y: e.y,
+          x2: e.x2,
+          y2: e.y2,
           cor: e.cor,
           intensidade: e.intensidade,
         };
