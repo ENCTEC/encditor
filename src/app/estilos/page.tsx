@@ -1,22 +1,43 @@
 "use client";
 
 import { Player } from "@remotion/player";
-import { ESTILOS_LEGENDA, ItemCatalogo, TRANSICOES } from "@/catalogo/estilos";
+import {
+  arquivoDoSom,
+  EFEITOS_VISUAIS,
+  ESTILOS_LEGENDA,
+  ItemCatalogo,
+  MOTIONS,
+  SONS,
+  TRANSICOES,
+} from "@/catalogo/estilos";
 import { EfeitosAudio } from "@/componentes/estilos/EfeitosAudio";
 import { citarNoChat } from "@/componentes/Mencoes";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import {
   DEMO,
+  DemoEfeito,
   DemoLegenda,
+  DemoMotion,
   DemoTransicao,
+  DURACAO_DEMO_EFEITO,
   DURACAO_DEMO_LEGENDA,
+  DURACAO_DEMO_MOTION,
   DURACAO_DEMO_TRANSICAO,
 } from "@/remotion/demos/Demos";
 import { atualizarItem } from "@/timeline/operacoes";
 import { EstiloLegenda, TipoTransicao } from "@/timeline/schema";
 
-// Aba "Estilos": menu de transições e de estilos de legenda, cada um com
-// um exemplo animado. Cite no chat com # ou aplique direto no projeto.
+// Aba "Estilos": menu de transições, estilos de legenda, motions, efeitos
+// de imagem e efeitos sonoros, cada um com um exemplo. Cite no chat com #
+// ou aplique direto no projeto.
+
+// Toca um efeito sonoro (um de cada vez).
+let tocando: HTMLAudioElement | null = null;
+const ouvir = (url: string) => {
+  tocando?.pause();
+  tocando = new Audio(url);
+  void tocando.play();
+};
 
 const Cartao: React.FC<{
   item: ItemCatalogo<string>;
@@ -124,7 +145,9 @@ export default function PaginaEstilos() {
             <b className="font-mono">#tag</b> no chat — por exemplo{" "}
             <i>“coloque #cortina entre as cenas”</i> ou{" "}
             <i>“legende o vídeo com #karaoke”</i> ou{" "}
-            <i>“aplique #sem-ruido no @principal”</i> — ou aplique direto aqui.
+            <i>“aplique #sem-ruido no @principal”</i> ou{" "}
+            <i>“coloque um #contador quando eu falo 5 mil clientes”</i> ou{" "}
+            <i>“deixa o vídeo mais dinâmico”</i> — ou aplique direto aqui.
           </p>
         </header>
 
@@ -179,6 +202,103 @@ export default function PaginaEstilos() {
                   executar: () => aplicarEstilo(e.id),
                 }}
               />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="rotulo-zine mb-1">Motions (textos animados)</h2>
+          <p className="mb-3 text-sm text-zinc-500">
+            Entram por cima do vídeo, abaixo das legendas. No texto,{" "}
+            <b className="font-mono">*palavra*</b> sai na cor de destaque. Na
+            Timeline: “+ Motion aqui” e troque o modelo no painel.
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {MOTIONS.map((m) => (
+              <Cartao
+                key={m.id}
+                item={m}
+                exemplo={
+                  <Exemplo
+                    componente={DemoMotion as React.FC<Record<string, unknown>>}
+                    props={{ modelo: m.id }}
+                    duracao={DURACAO_DEMO_MOTION}
+                  />
+                }
+                aplicar={null}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="rotulo-zine mb-1">Efeitos de imagem</h2>
+          <p className="mb-3 text-sm text-zinc-500">
+            Valem para um trecho do vídeo (cenas e inserts). Na Timeline: “+
+            Efeito aqui” e troque o efeito no painel.
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {EFEITOS_VISUAIS.map((e) => (
+              <Cartao
+                key={e.id}
+                item={e}
+                exemplo={
+                  <Exemplo
+                    componente={DemoEfeito as React.FC<Record<string, unknown>>}
+                    props={{ tipo: e.id }}
+                    duracao={DURACAO_DEMO_EFEITO}
+                  />
+                }
+                aplicar={null}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="rotulo-zine mb-1">Efeitos sonoros</h2>
+          <p className="mb-3 text-sm text-zinc-500">
+            Criados pelo próprio encEditor (sem direito autoral). Na Timeline,
+            “+ Som aqui”; no chat, “coloque efeitos sonoros” põe o som certo em
+            cada transição, motion e efeito.
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {SONS.map((s) => (
+              <div
+                key={s.id}
+                className="cartao-zine flex items-start gap-3 p-3"
+              >
+                <button
+                  onClick={() => ouvir(arquivoDoSom(s.id))}
+                  className="botao-spray shrink-0 !px-3 !py-2"
+                  title="Ouvir"
+                >
+                  ▶
+                </button>
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-baseline gap-2">
+                    <b className="font-display text-xl leading-none tracking-wide uppercase">
+                      {s.nome}
+                    </b>
+                    <span className="font-mono text-xs text-spray">
+                      {s.tag}
+                    </span>
+                  </p>
+                  <p className="text-sm">{s.descricao}</p>
+                  <p className="text-xs text-zinc-500">
+                    <b className="font-mono tracking-wider uppercase">
+                      Use em:
+                    </b>{" "}
+                    {s.quandoUsar}
+                  </p>
+                  <button
+                    onClick={() => citarNoChat(s.tag)}
+                    className="mt-1 font-mono text-[11px] text-spray uppercase underline"
+                  >
+                    Citar {s.tag} no chat
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         </section>

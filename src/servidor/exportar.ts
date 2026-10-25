@@ -10,7 +10,7 @@ import {
   IdFormato,
   mudarFormato,
 } from "@/timeline/formatos";
-import { Timeline } from "@/timeline/schema";
+import { normalizarTimeline, Timeline } from "@/timeline/schema";
 import { apagarArquivos, reservarArquivo } from "./armazenamento";
 import {
   contarExportacoes,
@@ -56,7 +56,8 @@ const pacote = () =>
 const comEnderecoCompleto = (t: Timeline, origem: string): Timeline => {
   const abs = (url: string) => (url.startsWith("/") ? origem + url : url);
   return {
-    ...t,
+    // Projetos salvos antes das faixas Motion e Efeitos.
+    ...normalizarTimeline(t),
     clipes: t.clipes.map((c) => ({ ...c, url: abs(c.url) })),
     inserts: t.inserts.map((i) => ({ ...i, url: abs(i.url) })),
     audios: t.audios.map((a) => ({ ...a, url: abs(a.url) })),

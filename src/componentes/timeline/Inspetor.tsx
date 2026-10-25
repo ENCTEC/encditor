@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
+import {
+  EFEITOS_VISUAIS,
+  ESTILOS_LEGENDA,
+  MOTIONS,
+  TRANSICOES,
+} from "@/catalogo/estilos";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { FORMATOS } from "@/timeline/formatos";
 import {
@@ -28,7 +33,7 @@ type Campo =
       passo?: number;
       opcional?: boolean;
     }
-  | { chave: string; rotulo: string; tipo: "texto" }
+  | { chave: string; rotulo: string; tipo: "texto"; opcional?: boolean }
   | {
       chave: string;
       rotulo: string;
@@ -36,6 +41,17 @@ type Campo =
       opcoes: { valor: string; rotulo: string }[];
       opcional?: boolean;
     };
+
+// Cores de destaque dos motions (vazio = vermelho do encEditor).
+const CORES_MOTION = [
+  { valor: "", rotulo: "Vermelho (padrão)" },
+  { valor: "#FFD60A", rotulo: "Amarelo" },
+  { valor: "#FFFFFF", rotulo: "Branco" },
+  { valor: "#111110", rotulo: "Preto" },
+  { valor: "#FF4FA3", rotulo: "Rosa" },
+  { valor: "#1F7A3A", rotulo: "Verde" },
+  { valor: "#1D4F8C", rotulo: "Azul" },
+];
 
 const CAMPOS: Record<Faixa, Campo[]> = {
   clipes: [
@@ -127,6 +143,83 @@ const CAMPOS: Record<Faixa, Campo[]> = {
       ],
     },
   ],
+  motions: [
+    {
+      chave: "modelo",
+      rotulo: "Modelo",
+      tipo: "opcoes",
+      opcoes: MOTIONS.map((m) => ({
+        valor: m.id,
+        rotulo: `${m.nome} (${m.tag})`,
+      })),
+    },
+    {
+      chave: "texto",
+      rotulo: "Texto (*palavra* = cor de destaque)",
+      tipo: "texto",
+    },
+    {
+      chave: "detalhe",
+      rotulo: "Detalhe (preço antigo, rótulo ou itens com |)",
+      tipo: "texto",
+      opcional: true,
+    },
+    { chave: "inicio", rotulo: "Aparece em (s)", tipo: "numero" },
+    { chave: "fim", rotulo: "Some em (s)", tipo: "numero" },
+    {
+      chave: "posicao",
+      rotulo: "Posição",
+      tipo: "opcoes",
+      opcional: true,
+      opcoes: [
+        { valor: "", rotulo: "Padrão do modelo" },
+        { valor: "topo", rotulo: "Topo" },
+        { valor: "centro", rotulo: "Centro" },
+        { valor: "base", rotulo: "Base" },
+      ],
+    },
+    {
+      chave: "x",
+      rotulo: "Ponto X % (seta, círculo, selo)",
+      tipo: "numero",
+      passo: 1,
+      opcional: true,
+    },
+    {
+      chave: "y",
+      rotulo: "Ponto Y % (seta, círculo, selo)",
+      tipo: "numero",
+      passo: 1,
+      opcional: true,
+    },
+    {
+      chave: "cor",
+      rotulo: "Cor de destaque",
+      tipo: "opcoes",
+      opcional: true,
+      opcoes: CORES_MOTION,
+    },
+  ],
+  efeitos: [
+    {
+      chave: "tipo",
+      rotulo: "Efeito",
+      tipo: "opcoes",
+      opcoes: EFEITOS_VISUAIS.map((e) => ({
+        valor: e.id,
+        rotulo: `${e.nome} (${e.tag})`,
+      })),
+    },
+    { chave: "inicio", rotulo: "Início (s)", tipo: "numero" },
+    { chave: "fim", rotulo: "Fim (s)", tipo: "numero" },
+    {
+      chave: "intensidade",
+      rotulo: "Intensidade (0,1 sutil – 1 forte; vazio = 0,6)",
+      tipo: "numero",
+      passo: 0.1,
+      opcional: true,
+    },
+  ],
 };
 
 const TITULO: Record<Faixa, string> = {
@@ -135,6 +228,8 @@ const TITULO: Record<Faixa, string> = {
   audios: "Áudio",
   zooms: "Zoom",
   legendas: "Legenda",
+  motions: "Motion",
+  efeitos: "Efeito",
 };
 
 const estiloCampo =

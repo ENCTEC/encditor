@@ -7,6 +7,7 @@ import {
 import { Midia } from "@/projeto/tipos";
 import { calcularClipes, calcularDuracaoTotal } from "@/timeline/calculos";
 import { caixaParaPosicao, ehTelaCheia } from "@/timeline/caixas";
+import { sonsAutomaticos } from "@/timeline/efeitosSonoros";
 import { formatoPorId, mudarFormato } from "@/timeline/formatos";
 import { AudioFaixa, Clipe, Insert, Timeline, Zoom } from "@/timeline/schema";
 import { chaveCena, chaveInsert, itensDoPlano } from "./pendencias";
@@ -19,7 +20,8 @@ import { CenaPlano, PlanoGerado, PlanoSalvo } from "./tipos";
 //   anterior ganha esse tempo a mais para a próxima continuar no lugar;
 // - take curto demais: a próxima cena entra antes (e fica um aviso);
 // - o som de cada take entra por baixo da narração no volume do plano;
-// - música, inserts, zooms e legendas seguindo o plano.
+// - música, inserts, zooms e legendas seguindo o plano;
+// - um efeito sonoro em cada transição com efeito (whoosh, swoosh…).
 // Depois o usuário ajusta pelo chat ou na Timeline, como sempre.
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -68,6 +70,8 @@ export const montarDoPlano = (
       audios: [],
       zooms: [],
       legendas: [],
+      motions: [],
+      efeitos: [],
     },
     formato.largura,
     formato.altura,
@@ -306,5 +310,6 @@ export const montarDoPlano = (
           }
         : undefined,
   };
+  t = sonsAutomaticos(t, { transicoes: true }).timeline;
   return { timeline: t, avisos };
 };

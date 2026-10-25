@@ -32,6 +32,12 @@ export const validarTimeline = (timeline: Timeline) => {
   timeline.audios.forEach((c, i) => validarIntervalo(`Áudio ${i + 1}`, c));
   timeline.zooms.forEach((c, i) => validarIntervalo(`Zoom ${i + 1}`, c));
   timeline.legendas.forEach((c, i) => validarIntervalo(`Legenda ${i + 1}`, c));
+  (timeline.motions ?? []).forEach((c, i) =>
+    validarIntervalo(`Motion ${i + 1}`, c),
+  );
+  (timeline.efeitos ?? []).forEach((c, i) =>
+    validarIntervalo(`Efeito ${i + 1}`, c),
+  );
 };
 
 // Converte segundos -> frames e garante que as transições não fiquem

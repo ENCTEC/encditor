@@ -17,6 +17,8 @@ import {
   ehTelaCheia,
   TAMANHOS,
 } from "@/timeline/caixas";
+import { IdSom, MOTIONS, SONS } from "@/catalogo/estilos";
+import { adicionarSom } from "@/timeline/efeitosSonoros";
 import { adicionarItem, colocarCena, removerItem } from "@/timeline/operacoes";
 
 const arredondar = (n: number) => Math.round(n * 100) / 100;
@@ -85,27 +87,49 @@ export default function PaginaTimeline() {
 
   const inicio = arredondar(segundoAtual);
 
-  const adicionar = (faixa: "legendas" | "zooms") => {
+  const adicionar = (faixa: "legendas" | "zooms" | "motions" | "efeitos") => {
     const novoIndice = timeline[faixa].length;
-    const ok =
-      faixa === "legendas"
-        ? aplicar((t) =>
-            adicionarItem(t, "legendas", {
-              texto: "Nova legenda",
-              inicio,
-              fim: inicio + 2,
-            }),
-          )
-        : aplicar((t) =>
-            adicionarItem(t, "zooms", {
-              inicio,
-              fim: inicio + 2,
-              escala: 1.3,
-              focoX: 50,
-              focoY: 50,
-            }),
-          );
+    const exemplo = MOTIONS[0].exemplo;
+    const ok = aplicar((t) => {
+      switch (faixa) {
+        case "legendas":
+          return adicionarItem(t, "legendas", {
+            texto: "Nova legenda",
+            inicio,
+            fim: inicio + 2,
+          });
+        case "zooms":
+          return adicionarItem(t, "zooms", {
+            inicio,
+            fim: inicio + 2,
+            escala: 1.3,
+            focoX: 50,
+            focoY: 50,
+          });
+        // Começa com a frase de impacto; o modelo muda no inspetor.
+        case "motions":
+          return adicionarItem(t, "motions", {
+            modelo: MOTIONS[0].id,
+            inicio,
+            fim: arredondar(inicio + 2),
+            texto: exemplo.texto,
+          });
+        case "efeitos":
+          return adicionarItem(t, "efeitos", {
+            tipo: "tremor",
+            inicio,
+            fim: arredondar(inicio + 0.5),
+          });
+      }
+    });
     if (ok) setSelecao({ faixa, indice: novoIndice });
+  };
+
+  const adicionarEfeitoSonoro = (id: IdSom) => {
+    const novoIndice = timeline.audios.length;
+    if (aplicar((t) => adicionarSom(t, id, inicio))) {
+      setSelecao({ faixa: "audios", indice: novoIndice });
+    }
   };
 
   const colocarDaBiblioteca = (midia: Midia) => {
@@ -205,6 +229,37 @@ export default function PaginaTimeline() {
             >
               + Zoom aqui
             </button>
+            <button
+              onClick={() => adicionar("motions")}
+              className="border-2 border-tinta px-3 py-1 font-mono text-xs tracking-wider uppercase hover:bg-tinta hover:text-papel"
+              title="Texto ou grafismo animado (troque o modelo no painel ao lado)"
+            >
+              + Motion aqui
+            </button>
+            <button
+              onClick={() => adicionar("efeitos")}
+              className="border-2 border-tinta px-3 py-1 font-mono text-xs tracking-wider uppercase hover:bg-tinta hover:text-papel"
+              title="Tremor, flash, glitch, cor… (troque o efeito no painel ao lado)"
+            >
+              + Efeito aqui
+            </button>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  adicionarEfeitoSonoro(e.target.value as IdSom);
+                }
+              }}
+              className="border-2 border-tinta bg-papel px-2 py-1 font-mono text-xs tracking-wider uppercase"
+              title="Efeito sonoro no cursor"
+            >
+              <option value="">+ Som aqui…</option>
+              {SONS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nome}
+                </option>
+              ))}
+            </select>
           </div>
         </section>
         <aside className="flex w-80 shrink-0 flex-col gap-6 overflow-y-auto border-l border-zinc-800 p-4">
@@ -229,7 +284,7 @@ export default function PaginaTimeline() {
           </div>
         </aside>
       </div>
-      <section className="h-64 shrink-0 border-t border-zinc-800 bg-zinc-950">
+      <section className="h-72 shrink-0 border-t border-zinc-800 bg-zinc-950">
         <Trilhas
           segundoAtual={segundoAtual}
           aoBuscar={buscar}

@@ -1,6 +1,7 @@
+import { EFEITOS_VISUAIS, MOTIONS, somPorArquivo } from "@/catalogo/estilos";
 import { Midia } from "@/projeto/tipos";
 import { calcularClipes, inicioDosClipes } from "@/timeline/calculos";
-import { Faixa } from "@/timeline/operacoes";
+import { ehEfeitoSonoro, Faixa } from "@/timeline/operacoes";
 import { Timeline } from "@/timeline/schema";
 
 // Converte a timeline em "blocos" para desenhar: cada item com sua posição
@@ -23,12 +24,23 @@ export const FAIXAS_VISUAIS: { faixa: Faixa; rotulo: string; cor: string }[] = [
     cor: "bg-emerald-700 border-emerald-400",
   },
   { faixa: "zooms", rotulo: "Zoom", cor: "bg-amber-700 border-amber-400" },
+  {
+    faixa: "efeitos",
+    rotulo: "Efeitos",
+    cor: "bg-indigo-700 border-indigo-400",
+  },
+  {
+    faixa: "motions",
+    rotulo: "Motion",
+    cor: "bg-yellow-600 border-yellow-300",
+  },
   { faixa: "legendas", rotulo: "Legendas", cor: "bg-pink-700 border-pink-400" },
 ];
 
 // Linhas desenhadas na Timeline: uma por faixa, mas os áudios ganham uma
 // linha por ARQUIVO ("Áudio 1 — narração", "Áudio 2 — música"); os
-// pedaços do mesmo arquivo ficam na mesma linha.
+// pedaços do mesmo arquivo ficam na mesma linha. Os efeitos sonoros do
+// encEditor (whoosh, pop…) ficam todos juntos numa linha "Sons".
 export type Linha = {
   chave: string;
   faixa: Faixa;
@@ -53,18 +65,37 @@ export const linhasDaTimeline = (
     if (faixa !== "audios" || !t.audios.length) {
       return [{ chave: faixa, faixa, rotulo, cor, blocos: blocos[faixa] }];
     }
-    const urls = [...new Set(t.audios.map((a) => a.url))];
-    return urls.map((url, n) => {
-      const midia = biblioteca.find((m) => m.url === url);
-      const nome = midia?.apelido ? `@${midia.apelido}` : (midia?.nome ?? "");
-      return {
-        chave: `audio:${url}`,
-        faixa,
-        rotulo: `Áudio ${n + 1}${nome ? ` — ${nome}` : ""}`,
-        cor: CORES_AUDIO[n % CORES_AUDIO.length],
-        blocos: blocos.audios.filter((b) => t.audios[b.indice].url === url),
-      };
-    });
+    const urls = [
+      ...new Set(t.audios.map((a) => a.url).filter((u) => !ehEfeitoSonoro(u))),
+    ];
+    const sons = blocos.audios.filter((b) =>
+      ehEfeitoSonoro(t.audios[b.indice].url),
+    );
+    const linhaDeSons: Linha[] = sons.length
+      ? [
+          {
+            chave: "audio:sons",
+            faixa,
+            rotulo: "Sons (efeitos)",
+            cor: "bg-stone-600 border-stone-400",
+            blocos: sons,
+          },
+        ]
+      : [];
+    return [
+      ...urls.map((url, n) => {
+        const midia = biblioteca.find((m) => m.url === url);
+        const nome = midia?.apelido ? `@${midia.apelido}` : (midia?.nome ?? "");
+        return {
+          chave: `audio:${url}`,
+          faixa,
+          rotulo: `Áudio ${n + 1}${nome ? ` — ${nome}` : ""}`,
+          cor: CORES_AUDIO[n % CORES_AUDIO.length],
+          blocos: blocos.audios.filter((b) => t.audios[b.indice].url === url),
+        };
+      }),
+      ...linhaDeSons,
+    ];
   });
 
 export const calcularBlocos = (
@@ -93,6 +124,16 @@ export const calcularBlocos = (
       rotulo: nomePorUrl(x.url) ?? `Insert ${i + 1}`,
     })),
     audios: t.audios.map((x, i) => {
+      const som = somPorArquivo(x.url);
+      if (som) {
+        return {
+          faixa: "audios",
+          indice: i,
+          inicio: x.inicio,
+          fim: x.fim,
+          rotulo: som.nome,
+        };
+      }
       const apelido = biblioteca.find((m) => m.url === x.url)?.apelido;
       return {
         faixa: "audios",
@@ -117,6 +158,20 @@ export const calcularBlocos = (
       inicio: x.inicio,
       fim: x.fim,
       rotulo: x.texto,
+    })),
+    motions: (t.motions ?? []).map((x, i) => ({
+      faixa: "motions",
+      indice: i,
+      inicio: x.inicio,
+      fim: x.fim,
+      rotulo: `${MOTIONS.find((m) => m.id === x.modelo)?.nome ?? x.modelo}: ${x.texto.replace(/\*/g, "")}`,
+    })),
+    efeitos: (t.efeitos ?? []).map((x, i) => ({
+      faixa: "efeitos",
+      indice: i,
+      inicio: x.inicio,
+      fim: x.fim,
+      rotulo: EFEITOS_VISUAIS.find((e) => e.id === x.tipo)?.nome ?? x.tipo,
     })),
   };
 };

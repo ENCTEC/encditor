@@ -1,4 +1,9 @@
-import { EstiloLegenda, TipoTransicao } from "@/timeline/schema";
+import {
+  EstiloLegenda,
+  ModeloMotion,
+  TipoEfeito,
+  TipoTransicao,
+} from "@/timeline/schema";
 
 // Catálogo de transições e estilos de legenda: o mesmo texto aparece no
 // menu "Estilos", nas sugestões do "#" no chat e nas instruções da IA.
@@ -69,7 +74,386 @@ export const TRANSICOES: ItemCatalogo<TipoTransicao>[] = [
     descricao: "Corte com zoom rápido e flash.",
     quandoUsar: "Momentos fortes, revelação, batida da música.",
   },
+  {
+    id: "mergulho",
+    tag: "#mergulho",
+    nome: "Mergulho",
+    descricao: "A câmera mergulha na cena com zoom forte e sai na próxima.",
+    quandoUsar: "Reels dinâmicos, 'olha isso', entrar num detalhe.",
+  },
+  {
+    id: "chicote",
+    tag: "#chicote",
+    nome: "Chicote",
+    descricao: "A imagem passa rápida para o lado, borrada (whip pan).",
+    quandoUsar:
+      "Ritmo acelerado, troca de produto, 'e tem mais'. Aceita direção.",
+  },
+  {
+    id: "clarao",
+    tag: "#clarao",
+    nome: "Clarão",
+    descricao: "Um flash branco estoura e a cena nova aparece.",
+    quandoUsar: "Revelação, antes/depois, batida forte da música.",
+  },
+  {
+    id: "falha",
+    tag: "#falha",
+    nome: "Falha",
+    descricao: "Glitch digital: a imagem treme, corta em faixas e troca.",
+    quandoUsar: "Tecnologia, quebra de expectativa, estilo moderno.",
+  },
+  {
+    id: "borrao",
+    tag: "#borrao",
+    nome: "Borrão",
+    descricao: "Uma cena desfoca e a outra aparece entrando em foco.",
+    quandoUsar: "Transição elegante, sonho, lembrança, beleza.",
+  },
+  {
+    id: "giro",
+    tag: "#giro",
+    nome: "Giro",
+    descricao: "A imagem gira e aproxima até virar a cena nova.",
+    quandoUsar: "Diversão, energia, mudança brusca de assunto.",
+  },
 ];
+
+// Motion graphics: textos e grafismos animados por cima do vídeo.
+// Em qualquer texto, *palavra* entre asteriscos sai na cor de destaque.
+export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
+  // O que vai em "texto" e em "detalhe".
+  campos: string;
+  // Exemplo usado na aba Estilos e na Timeline ("+ Motion").
+  exemplo: { texto: string; detalhe?: string };
+  // Som que combina (adicionado junto pela IA e pela montagem).
+  som: IdSom;
+})[] = [
+  {
+    id: "frase",
+    tag: "#frase",
+    nome: "Frase de impacto",
+    descricao: "Frase curta e enorme que bate na tela e treme ao chegar.",
+    quandoUsar: "Gancho no começo, a ideia principal, 'ATENÇÃO'.",
+    campos: "texto = a frase (curta).",
+    exemplo: { texto: "ISSO MUDA *TUDO*" },
+    som: "boom",
+  },
+  {
+    id: "preco",
+    tag: "#preco",
+    nome: "Preço / oferta",
+    descricao: "Preço antigo riscado e o preço novo saltando numa etiqueta.",
+    quandoUsar: "Promoção, desconto, 'de… por…'.",
+    campos: "texto = preço novo; detalhe = preço antigo (opcional).",
+    exemplo: { texto: "R$ 59,90", detalhe: "R$ 89,90" },
+    som: "caixa",
+  },
+  {
+    id: "contador",
+    tag: "#contador",
+    nome: "Contador",
+    descricao: "Número grande que conta até o valor, com um rótulo embaixo.",
+    quandoUsar: "Dados e provas: '+5.000 clientes', '50% OFF', '3x sem juros'.",
+    campos: "texto = número com o que vier junto; detalhe = rótulo.",
+    exemplo: { texto: "+5.000", detalhe: "clientes atendidas" },
+    som: "subida",
+  },
+  {
+    id: "titulo",
+    tag: "#titulo",
+    nome: "Título com marca-texto",
+    descricao:
+      "Título com uma faixa colorida que passa por trás, como marca-texto.",
+    quandoUsar: "Abrir um assunto, nome do produto, 'passo 1'.",
+    campos: "texto = título; detalhe = linha pequena acima (opcional).",
+    exemplo: { texto: "Hidratação *profunda*", detalhe: "NOVIDADE" },
+    som: "swoosh",
+  },
+  {
+    id: "rodape",
+    tag: "#rodape",
+    nome: "Rodapé (nome)",
+    descricao: "Caixa que desliza no canto de baixo com nome e descrição.",
+    quandoUsar: "Apresentar pessoa, loja, produto ou endereço.",
+    campos: "texto = nome; detalhe = descrição (opcional).",
+    exemplo: { texto: "Linnda Cosméticos", detalhe: "Eusébio · CE" },
+    som: "swoosh",
+  },
+  {
+    id: "lista",
+    tag: "#lista",
+    nome: "Lista de benefícios",
+    descricao: "Itens com ✓ que entram um de cada vez.",
+    quandoUsar: "Benefícios, o que vem no kit, passo a passo.",
+    campos: "texto = título (opcional); detalhe = itens separados por |.",
+    exemplo: {
+      texto: "Por que usar",
+      detalhe: "Brilho na hora|Sem frizz|Cheiro que dura",
+    },
+    som: "pop",
+  },
+  {
+    id: "chamada",
+    tag: "#chamada",
+    nome: "Chamada (CTA)",
+    descricao: "Botão pulsando com uma seta apontando para ele.",
+    quandoUsar: "Final do vídeo: 'chame no WhatsApp', 'compre agora'.",
+    campos: "texto = texto do botão; detalhe = linha pequena acima (opcional).",
+    exemplo: { texto: "CHAME NO WHATSAPP", detalhe: "Link na bio" },
+    som: "pop",
+  },
+  {
+    id: "selo",
+    tag: "#selo",
+    nome: "Selo",
+    descricao: "Selo redondo carimbado na tela, girando devagar.",
+    quandoUsar: "'Frete grátis', '-30%', 'Novo', 'Mais vendido'.",
+    campos: "texto = texto do selo (curto).",
+    exemplo: { texto: "-30%" },
+    som: "boom",
+  },
+  {
+    id: "seta",
+    tag: "#seta",
+    nome: "Seta",
+    descricao: "Seta desenhada apontando para um ponto, com um texto.",
+    quandoUsar: "Mostrar um detalhe: 'olha a textura', 'aqui o preço'.",
+    campos: "texto = rótulo; x/y = ponto apontado (% da tela).",
+    exemplo: { texto: "olha a textura" },
+    som: "swoosh",
+  },
+  {
+    id: "circulo",
+    tag: "#circulo",
+    nome: "Círculo de destaque",
+    descricao: "Círculo desenhado à mão em volta de um ponto.",
+    quandoUsar: "Chamar atenção para algo na imagem.",
+    campos: "texto = rótulo (opcional); x/y = centro (% da tela).",
+    exemplo: { texto: "" },
+    som: "clique",
+  },
+];
+
+// Efeitos de imagem num trecho (como o zoom, valem para cenas e inserts).
+export const EFEITOS_VISUAIS: (ItemCatalogo<TipoEfeito> & {
+  // Duração típica, em segundos.
+  duracao: number;
+  som: IdSom | null;
+})[] = [
+  {
+    id: "tremor",
+    tag: "#tremor",
+    nome: "Tremor",
+    descricao: "A câmera treme, como num impacto.",
+    quandoUsar: "Batida, susto, frase forte, explosão.",
+    duracao: 0.5,
+    som: "boom",
+  },
+  {
+    id: "flash",
+    tag: "#flash",
+    nome: "Flash",
+    descricao: "Clarão branco rápido, como flash de foto.",
+    quandoUsar: "Foto, revelação, batida da música.",
+    duracao: 0.4,
+    som: "obturador",
+  },
+  {
+    id: "glitch",
+    tag: "#glitch",
+    nome: "Glitch",
+    descricao: "Falha digital: a imagem pula, troca de cor e corta em faixas.",
+    quandoUsar: "Tecnologia, 'erro', virada inesperada.",
+    duracao: 0.4,
+    som: "falha",
+  },
+  {
+    id: "desfoque",
+    tag: "#desfoque",
+    nome: "Desfoque",
+    descricao: "A imagem perde o foco e volta.",
+    quandoUsar: "Lembrança, tontura, fundo atrás de um texto.",
+    duracao: 1,
+    som: null,
+  },
+  {
+    id: "batida",
+    tag: "#batida",
+    nome: "Batida",
+    descricao: "Pulso rápido de zoom que vai e volta.",
+    quandoUsar: "Ênfase numa palavra, batida da música.",
+    duracao: 0.3,
+    som: "boom",
+  },
+  {
+    id: "pb",
+    tag: "#pb",
+    nome: "Preto e branco",
+    descricao: "Tira a cor do trecho.",
+    quandoUsar: "'Antes', passado, problema (e volta à cor na solução).",
+    duracao: 2,
+    som: null,
+  },
+  {
+    id: "quente",
+    tag: "#quente",
+    nome: "Cor quente",
+    descricao: "Puxa para o dourado e alaranjado.",
+    quandoUsar: "Aconchego, pele bonita, fim de tarde.",
+    duracao: 3,
+    som: null,
+  },
+  {
+    id: "frio",
+    tag: "#frio",
+    nome: "Cor fria",
+    descricao: "Puxa para o azul.",
+    quandoUsar: "Limpeza, frescor, tecnologia, noite.",
+    duracao: 3,
+    som: null,
+  },
+  {
+    id: "vibrante",
+    tag: "#vibrante",
+    nome: "Vibrante",
+    descricao: "Mais contraste e cor (imagem mais 'viva').",
+    quandoUsar: "Produto, comida, cores do antes/depois.",
+    duracao: 3,
+    som: null,
+  },
+  {
+    id: "vinheta",
+    tag: "#vinheta",
+    nome: "Vinheta",
+    descricao: "Escurece as bordas e foca o centro.",
+    quandoUsar: "Clima dramático, depoimento, destacar o centro.",
+    duracao: 3,
+    som: null,
+  },
+  {
+    id: "grao",
+    tag: "#grao",
+    nome: "Grão de filme",
+    descricao: "Granulado de filme antigo por cima.",
+    quandoUsar: "Estética retrô, bastidores, documentário.",
+    duracao: 3,
+    som: null,
+  },
+  {
+    id: "vhs",
+    tag: "#vhs",
+    nome: "VHS",
+    descricao: "Fita antiga: linhas, cor lavada e imagem tremida.",
+    quandoUsar: "Nostalgia, 'antigamente', humor.",
+    duracao: 2,
+    som: "falha",
+  },
+];
+
+// Efeitos sonoros do encEditor, gerados por síntese (scripts/gerar-sons.mjs,
+// sem direito autoral). Entram como áudios da timeline.
+export const SONS = [
+  {
+    id: "whoosh",
+    tag: "#som-whoosh",
+    nome: "Whoosh",
+    descricao: "Passagem de ar, como algo voando pela tela.",
+    quandoUsar: "Transições, texto entrando, troca de cena.",
+    duracao: 0.7,
+    volume: 0.45,
+  },
+  {
+    id: "swoosh",
+    tag: "#som-swoosh",
+    nome: "Swoosh curto",
+    descricao: "Passagem rápida e aguda.",
+    quandoUsar: "Títulos e rodapés entrando, cortes rápidos.",
+    duracao: 0.35,
+    volume: 0.4,
+  },
+  {
+    id: "pop",
+    tag: "#som-pop",
+    nome: "Pop",
+    descricao: "Estalo curto de bolha.",
+    quandoUsar: "Itens de lista, emojis, botões aparecendo.",
+    duracao: 0.18,
+    volume: 0.5,
+  },
+  {
+    id: "clique",
+    tag: "#som-clique",
+    nome: "Clique",
+    descricao: "Clique seco de botão.",
+    quandoUsar: "Círculo/seta de destaque, interface, toque na tela.",
+    duracao: 0.05,
+    volume: 0.5,
+  },
+  {
+    id: "boom",
+    tag: "#som-boom",
+    nome: "Boom",
+    descricao: "Impacto grave.",
+    quandoUsar: "Frase de impacto, tremor, revelação.",
+    duracao: 1.4,
+    volume: 0.5,
+  },
+  {
+    id: "ding",
+    tag: "#som-ding",
+    nome: "Ding",
+    descricao: "Sino agudo de notificação.",
+    quandoUsar: "Ideia, resposta certa, 'olha que bom'.",
+    duracao: 1.3,
+    volume: 0.4,
+  },
+  {
+    id: "caixa",
+    tag: "#som-caixa",
+    nome: "Caixa registradora",
+    descricao: "Dois sinos de venda ('tchan-tchan').",
+    quandoUsar: "Preço, promoção, venda feita.",
+    duracao: 1,
+    volume: 0.45,
+  },
+  {
+    id: "subida",
+    tag: "#som-subida",
+    nome: "Subida (riser)",
+    descricao: "Som que vai subindo e cria expectativa.",
+    quandoUsar: "Antes de uma revelação, contador, chegada do clímax.",
+    duracao: 1.6,
+    volume: 0.35,
+  },
+  {
+    id: "falha",
+    tag: "#som-falha",
+    nome: "Falha digital",
+    descricao: "Chiado picotado de glitch.",
+    quandoUsar: "Glitch, VHS, erro, tecnologia.",
+    duracao: 0.45,
+    volume: 0.35,
+  },
+  {
+    id: "obturador",
+    tag: "#som-obturador",
+    nome: "Obturador",
+    descricao: "Clique de câmera fotográfica.",
+    quandoUsar: "Flash, 'foto', antes/depois.",
+    duracao: 0.25,
+    volume: 0.5,
+  },
+] as const satisfies readonly (ItemCatalogo<string> & {
+  duracao: number;
+  volume: number;
+})[];
+
+export type IdSom = (typeof SONS)[number]["id"];
+export const IDS_SONS = SONS.map((s) => s.id) as [IdSom, ...IdSom[]];
+export const arquivoDoSom = (id: IdSom) => `/sons/${id}.mp3`;
+export const somPorArquivo = (url: string) =>
+  SONS.find((s) => arquivoDoSom(s.id) === url) ?? null;
 
 export const ESTILOS_LEGENDA: ItemCatalogo<EstiloLegenda>[] = [
   {
@@ -148,6 +532,20 @@ export const catalogoParaIA = () =>
     "Efeitos de áudio (cite com #; use a ferramenta efeitos_de_audio):",
     ...EFEITOS_AUDIO.map(
       (e) => `- ${e.tag} = ${e.nome}: ${e.descricao} Uso: ${e.quandoUsar}`,
+    ),
+    "Motions — textos e grafismos animados (cite com #; use adicionar_motion):",
+    ...MOTIONS.map(
+      (m) =>
+        `- ${m.tag} = ${m.nome}: ${m.descricao} Uso: ${m.quandoUsar} Campos: ${m.campos}`,
+    ),
+    "Efeitos de imagem num trecho (cite com #; use adicionar_efeito):",
+    ...EFEITOS_VISUAIS.map(
+      (e) =>
+        `- ${e.tag} = ${e.nome}: ${e.descricao} Uso: ${e.quandoUsar} (duração típica ${e.duracao}s)`,
+    ),
+    "Efeitos sonoros (cite com #; use adicionar_som):",
+    ...SONS.map(
+      (s) => `- ${s.tag} = ${s.nome}: ${s.descricao} Uso: ${s.quandoUsar}`,
     ),
   ].join("\n");
 

@@ -1,3 +1,4 @@
+import { somPorArquivo } from "@/catalogo/estilos";
 import { Midia } from "@/projeto/tipos";
 import {
   calcularClipes,
@@ -55,7 +56,9 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     })),
     audios: t.audios.map((x, i) => ({
       numero: i + 1,
-      arquivo: nome(x.url),
+      arquivo: somPorArquivo(x.url)
+        ? `efeito sonoro ${somPorArquivo(x.url)!.tag}`
+        : nome(x.url),
       de: x.inicio,
       ate: x.fim,
       comeca_no_segundo_do_arquivo: x.origemInicio,
@@ -78,6 +81,24 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       ...(x.estilo ? { estilo: x.estilo } : {}),
       de: x.inicio,
       ate: x.fim,
+    })),
+    motions: (t.motions ?? []).map((x, i) => ({
+      numero: i + 1,
+      modelo: x.modelo,
+      texto: x.texto,
+      ...(x.detalhe ? { detalhe: x.detalhe } : {}),
+      de: x.inicio,
+      ate: x.fim,
+      ...(x.posicao ? { posicao: x.posicao } : {}),
+      ...(x.x !== undefined ? { x: x.x, y: x.y } : {}),
+      ...(x.cor ? { cor: x.cor } : {}),
+    })),
+    efeitos: (t.efeitos ?? []).map((x, i) => ({
+      numero: i + 1,
+      tipo: x.tipo,
+      de: x.inicio,
+      ate: x.fim,
+      ...(x.intensidade !== undefined ? { intensidade: x.intensidade } : {}),
     })),
     biblioteca: biblioteca.map((m) => ({
       nome: m.nome,

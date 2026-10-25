@@ -11,7 +11,11 @@ import { z } from "zod";
 // cortina = a cena nova é revelada passando por cima (wipe); virar = gira
 // como uma carta (flip); relogio = revela em círculo como ponteiro;
 // iris = revela por um círculo que abre do centro; impacto = corte com
-// zoom rápido e flash (push-cut).
+// zoom rápido e flash (push-cut). As de baixo são próprias do encEditor
+// (transicoesExtras.tsx): mergulho = zoom forte atravessando a cena;
+// chicote = passa rápido para o lado, borrado (whip pan); clarao = flash
+// branco; falha = glitch digital; borrao = desfoca uma e foca a outra;
+// giro = gira e aproxima.
 export const tipoTransicaoSchema = z.enum([
   "corte",
   "fade",
@@ -21,6 +25,12 @@ export const tipoTransicaoSchema = z.enum([
   "relogio",
   "iris",
   "impacto",
+  "mergulho",
+  "chicote",
+  "clarao",
+  "falha",
+  "borrao",
+  "giro",
 ]);
 
 // De onde a cena nova entra (vale para slide, cortina e virar).
@@ -139,6 +149,62 @@ export const aparenciaLegendasSchema = z.object({
   entrelinhas: z.number().min(0.7).max(2.5).optional(),
 });
 
+// Motion graphics: textos e grafismos animados por cima do vídeo (acima
+// das cenas e inserts, abaixo das legendas). Ver src/catalogo/estilos.ts.
+export const modeloMotionSchema = z.enum([
+  "frase",
+  "preco",
+  "contador",
+  "titulo",
+  "rodape",
+  "lista",
+  "chamada",
+  "selo",
+  "seta",
+  "circulo",
+]);
+
+export const motionSchema = z.object({
+  modelo: modeloMotionSchema,
+  inicio: z.number().min(0),
+  fim: z.number().min(0),
+  // Texto principal. *palavra* entre asteriscos sai na cor de destaque.
+  texto: z.string(),
+  // Texto de apoio: preço antigo (preco), rótulo (contador, titulo,
+  // rodape, chamada) ou os itens da lista separados por "|".
+  detalhe: z.string().optional(),
+  posicao: z.enum(["topo", "centro", "base"]).optional(),
+  // Ponto (em % da tela) para onde a seta aponta ou que o círculo marca.
+  x: z.number().min(0).max(100).optional(),
+  y: z.number().min(0).max(100).optional(),
+  // Cor de destaque (#rrggbb). Sem valor = vermelho do encEditor.
+  cor: z.string().optional(),
+});
+
+// Efeitos de imagem num trecho (como o zoom, valem para cenas e inserts).
+export const tipoEfeitoSchema = z.enum([
+  "tremor",
+  "flash",
+  "glitch",
+  "desfoque",
+  "batida",
+  "pb",
+  "quente",
+  "frio",
+  "vibrante",
+  "vinheta",
+  "grao",
+  "vhs",
+]);
+
+export const efeitoSchema = z.object({
+  tipo: tipoEfeitoSchema,
+  inicio: z.number().min(0),
+  fim: z.number().min(0),
+  // 0.1 = sutil, 1 = forte. Sem valor = 0.6.
+  intensidade: z.number().min(0.1).max(1).optional(),
+});
+
 export const timelineSchema = z.object({
   fps: z.number().int().positive(),
   largura: z.number().int().positive(),
@@ -150,6 +216,9 @@ export const timelineSchema = z.object({
   audios: z.array(audioSchema),
   zooms: z.array(zoomSchema),
   legendas: z.array(legendaSchema),
+  // Projetos de antes destas faixas chegam sem elas (ver normalizarTimeline).
+  motions: z.array(motionSchema).default([]),
+  efeitos: z.array(efeitoSchema).default([]),
   // Estilo padrão das legendas (sem valor = clássico).
   estiloLegenda: estiloLegendaSchema.optional(),
   aparenciaLegendas: aparenciaLegendasSchema.optional(),
@@ -162,7 +231,17 @@ export type Insert = z.infer<typeof insertSchema>;
 export type AudioFaixa = z.infer<typeof audioSchema>;
 export type Zoom = z.infer<typeof zoomSchema>;
 export type Legenda = z.infer<typeof legendaSchema>;
+export type ModeloMotion = z.infer<typeof modeloMotionSchema>;
+export type Motion = z.infer<typeof motionSchema>;
+export type TipoEfeito = z.infer<typeof tipoEfeitoSchema>;
+export type Efeito = z.infer<typeof efeitoSchema>;
 export type EstiloLegenda = z.infer<typeof estiloLegendaSchema>;
 export type PosicaoLegenda = z.infer<typeof posicaoLegendaSchema>;
 export type AparenciaLegendas = z.infer<typeof aparenciaLegendasSchema>;
 export type Timeline = z.infer<typeof timelineSchema>;
+
+// Timeline salva antes das faixas Motion e Efeitos: ganha as duas vazias.
+export const normalizarTimeline = (
+  t: Omit<Timeline, "motions" | "efeitos"> &
+    Partial<Pick<Timeline, "motions" | "efeitos">>,
+): Timeline => ({ ...t, motions: t.motions ?? [], efeitos: t.efeitos ?? [] });

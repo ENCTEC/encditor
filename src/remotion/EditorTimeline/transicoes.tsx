@@ -10,6 +10,7 @@ import { slide } from "@remotion/transitions/slide";
 import { wipe } from "@remotion/transitions/wipe";
 import { ClipeCalculado } from "../../timeline/calculos";
 import { Direcao, TipoTransicao } from "../../timeline/schema";
+import { ehTransicaoExtra, transicaoExtra } from "./transicoesExtras";
 
 // Traduz o tipo de transição do JSON para o efeito do Remotion.
 
@@ -30,6 +31,9 @@ export const criarTransicao = (
   largura: number,
   altura: number,
 ): Apresentacao => {
+  if (ehTransicaoExtra(tipo)) {
+    return transicaoExtra(tipo, direcao) as unknown as Apresentacao;
+  }
   const efeito = (() => {
     switch (tipo) {
       case "fade":

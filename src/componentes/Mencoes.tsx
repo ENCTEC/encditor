@@ -1,10 +1,17 @@
 "use client";
 
-import { EFEITOS_AUDIO, ESTILOS_LEGENDA, TRANSICOES } from "@/catalogo/estilos";
+import {
+  EFEITOS_AUDIO,
+  EFEITOS_VISUAIS,
+  ESTILOS_LEGENDA,
+  MOTIONS,
+  SONS,
+  TRANSICOES,
+} from "@/catalogo/estilos";
 import { Midia } from "@/projeto/tipos";
 
-// Menções no chat: @apelido cita um arquivo; #tag cita uma transição ou um
-// estilo de legenda. Aqui ficam o destaque no texto das mensagens, a lista
+// Menções no chat: @apelido cita um arquivo; #tag cita uma transição, um
+// estilo de legenda, um motion, um efeito ou um som. Aqui ficam o destaque no texto das mensagens, a lista
 // de sugestões ao digitar "@"/"#" e o "citar no chat" do menu Estilos.
 
 export type Prefixo = "@" | "#";
@@ -22,6 +29,9 @@ const CATALOGO = [
   ...TRANSICOES.map((t) => ({ ...t, grupo: "transição" })),
   ...ESTILOS_LEGENDA.map((e) => ({ ...e, grupo: "legenda" })),
   ...EFEITOS_AUDIO.map((e) => ({ ...e, grupo: "áudio" })),
+  ...MOTIONS.map((m) => ({ ...m, grupo: "motion" })),
+  ...EFEITOS_VISUAIS.map((e) => ({ ...e, grupo: "efeito" })),
+  ...SONS.map((s) => ({ ...s, grupo: "som" })),
 ];
 
 const PADRAO = /([@#][a-z0-9_-]+)/gi;

@@ -25,15 +25,33 @@ import {
   trocarUrl,
   urlsDeMusica as musicasDaTimeline,
 } from "@/timeline/operacoes";
-import { EfeitoAudio, IDS_EFEITOS_AUDIO } from "@/catalogo/estilos";
+import {
+  EFEITOS_VISUAIS,
+  EfeitoAudio,
+  IDS_EFEITOS_AUDIO,
+  IDS_SONS,
+  MOTIONS,
+  SONS,
+} from "@/catalogo/estilos";
+import {
+  adicionarSom,
+  momentoDoSomDoMotion,
+  somDoEfeito,
+  somDoMotion,
+  sonsAutomaticos,
+} from "@/timeline/efeitosSonoros";
 import { nomeDaUrl } from "@/servidor/armazenamento";
 import { aplicarEfeitos } from "@/servidor/efeitos";
 import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
 import {
   direcaoSchema,
+  Efeito,
   estiloLegendaSchema,
+  modeloMotionSchema,
+  Motion,
   posicaoLegendaSchema,
   Timeline,
+  tipoEfeitoSchema,
   tipoTransicaoSchema,
 } from "@/timeline/schema";
 import {
@@ -103,7 +121,29 @@ const FAIXA_POR_TIPO: Record<string, Faixa> = {
   audio: "audios",
   zoom: "zooms",
   legenda: "legendas",
+  motion: "motions",
+  efeito: "efeitos",
 };
+
+const TIPOS_DE_ITEM = [
+  "cena",
+  "insert",
+  "audio",
+  "zoom",
+  "legenda",
+  "motion",
+  "efeito",
+] as const;
+
+// Quanto um motion fica na tela quando a IA não diz.
+const duracaoPadraoDoMotion = (modelo: Motion["modelo"], itens: number) =>
+  modelo === "lista"
+    ? 1.2 + itens * 0.6 + 1
+    : modelo === "frase" || modelo === "selo"
+      ? 1.8
+      : modelo === "contador"
+        ? 2.6
+        : 2.5;
 
 export const criarFerramentas = (sessao: SessaoEdicao) => {
   const duracaoTotal = () =>
@@ -777,6 +817,165 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     }),
 
     ferramenta({
+      name: "adicionar_motion",
+      description:
+        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
+      inputSchema: z.object({
+        modelo: modeloMotionSchema,
+        de: z
+          .number()
+          .min(0)
+          .describe("Segundo do vídeo final em que aparece."),
+        ate: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe(
+            "Segundo em que some. null = duração padrão do modelo (~2,5s).",
+          ),
+        texto: z.string().describe("Texto principal, CURTO (veja o modelo)."),
+        detalhe: z.string().nullable(),
+        posicao: z
+          .enum(["topo", "centro", "base"])
+          .nullable()
+          .describe(
+            "null = padrão do modelo (a base fica acima das legendas).",
+          ),
+        x: z
+          .number()
+          .min(0)
+          .max(100)
+          .nullable()
+          .describe("seta/circulo/selo: ponto em % da largura."),
+        y: z
+          .number()
+          .min(0)
+          .max(100)
+          .nullable()
+          .describe("seta/circulo/selo: ponto em % da altura."),
+        cor: z
+          .string()
+          .nullable()
+          .describe("Cor de destaque #rrggbb. null = vermelho do encEditor."),
+        com_som: z
+          .boolean()
+          .describe(
+            "true = coloca junto o efeito sonoro que combina (padrão).",
+          ),
+      }),
+      run: (e) => {
+        if (e.cor && !/^#[0-9a-f]{6}$/i.test(e.cor)) {
+          throw new Error("Cor inválida: use #rrggbb (ex.: #FFD60A).");
+        }
+        const itens = (e.detalhe ?? e.texto).split("|").filter(Boolean).length;
+        const motion: Motion = {
+          modelo: e.modelo,
+          inicio: s(e.de),
+          fim: s(e.ate ?? e.de + duracaoPadraoDoMotion(e.modelo, itens)),
+          texto: e.texto,
+          ...(e.detalhe ? { detalhe: e.detalhe } : {}),
+          ...(e.posicao ? { posicao: e.posicao } : {}),
+          ...(e.x !== null ? { x: e.x } : {}),
+          ...(e.y !== null ? { y: e.y } : {}),
+          ...(e.cor ? { cor: e.cor } : {}),
+        };
+        const som = e.com_som ? somDoMotion(motion) : null;
+        const nome = MOTIONS.find((m) => m.id === e.modelo)?.nome ?? e.modelo;
+        return aplicar(
+          (t) => {
+            const com = adicionarItem(t, "motions", motion);
+            return som
+              ? adicionarSom(com, som, momentoDoSomDoMotion(motion))
+              : com;
+          },
+          `motion "${nome}" ("${e.texto}") de ${motion.inicio}s a ${motion.fim}s${som ? ` com o som ${som}` : ""}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "adicionar_efeito",
+      description:
+        "Coloca um EFEITO DE IMAGEM num trecho do vídeo final (vale para cenas e inserts; motions e legendas ficam por cima, sem efeito). Impactos curtos (0,2–0,6s): tremor, flash, glitch, batida (pulso de zoom). Clima (1–4s ou mais): desfoque, pb (preto e branco), quente, frio, vibrante, vinheta, grao, vhs. Com com_som true já coloca o efeito sonoro que combina (tremor/batida = boom, flash = obturador, glitch/vhs = falha).",
+      inputSchema: z.object({
+        tipo: tipoEfeitoSchema,
+        de: z.number().min(0),
+        ate: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe("null = duração típica do efeito."),
+        intensidade: z
+          .number()
+          .min(0.1)
+          .max(1)
+          .nullable()
+          .describe("0,3 sutil, 0,6 médio (padrão), 1 forte."),
+        com_som: z.boolean(),
+      }),
+      run: (e) => {
+        const tipico =
+          EFEITOS_VISUAIS.find((x) => x.id === e.tipo)?.duracao ?? 1;
+        const efeito: Efeito = {
+          tipo: e.tipo,
+          inicio: s(e.de),
+          fim: s(e.ate ?? e.de + tipico),
+          ...(e.intensidade !== null ? { intensidade: e.intensidade } : {}),
+        };
+        const som = e.com_som ? somDoEfeito(efeito) : null;
+        return aplicar(
+          (t) => {
+            const com = adicionarItem(t, "efeitos", efeito);
+            return som ? adicionarSom(com, som, efeito.inicio) : com;
+          },
+          `efeito ${e.tipo} de ${efeito.inicio}s a ${efeito.fim}s${som ? ` com o som ${som}` : ""}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "adicionar_som",
+      description:
+        "Coloca um EFEITO SONORO do encEditor (whoosh, swoosh, pop, clique, boom, ding, caixa, subida, falha, obturador) no vídeo final. 'no_segundo' é o momento em que o som ACONTECE: o auge do whoosh/swoosh, a batida do boom, o fim da subida (riser). Entra como áudio (na linha 'Sons' da Timeline).",
+      inputSchema: z.object({
+        som: z.enum(IDS_SONS),
+        no_segundo: z.number().min(0),
+        volume: z
+          .number()
+          .min(0)
+          .max(1.5)
+          .nullable()
+          .describe("null = volume padrão do som (por baixo da narração)."),
+      }),
+      run: (e) =>
+        aplicar(
+          (t) => adicionarSom(t, e.som, e.no_segundo, e.volume ?? undefined),
+          `efeito sonoro ${SONS.find((x) => x.id === e.som)?.nome ?? e.som} em ${s(e.no_segundo)}s`,
+        ),
+    }),
+
+    ferramenta({
+      name: "sons_automaticos",
+      description:
+        "Coloca de uma vez o efeito sonoro que combina em cada transição com efeito (slide/chicote = swoosh, mergulho/giro = whoosh, impacto = boom, clarao = obturador, falha = falha; fade e borrao ficam sem som), em cada motion e em cada efeito de imagem que ainda não têm som por perto. Use depois de montar transições/motions/efeitos, ou quando o usuário pedir 'coloque efeitos sonoros'.",
+      inputSchema: z.object({
+        transicoes: z.boolean(),
+        motions: z.boolean(),
+        efeitos: z.boolean(),
+      }),
+      run: (e) => {
+        const { colocados } = sonsAutomaticos(sessao.timeline, e);
+        if (!colocados) {
+          return "OK: nenhum som novo — tudo o que combina com som já tem um efeito sonoro por perto (ou não há transições com efeito, motions nem efeitos).";
+        }
+        return aplicar(
+          (t) => sonsAutomaticos(t, e).timeline,
+          `${colocados} efeito(s) sonoro(s) colocados automaticamente`,
+        );
+      },
+    }),
+
+    ferramenta({
       name: "adicionar_legenda",
       description:
         "Adiciona uma legenda com texto escrito pelo usuário (ou combinado com ele) num intervalo do vídeo final.",
@@ -800,9 +999,9 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "editar_item",
       description:
-        "Altera um insert, áudio, zoom ou legenda existente (pelo número). Para cenas, só o volume; trechos e transições de cena têm ferramentas próprias. Campos null não mudam.",
+        "Altera um insert, áudio, zoom, legenda, motion ou efeito existente (pelo número). Para cenas, só o volume; trechos e transições de cena têm ferramentas próprias. Campos null não mudam. Para trocar o modelo de um motion ou o tipo de um efeito, remova e adicione de novo.",
       inputSchema: z.object({
-        tipo: z.enum(["cena", "insert", "audio", "zoom", "legenda"]),
+        tipo: z.enum(TIPOS_DE_ITEM),
         numero: z.number().int().min(1),
         de: z.number().min(0).nullable(),
         ate: z.number().min(0).nullable(),
@@ -820,6 +1019,25 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .min(0)
           .nullable()
           .describe("Só zoom: segundos para aproximar/voltar."),
+        detalhe: z
+          .string()
+          .nullable()
+          .describe(
+            "Só motion: texto de apoio (preço antigo, rótulo, itens com |).",
+          ),
+        posicao_do_motion: z.enum(["topo", "centro", "base"]).nullable(),
+        x: z.number().min(0).max(100).nullable().describe("Só motion."),
+        y: z.number().min(0).max(100).nullable().describe("Só motion."),
+        cor: z
+          .string()
+          .nullable()
+          .describe("Só motion: cor de destaque #rrggbb."),
+        intensidade: z
+          .number()
+          .min(0.1)
+          .max(1)
+          .nullable()
+          .describe("Só efeito."),
       }),
       run: (e) => {
         const faixa = FAIXA_POR_TIPO[e.tipo];
@@ -837,7 +1055,16 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           fadeSaida: e.fade_saida,
           origemInicio: e.comeca_no_segundo_do_arquivo,
           rampa: e.rampa_s,
+          detalhe: e.detalhe,
+          x: e.x,
+          y: e.y,
+          cor: e.cor,
+          intensidade: e.intensidade,
         };
+        if (faixa === "motions") campos.posicao = e.posicao_do_motion;
+        if (e.cor && !/^#[0-9a-f]{6}$/i.test(e.cor)) {
+          throw new Error("Cor inválida: use #rrggbb (ex.: #FFD60A).");
+        }
         if (faixa === "clipes") {
           // Em cenas, inicio/fim são do arquivo: só o volume é editável aqui.
           Object.keys(campos).forEach(
@@ -885,14 +1112,19 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "dividir_item",
       description:
-        "Divide (corta em dois) um áudio, insert ou zoom num segundo do vídeo final, como a lâmina dos editores. O segundo pedaço continua do ponto certo do arquivo. Para cenas use dividir_cena.",
+        "Divide (corta em dois) um áudio, insert, zoom, motion ou efeito num segundo do vídeo final, como a lâmina dos editores. O segundo pedaço continua do ponto certo do arquivo. Para cenas use dividir_cena.",
       inputSchema: z.object({
-        tipo: z.enum(["audio", "insert", "zoom"]),
+        tipo: z.enum(["audio", "insert", "zoom", "motion", "efeito"]),
         numero: z.number().int().min(1),
         no_segundo: z.number().min(0).describe("Segundo do vídeo final."),
       }),
       run: (e) => {
-        const faixa = FAIXA_POR_TIPO[e.tipo] as "audios" | "inserts" | "zooms";
+        const faixa = FAIXA_POR_TIPO[e.tipo] as
+          | "audios"
+          | "inserts"
+          | "zooms"
+          | "motions"
+          | "efeitos";
         return aplicar(
           (t) => dividirItemNoTempo(t, faixa, e.numero - 1, e.no_segundo),
           `${e.tipo} ${e.numero} dividido em ${s(e.no_segundo)}s (agora são o ${e.tipo} ${e.numero} e o ${e.numero + 1})`,
@@ -905,17 +1137,23 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       description:
         "Apara o começo ou o fim de um áudio, insert, zoom ou legenda até um segundo do vídeo final, SEM tirar tempo do vídeo (fica silêncio/espaço). O conteúdo fica no lugar: aparar o começo de uma narração não faz a fala escorregar. Para tirar o tempo do vídeo inteiro use cortar_trecho; para cenas, aparar_cena.",
       inputSchema: z.object({
-        tipo: z.enum(["audio", "insert", "zoom", "legenda"]),
+        tipo: z.enum([
+          "audio",
+          "insert",
+          "zoom",
+          "legenda",
+          "motion",
+          "efeito",
+        ]),
         numero: z.number().int().min(1),
         ponta: z.enum(["inicio", "fim"]),
         no_segundo: z.number().min(0),
       }),
       run: (e) => {
-        const faixa = FAIXA_POR_TIPO[e.tipo] as
-          | "audios"
-          | "inserts"
-          | "zooms"
-          | "legendas";
+        const faixa = FAIXA_POR_TIPO[e.tipo] as Exclude<
+          (typeof FAIXA_POR_TIPO)[string],
+          "clipes"
+        >;
         return aplicar(
           (t) => apararItem(t, faixa, e.numero - 1, e.ponta, e.no_segundo),
           `${e.tipo} ${e.numero}: ${e.ponta === "inicio" ? "começo" : "fim"} aparado em ${s(e.no_segundo)}s`,
@@ -926,9 +1164,9 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "juntar_itens",
       description:
-        "Junta um item com o pedaço seguinte do mesmo arquivo, colado nele (desfaz um dividir). Vale para cena (com a próxima cena), áudio, insert, zoom e legenda.",
+        "Junta um item com o pedaço seguinte do mesmo arquivo, colado nele (desfaz um dividir). Vale para cena (com a próxima cena), áudio, insert, zoom, legenda, motion e efeito.",
       inputSchema: z.object({
-        tipo: z.enum(["cena", "insert", "audio", "zoom", "legenda"]),
+        tipo: z.enum(TIPOS_DE_ITEM),
         numero: z
           .number()
           .int()
@@ -945,9 +1183,9 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "duplicar_item",
       description:
-        "Duplica uma cena (a cópia entra logo depois dela), insert, áudio, zoom ou legenda (a cópia fica colada no fim do original).",
+        "Duplica uma cena (a cópia entra logo depois dela), insert, áudio, zoom, legenda, motion ou efeito (a cópia fica colada no fim do original).",
       inputSchema: z.object({
-        tipo: z.enum(["cena", "insert", "audio", "zoom", "legenda"]),
+        tipo: z.enum(TIPOS_DE_ITEM),
         numero: z.number().int().min(1),
       }),
       run: (e) =>
@@ -960,9 +1198,9 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "remover_item",
       description:
-        "Remove uma cena, insert, áudio, zoom ou legenda pelo número.",
+        "Remove uma cena, insert, áudio, zoom, legenda, motion ou efeito pelo número. Efeitos sonoros são áudios.",
       inputSchema: z.object({
-        tipo: z.enum(["cena", "insert", "audio", "zoom", "legenda"]),
+        tipo: z.enum(TIPOS_DE_ITEM),
         numero: z.number().int().min(1),
       }),
       run: (e) =>

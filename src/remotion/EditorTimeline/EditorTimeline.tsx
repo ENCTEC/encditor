@@ -7,7 +7,7 @@ import {
   Sequence,
   useVideoConfig,
 } from "remotion";
-import { Timeline } from "../../timeline/schema";
+import { normalizarTimeline, Timeline } from "../../timeline/schema";
 import {
   calcularClipes,
   calcularDuracaoTotal,
@@ -15,8 +15,10 @@ import {
   validarTimeline,
 } from "../../timeline/calculos";
 import { Audios } from "./Audios";
+import { Efeitos } from "./Efeitos";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
+import { Motions } from "./Motions";
 import { PREMONTAR_S } from "./premontar";
 import { ClipeComTransicoes } from "./transicoes";
 import { Zoom } from "./Zoom";
@@ -36,8 +38,11 @@ export const calcularMetadata: CalculateMetadataFunction<Timeline> = ({
 };
 
 // Camadas, de baixo para cima: trilha principal → inserts (os dois sob o
-// zoom, como uma câmera) → legendas. O áudio não aparece na tela.
-export const EditorTimeline: React.FC<Timeline> = (timeline) => {
+// zoom e os efeitos, como uma câmera) → motions → legendas. O áudio não
+// aparece na tela.
+export const EditorTimeline: React.FC<Timeline> = (recebida) => {
+  // Versões exportadas antes das faixas Motion e Efeitos chegam sem elas.
+  const timeline = normalizarTimeline(recebida);
   const clipes = calcularClipes(timeline);
   const inicios = inicioDosClipes(clipes);
   const duracaoTotal = calcularDuracaoTotal(clipes);
@@ -45,52 +50,55 @@ export const EditorTimeline: React.FC<Timeline> = (timeline) => {
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
-      <Zoom zooms={timeline.zooms}>
-        {clipes.map((clipe, i) => (
-          <Sequence
-            key={i}
-            from={inicios[i]}
-            durationInFrames={clipe.duracaoFrames}
-            name={`Clipe ${i + 1}`}
-            premountFor={PREMONTAR_S * timeline.fps}
-            // A 1ª cena continua montada até o fim: ao repetir o vídeo
-            // (ou voltar ao início) ela já está carregada, sem piscar.
-            postmountFor={i === 0 ? duracaoTotal : undefined}
-          >
-            <ClipeComTransicoes
-              clipe={clipe}
-              proximo={clipes[i + 1]}
-              largura={width}
-              altura={height}
+      <Efeitos efeitos={timeline.efeitos}>
+        <Zoom zooms={timeline.zooms}>
+          {clipes.map((clipe, i) => (
+            <Sequence
+              key={i}
+              from={inicios[i]}
+              durationInFrames={clipe.duracaoFrames}
+              name={`Clipe ${i + 1}`}
+              premountFor={PREMONTAR_S * timeline.fps}
+              // A 1ª cena continua montada até o fim: ao repetir o vídeo
+              // (ou voltar ao início) ela já está carregada, sem piscar.
+              postmountFor={i === 0 ? duracaoTotal : undefined}
             >
-              {clipe.tipo === "imagem" ? (
-                <Img
-                  src={clipe.url}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              ) : (
-                <OffthreadVideo
-                  src={clipe.url}
-                  trimBefore={clipe.trimInicio}
-                  trimAfter={clipe.trimFim}
-                  volume={clipe.volume}
-                  playbackRate={clipe.velocidade ?? 1}
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
-                />
-              )}
-            </ClipeComTransicoes>
-          </Sequence>
-        ))}
-        <Inserts inserts={timeline.inserts} />
-      </Zoom>
+              <ClipeComTransicoes
+                clipe={clipe}
+                proximo={clipes[i + 1]}
+                largura={width}
+                altura={height}
+              >
+                {clipe.tipo === "imagem" ? (
+                  <Img
+                    src={clipe.url}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : (
+                  <OffthreadVideo
+                    src={clipe.url}
+                    trimBefore={clipe.trimInicio}
+                    trimAfter={clipe.trimFim}
+                    volume={clipe.volume}
+                    playbackRate={clipe.velocidade ?? 1}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                )}
+              </ClipeComTransicoes>
+            </Sequence>
+          ))}
+          <Inserts inserts={timeline.inserts} />
+        </Zoom>
+      </Efeitos>
+      <Motions motions={timeline.motions} />
       <Legendas
         legendas={timeline.legendas}
         estiloPadrao={timeline.estiloLegenda}

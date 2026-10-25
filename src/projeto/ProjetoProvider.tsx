@@ -12,7 +12,7 @@ import React, {
 } from "react";
 import { validarTimeline } from "@/timeline/calculos";
 import { timelineVazia } from "@/timeline/operacoes";
-import { Timeline } from "@/timeline/schema";
+import { normalizarTimeline, Timeline } from "@/timeline/schema";
 import { Analise } from "./analise";
 import { gerarApelido } from "./midia-cliente";
 import { arquivosDoProjeto } from "./doProjeto";
@@ -89,7 +89,8 @@ const projetoVazio = (): Projeto => ({
   mensagens: [],
 });
 
-// Projetos salvos antes dos apelidos/IA opcional ganham valores padrão.
+// Projetos salvos antes dos apelidos/IA opcional (ou das faixas Motion e
+// Efeitos) ganham valores padrão.
 const migrarProjeto = (projeto: Projeto): Projeto => {
   const biblioteca: Midia[] = [];
   for (const m of projeto.biblioteca) {
@@ -99,7 +100,11 @@ const migrarProjeto = (projeto: Projeto): Projeto => {
       usarIA: m.usarIA ?? true,
     });
   }
-  return { ...projeto, biblioteca };
+  return {
+    ...projeto,
+    timeline: normalizarTimeline(projeto.timeline),
+    biblioteca,
+  };
 };
 
 const reducer = (estado: Estado, acao: Acao): Estado => {

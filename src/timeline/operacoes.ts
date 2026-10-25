@@ -1,6 +1,15 @@
 import { calcularClipes, inicioDosClipes } from "./calculos";
 import { mudarFormato } from "./formatos";
-import { AudioFaixa, Clipe, Insert, Legenda, Timeline, Zoom } from "./schema";
+import {
+  AudioFaixa,
+  Clipe,
+  Efeito,
+  Insert,
+  Legenda,
+  Motion,
+  Timeline,
+  Zoom,
+} from "./schema";
 
 // Todas as mudanças na timeline passam por estas funções. Elas são puras:
 // recebem a timeline e devolvem uma NOVA (sem alterar a original), o que
@@ -13,6 +22,8 @@ export type ItensPorFaixa = {
   audios: AudioFaixa;
   zooms: Zoom;
   legendas: Legenda;
+  motions: Motion;
+  efeitos: Efeito;
 };
 
 export type Faixa = keyof ItensPorFaixa;
@@ -23,7 +34,13 @@ export const FAIXAS: Faixa[] = [
   "audios",
   "zooms",
   "legendas",
+  "motions",
+  "efeitos",
 ];
+
+// Efeitos sonoros da biblioteca do encEditor (public/sons): curtos e
+// repetidos à vontade — não contam como "o mesmo áudio tocando duas vezes".
+export const ehEfeitoSonoro = (url: string) => url.startsWith("/sons/");
 
 export const timelineVazia = (): Timeline => ({
   fps: 30,
@@ -35,6 +52,8 @@ export const timelineVazia = (): Timeline => ({
   audios: [],
   zooms: [],
   legendas: [],
+  motions: [],
+  efeitos: [],
 });
 
 const conferirIndice = (t: Timeline, faixa: Faixa, indice: number) => {
@@ -387,6 +406,17 @@ export const cortarTrecho = (
       zooms.push({ ...z, inicio: r3(e.inicio), fim: r3(e.fim) });
     }
   }
+  const encaixarTodos = <T extends { inicio: number; fim: number }>(
+    itens: T[],
+  ) =>
+    itens.flatMap((x) => {
+      const e = encaixar(x.inicio, x.fim, de, ate);
+      return e && e.fim - e.inicio >= 0.1
+        ? [{ ...x, inicio: r3(e.inicio), fim: r3(e.fim) }]
+        : [];
+    });
+  const motions = encaixarTodos(t.motions ?? []);
+  const efeitos = encaixarTodos(t.efeitos ?? []);
 
   // Legendas: as palavras ditas dentro do corte saem; as de depois andam
   // junto com a fala.
@@ -424,13 +454,14 @@ export const cortarTrecho = (
     });
   }
 
-  return { ...t, clipes, audios, inserts, zooms, legendas };
+  return { ...t, clipes, audios, inserts, zooms, legendas, motions, efeitos };
 };
 
-// Divide um áudio, insert ou zoom num ponto do vídeo final (o cursor).
+// Divide um áudio, insert, zoom, motion ou efeito num ponto do vídeo final
+// (o cursor).
 export const dividirItemNoTempo = (
   t: Timeline,
-  faixa: "audios" | "inserts" | "zooms",
+  faixa: "audios" | "inserts" | "zooms" | "motions" | "efeitos",
   indice: number,
   tempo: number,
 ): Timeline => {
@@ -487,17 +518,18 @@ export const urlsDeMusica = (
 const temOrigem = (faixa: Faixa, item: { tipo?: string }) =>
   faixa === "audios" || (faixa === "inserts" && item.tipo === "video");
 
-// Apara uma ponta de um áudio, insert, zoom ou legenda até um tempo do
-// vídeo final, mantendo o conteúdo no lugar (áudio não "escorrega").
+// Apara uma ponta de um áudio, insert, zoom, legenda, motion ou efeito até
+// um tempo do vídeo final, mantendo o conteúdo no lugar (áudio não
+// "escorrega").
 export const apararItem = (
   t: Timeline,
-  faixa: "audios" | "inserts" | "zooms" | "legendas",
+  faixa: Exclude<Faixa, "clipes">,
   indice: number,
   ponta: "inicio" | "fim",
   tempo: number,
 ): Timeline => {
   conferirIndice(t, faixa, indice);
-  const item = t[faixa][indice] as AudioFaixa | Insert | Zoom | Legenda;
+  const item = t[faixa][indice] as { inicio: number; fim: number };
   const novo = r3(Math.max(0, tempo));
   if (
     ponta === "inicio" ? novo >= item.fim - 0.05 : novo <= item.inicio + 0.05
@@ -572,15 +604,20 @@ export const juntarItens = (
     clipes.splice(indice, 2, { ...a, fim: b.fim });
     return { ...t, clipes };
   }
-  if (faixa === "zooms" || faixa === "legendas") {
-    const lista = t[faixa] as (Zoom | Legenda)[];
+  if (
+    faixa === "zooms" ||
+    faixa === "legendas" ||
+    faixa === "motions" ||
+    faixa === "efeitos"
+  ) {
+    const lista = t[faixa] as (Zoom | Legenda | Motion | Efeito)[];
     const atual = lista[indice];
     const j = lista.findIndex(
       (x, k) => k !== indice && Math.abs(x.inicio - atual.fim) <= 0.05,
     );
     if (j < 0) throw new Error("Não há um item colado logo depois deste.");
     const prox = lista[j];
-    let junto: Zoom | Legenda = { ...atual, fim: prox.fim };
+    let junto: Zoom | Legenda | Motion | Efeito = { ...atual, fim: prox.fim };
     if (faixa === "legendas") {
       const la = atual as Legenda;
       const lb = prox as Legenda;
@@ -672,7 +709,7 @@ export const sobreposicaoDeAudio = (t: Timeline): string | null => {
     for (let j = i + 1; j < t.audios.length; j++) {
       const a = t.audios[i];
       const b = t.audios[j];
-      if (a.url !== b.url) continue;
+      if (a.url !== b.url || ehEfeitoSonoro(a.url)) continue;
       const sobra = Math.min(a.fim, b.fim) - Math.max(a.inicio, b.inicio);
       if (sobra > 0.05) {
         return `os áudios ${i + 1} e ${j + 1} são do mesmo arquivo e tocam juntos por ${sobra.toFixed(2)}s (${Math.max(a.inicio, b.inicio).toFixed(2)}s–${Math.min(a.fim, b.fim).toFixed(2)}s)`;
