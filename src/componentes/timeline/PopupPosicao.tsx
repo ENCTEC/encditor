@@ -4,6 +4,7 @@ import { Player } from "@remotion/player";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Midia } from "@/projeto/tipos";
 import { EditorTimeline } from "@/remotion/EditorTimeline/EditorTimeline";
+import { TAGS_DE_AUDIO_DO_PLAYER } from "@/remotion/EditorTimeline/premontar";
 import {
   AcabamentoCaixa,
   Caixa,
@@ -184,6 +185,7 @@ export const PopupPosicao: React.FC<{
                 compositionHeight={fundo.altura}
                 initialFrame={frame}
                 style={{ width: "100%", height: "100%" }}
+                numberOfSharedAudioTags={TAGS_DE_AUDIO_DO_PLAYER}
                 acknowledgeRemotionLicense
               />
             ) : null}

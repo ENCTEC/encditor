@@ -4,6 +4,7 @@ import { Player, PlayerRef } from "@remotion/player";
 import { forwardRef, useMemo } from "react";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import { EditorTimeline } from "@/remotion/EditorTimeline/EditorTimeline";
+import { TAGS_DE_AUDIO_DO_PLAYER } from "@/remotion/EditorTimeline/premontar";
 import { calcularClipes, calcularDuracaoTotal } from "@/timeline/calculos";
 import { Timeline } from "@/timeline/schema";
 
@@ -59,6 +60,7 @@ export const PreviewPlayer = forwardRef<
         compositionHeight={timeline.altura}
         style={{ width: "100%", height: "100%" }}
         controls
+        numberOfSharedAudioTags={TAGS_DE_AUDIO_DO_PLAYER}
         acknowledgeRemotionLicense
       />
     </div>
