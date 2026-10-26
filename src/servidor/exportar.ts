@@ -61,7 +61,8 @@ const impressaoDoCodigo = () =>
 
 // Empacota a composição do Remotion uma vez (e de novo se o código dela
 // mudou).
-const pacote = () => {
+// Também usado pela revisão do chat (quadros do vídeo).
+export const pacote = () => {
   const impressao = impressaoDoCodigo();
   const atual = global.pacoteRemotion;
   if (atual?.impressao === impressao && atual.caminho) return atual.caminho;
@@ -78,7 +79,7 @@ const pacote = () => {
 
 // As URLs da mídia no app são relativas ("/api/midia/x.mp4"); o
 // renderizador precisa do endereço completo do servidor.
-const comEnderecoCompleto = (t: Timeline, origem: string): Timeline => {
+export const comEnderecoCompleto = (t: Timeline, origem: string): Timeline => {
   const abs = (url: string) => (url.startsWith("/") ? origem + url : url);
   return {
     // Projetos salvos antes das faixas Motion e Efeitos.

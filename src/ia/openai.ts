@@ -55,32 +55,70 @@ export const editarComOpenAI = async ({
   ferramentas,
   historico,
   pedido,
+  imagens,
+  aoPensar,
+  aoEscrever,
 }: Conversa) => {
   const tools = ferramentas.map(paraOpenAI);
   const input: OpenAI.Responses.ResponseInput = [
     ...historico.map((m) => ({ role: m.papel, content: m.texto })),
-    { role: "user", content: pedido },
+    {
+      role: "user",
+      content: imagens?.length
+        ? [
+            { type: "input_text" as const, text: pedido },
+            ...imagens.flatMap((q) => [
+              { type: "input_text" as const, text: q.legenda },
+              {
+                type: "input_image" as const,
+                image_url: `data:image/jpeg;base64,${q.base64}`,
+                detail: "high" as const,
+              },
+            ]),
+          ]
+        : pedido,
+    },
   ];
 
-  const uso = { entrada: 0, saida: 0, etapas: 0 };
+  const uso = { entrada: 0, cache: 0, saida: 0, etapas: 0 };
   const registrarUso = () =>
     console.log(
-      `[ia] editor ${MODELOS.editor}: ${uso.etapas} etapa(s), ${uso.entrada} tokens de entrada, ${uso.saida} de saída`,
+      `[ia] editor ${MODELOS.editor}: ${uso.etapas} etapa(s), ${uso.entrada} tokens de entrada (${uso.cache} do cache, mais baratos), ${uso.saida} de saída`,
     );
 
   for (let etapa = 0; etapa < LIMITE_ETAPAS; etapa++) {
-    const resposta = await clienteOpenAI().responses.create({
+    aoPensar?.(etapa);
+    // Em fluxo: dá para avisar o que a IA está escrevendo (ex.: as telas da
+    // encenação) enquanto ela escreve — a barra do chat não fica parada.
+    const fluxo = clienteOpenAI().responses.stream({
       model: MODELOS.editor,
       instructions: INSTRUCOES,
       tools,
       input,
     });
+    if (aoEscrever) {
+      const nomes = new Map<number, string>();
+      fluxo.on("response.output_item.added", (ev) => {
+        if (ev.item.type === "function_call") {
+          nomes.set(ev.output_index, ev.item.name);
+          aoEscrever(ev.item.name, "");
+        }
+      });
+      fluxo.on("response.function_call_arguments.delta", (ev) => {
+        const nome = nomes.get(ev.output_index);
+        if (nome) aoEscrever(nome, ev.snapshot);
+      });
+    }
+    const resposta = await fluxo.finalResponse();
     uso.etapas++;
     uso.entrada += resposta.usage?.input_tokens ?? 0;
+    uso.cache += resposta.usage?.input_tokens_details?.cached_tokens ?? 0;
     uso.saida += resposta.usage?.output_tokens ?? 0;
 
     input.push(...toResponseInputItems(resposta.output));
-    const chamadas = resposta.output.filter(
+    const chamadas = (
+      resposta.output as OpenAI.Responses.ResponseOutputItem[]
+    ).filter(
       (item): item is OpenAI.Responses.ResponseFunctionToolCall =>
         item.type === "function_call",
     );

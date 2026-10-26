@@ -11,6 +11,21 @@ import { timelineSchema } from "@/timeline/schema";
 import { chaveCena, chaveInsert } from "@/plano/pendencias";
 import { lerPlanoSalvo } from "@/plano/tipos";
 import { lerMidiasDoCliente, lerPlano, lerProjeto } from "@/servidor/banco";
+import { enderecoInterno } from "@/servidor/endereco";
+import { renderizarQuadros } from "@/servidor/quadros";
+import {
+  conferirEdicao,
+  descreverMomento,
+  ehEdicaoGrande,
+  momentosParaRevisar,
+} from "@/ia/conferencia";
+import {
+  criarProgresso,
+  Progresso,
+  rotuloDaFerramenta,
+  semProgresso,
+  textoEscrevendo,
+} from "@/ia/progresso";
 
 // Resumo do plano para o editor: copy e o que cada cena deveria ser.
 const resumoDoPlano = (projetoId: string, biblioteca: Midia[]) => {
@@ -95,6 +110,24 @@ export type RespostaIA = {
 const erro = (mensagem: string, status: number) =>
   NextResponse.json({ erro: mensagem }, { status });
 
+// Resposta "OK" da revisão = nada a corrigir.
+const ehOk = (texto: string) => /^\s*ok[.!]?\s*$/i.test(texto);
+
+const mensagemDaConferencia = (problemas: string[], estado: string) =>
+  `CONFERÊNCIA AUTOMÁTICA da sua edição, antes de entregar ao usuário. Pontos encontrados:
+${problemas.map((p) => `- ${p}`).join("\n")}
+
+Corrija com as ferramentas o que for erro de verdade (o estado atual está abaixo; use os números dos itens). Se algum ponto foi pedido pelo usuário ou é de propósito, deixe como está. Depois responda com o resumo FINAL e completo do que foi feito no pedido (incluindo as correções). Se não mudar nada, responda exatamente: OK.
+
+Estado atual do projeto:
+${estado}`;
+
+const mensagemDaRevisao = (estado: string) =>
+  `REVISÃO ANTES DE ENTREGAR. Abaixo estão quadros do vídeo depois da sua edição; cada um vem com o segundo, o que está sendo falado naquele momento e o que deveria estar na tela. Olhe como um editor exigente: texto cortado ou saindo da tela; texto pequeno demais para ler no celular; uma coisa por cima da outra; algo cobrindo rosto ou produto; elemento que falta ou que não combina com a fala daquele momento; tela vazia. Se achar problema REAL, corrija com as ferramentas e depois responda com o resumo FINAL e completo do que foi feito no pedido (incluindo as correções). Se estiver tudo certo, responda exatamente: OK.
+
+Estado atual do projeto:
+${estado}`;
+
 export async function POST(req: NextRequest) {
   const usarOpenAI = openaiConfigurada();
   if (!usarOpenAI && !process.env.ANTHROPIC_API_KEY) {
@@ -127,48 +160,228 @@ export async function POST(req: NextRequest) {
     .filter((m) => m.texto.trim())
     .slice(-LIMITE_HISTORICO);
   while (anteriores[0]?.autor === "ia") anteriores.shift();
+  const historicoIA = anteriores.map((m) => ({
+    papel: m.autor === "usuario" ? ("user" as const) : ("assistant" as const),
+    texto: m.texto,
+  }));
 
-  const conversa = {
-    ferramentas: criarFerramentas(sessao),
-    historico: anteriores.map((m) => ({
-      papel: m.autor === "usuario" ? ("user" as const) : ("assistant" as const),
-      texto: m.texto,
-    })),
-    pedido: [
-      "Estado atual do projeto:",
-      JSON.stringify(resumoDoProjeto(timeline, biblioteca)),
-      plano
-        ? `Plano do vídeo (feito na aba Planejar; siga o que foi imaginado quando o pedido for vago):
+  const pedidoCompleto = [
+    "Estado atual do projeto:",
+    JSON.stringify(resumoDoProjeto(timeline, biblioteca)),
+    plano
+      ? `Plano do vídeo (feito na aba Planejar; siga o que foi imaginado quando o pedido for vago):
 ${plano}`
-        : "",
-      anexos.length ? `Anexados nesta mensagem: ${anexos.join(", ")}.` : "",
-      `Pedido: ${pedido}`,
-    ]
-      .filter(Boolean)
-      .join("\n\n"),
-  };
+      : "",
+    anexos.length ? `Anexados nesta mensagem: ${anexos.join(", ")}.` : "",
+    `Pedido: ${pedido}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
-  try {
-    const texto = usarOpenAI
-      ? await editarComOpenAI(conversa)
-      : await editarComClaude(conversa);
+  // O pedido inteiro: editar → conferir (regras) → olhar quadros (pedidos
+  // grandes) → corrigir. "progresso" alimenta a barra do chat.
+  const executar = async (progresso: Progresso): Promise<RespostaIA> => {
+    progresso.fase(1, 4, "Lendo o projeto…");
+    const ferramentas = criarFerramentas(sessao).map((f) => ({
+      ...f,
+      run: (entrada: unknown) => {
+        progresso.passo(`${rotuloDaFerramenta(f.name, entrada)}…`);
+        return f.run(entrada);
+      },
+    }));
+    // "pensando" = o texto da barra enquanto a IA pensa: [na 1ª etapa, nas
+    // seguintes]. Enquanto ela escreve o pedido de uma ferramenta, a barra
+    // diz o que está sendo escrito (só quando o texto muda).
+    let ultimoEscrevendo = "";
+    const rodar = (
+      texto: string,
+      historicoAtual: typeof historicoIA,
+      pensando: [string, string],
+      imagens?: { legenda: string; base64: string }[],
+    ) =>
+      (usarOpenAI ? editarComOpenAI : editarComClaude)({
+        ferramentas,
+        historico: historicoAtual,
+        pedido: texto,
+        imagens,
+        aoPensar: (etapa) => progresso.passo(pensando[etapa === 0 ? 0 : 1]),
+        aoEscrever: (nome, argumentos) => {
+          const agora = textoEscrevendo(nome, argumentos);
+          if (agora !== ultimoEscrevendo) progresso.detalhe(agora);
+          ultimoEscrevendo = agora;
+        },
+      });
+    const estado = () =>
+      JSON.stringify(resumoDoProjeto(sessao.timeline, sessao.biblioteca));
 
-    return NextResponse.json<RespostaIA>({
-      resposta:
-        texto ||
-        (sessao.acoes.length
-          ? "Pronto."
-          : "Não entendi o que mudar. Pode detalhar?"),
+    progresso.fase(4, 60, "Entendendo o pedido…");
+    const primeira = await rodar(pedidoCompleto, historicoIA, [
+      "Entendendo o pedido…",
+      "Pensando no próximo passo…",
+    ]);
+    let resposta = primeira;
+    const notas: string[] = [];
+
+    if (sessao.acoes.length) {
+      const conversa = [
+        ...historicoIA,
+        { papel: "user" as const, texto: pedido },
+        { papel: "assistant" as const, texto: primeira },
+      ];
+
+      // 1) Conferência automática (regras, sem custo). Se achar algo, a
+      //    IA corrige; confere de novo uma vez.
+      let corrigidos = 0;
+      for (let rodada = 0; rodada < 2; rodada++) {
+        progresso.fase(
+          60 + rodada * 7,
+          66 + rodada * 7,
+          rodada
+            ? "Conferindo de novo…"
+            : "Conferindo a edição (sobreposições, tempos, textos)…",
+        );
+        const problemas = conferirEdicao(
+          timeline,
+          sessao.timeline,
+          sessao.biblioteca,
+        );
+        if (!problemas.length) break;
+        progresso.passo(
+          `A conferência achou ${problemas.length} ponto(s) — corrigindo…`,
+        );
+        const acoesAntes = sessao.acoes.length;
+        const r = await rodar(
+          mensagemDaConferencia(problemas, estado()),
+          conversa,
+          [
+            `Corrigindo o que a conferência achou (${problemas.length} ponto(s))…`,
+            "Corrigindo…",
+          ],
+        );
+        conversa.push(
+          { papel: "user", texto: "(conferência automática da edição)" },
+          { papel: "assistant", texto: r },
+        );
+        if (sessao.acoes.length === acoesAntes) break;
+        corrigidos += problemas.length;
+        if (!ehOk(r)) resposta = r;
+      }
+      notas.push(
+        corrigidos
+          ? `a conferência automática achou e corrigiu ${corrigidos} ponto(s)`
+          : "a conferência automática não achou problemas",
+      );
+
+      // 2) Revisão olhando quadros (só em pedidos grandes).
+      const momentos = ehEdicaoGrande(timeline, sessao.timeline)
+        ? momentosParaRevisar(timeline, sessao.timeline)
+        : [];
+      if (momentos.length) {
+        progresso.fase(74, 86, "Gerando quadros do vídeo para revisar…");
+        try {
+          const quadros = await renderizarQuadros(
+            sessao.timeline,
+            enderecoInterno(req),
+            momentos,
+            (feitos, total) =>
+              progresso.em(
+                74 + (12 * feitos) / total,
+                `Gerando quadros para revisar (${feitos} de ${total})…`,
+              ),
+          );
+          progresso.fase(87, 97, "Olhando os quadros do vídeo…");
+          const acoesAntes = sessao.acoes.length;
+          const r = await rodar(
+            mensagemDaRevisao(estado()),
+            conversa,
+            [
+              `Olhando os ${quadros.length} quadros do vídeo…`,
+              "Corrigindo o que vi nos quadros…",
+            ],
+            quadros.map((q) => ({
+              base64: q.base64,
+              legenda: descreverMomento(
+                sessao.timeline,
+                sessao.biblioteca,
+                q.segundo,
+              ),
+            })),
+          );
+          const corrigiu = sessao.acoes.length > acoesAntes;
+          if (corrigiu && !ehOk(r)) resposta = r;
+          notas.push(
+            `olhei ${quadros.length} quadros do vídeo${corrigiu ? " e corrigi o que vi" : " e está tudo certo"}`,
+          );
+        } catch (e) {
+          console.error("[ia] revisão por quadros falhou:", e);
+          notas.push("não deu para gerar os quadros da revisão desta vez");
+        }
+      }
+    }
+
+    progresso.em(98, "Finalizando…");
+    const texto =
+      resposta ||
+      (sessao.acoes.length
+        ? "Pronto."
+        : "Não entendi o que mudar. Pode detalhar?");
+    return {
+      resposta: notas.length
+        ? `${texto}\n\n✓ Conferência: ${notas.join("; ")}.`
+        : texto,
       timeline: sessao.acoes.length ? sessao.timeline : null,
       acoes: sessao.acoes,
       midiasAlteradas: sessao.midiasAlteradas,
       insertsParaPosicionar: sessao.insertsParaPosicionar,
-    });
-  } catch (e) {
-    const conhecido = usarOpenAI
-      ? mensagemDeErroOpenAI(e)
-      : mensagemDeErroClaude(e);
-    if (conhecido) return erro(conhecido.erro, conhecido.status);
-    throw e;
+    };
+  };
+
+  const mensagemDeErro = (e: unknown) =>
+    usarOpenAI ? mensagemDeErroOpenAI(e) : mensagemDeErroClaude(e);
+
+  // Sem streaming (scripts de teste): espera tudo e devolve JSON.
+  if (!req.headers.get("accept")?.includes("application/x-ndjson")) {
+    try {
+      return NextResponse.json<RespostaIA>(await executar(semProgresso));
+    } catch (e) {
+      const conhecido = mensagemDeErro(e);
+      if (conhecido) return erro(conhecido.erro, conhecido.status);
+      throw e;
+    }
   }
+
+  // Com streaming (o chat): uma linha JSON por evento — o progresso
+  // enquanto trabalha e, no fim, a resposta (ou o erro).
+  const codificador = new TextEncoder();
+  const fluxo = new ReadableStream({
+    async start(controle) {
+      const enviar = (evento: object) =>
+        controle.enqueue(codificador.encode(`${JSON.stringify(evento)}\n`));
+      try {
+        const resultado = await executar(
+          criarProgresso((pct, texto) =>
+            enviar({ tipo: "progresso", pct, texto }),
+          ),
+        );
+        enviar({ tipo: "fim", ...resultado });
+      } catch (e) {
+        console.error("[ia] pedido falhou:", e);
+        enviar({
+          tipo: "erro",
+          erro:
+            mensagemDeErro(e)?.erro ??
+            (e instanceof Error ? e.message : String(e)),
+        });
+      } finally {
+        controle.close();
+      }
+    },
+  });
+  return new Response(fluxo, {
+    headers: {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

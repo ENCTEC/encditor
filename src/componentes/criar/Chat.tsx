@@ -19,6 +19,11 @@ import { useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
 import { useEnvio } from "@/projeto/useEnvio";
 import { XSpray } from "@/componentes/Rabiscos";
+import {
+  EstadoProgresso,
+  lerRespostaComProgresso,
+  ProgressoIA,
+} from "./ProgressoIA";
 
 const EXEMPLOS = [
   "Bote o Insert 1 a partir dos 2 segundos",
@@ -46,8 +51,8 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
   } = useProjeto();
   const envio = useEnvio();
   const [texto, setTexto] = useState("");
-  // Texto do indicador enquanto a IA trabalha ("Editando…").
-  const [pensando, setPensando] = useState<string | null>(null);
+  // Barra enquanto a IA trabalha: o que ela está fazendo e quanto falta.
+  const [progresso, setProgresso] = useState<EstadoProgresso | null>(null);
   const [arrastando, setArrastando] = useState(false);
   // Ditado: gravando (microfone aberto) ou transcrevendo a gravação.
   const [ditado, setDitado] = useState<"parado" | "gravando" | "transcrevendo">(
@@ -64,7 +69,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
   const inputArquivo = useRef<HTMLInputElement>(null);
   const fimDaLista = useRef<HTMLDivElement>(null);
 
-  const ocupado = envio.enviando || pensando !== null;
+  const ocupado = envio.enviando || progresso !== null;
   const opcoesMencao = mencao
     ? sugestoesDeMencao(projeto.biblioteca, mencao.prefixo, mencao.termo)
     : [];
@@ -82,7 +87,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
 
   useEffect(() => {
     fimDaLista.current?.scrollIntoView({ behavior: "smooth" });
-  }, [projeto.mensagens.length, pensando]);
+  }, [projeto.mensagens.length, progresso?.texto]);
 
   const enviar = async () => {
     const pedido = texto.trim();
@@ -123,10 +128,11 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
 
     // Pedido em texto: a IA edita a timeline no servidor. Antes, espera a
     // análise dos arquivos (fala/visual) que ainda estiver em andamento.
-    setPensando("Analisando os arquivos…");
+    const inicio = Date.now();
+    setProgresso({ pct: 1, texto: "Analisando os arquivos…", inicio });
     try {
       const analises = await aguardarAnalises();
-      setPensando("Editando…");
+      setProgresso({ pct: 2, texto: "Enviando o pedido para a IA…", inicio });
       // Só os arquivos deste projeto; o servidor busca o banco inteiro do
       // cliente quando a IA quer reaproveitar algo (buscar_no_banco).
       const atual = obterArquivosDoProjeto();
@@ -138,7 +144,11 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
       );
       const resposta = await fetch("/api/ia", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        // Em linhas: o progresso vai chegando enquanto a IA trabalha.
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/x-ndjson",
+        },
         body: JSON.stringify({
           pedido,
           anexos: enviados.map((m) => m.nome),
@@ -149,12 +159,16 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
           projetoId: meta?.id,
         }),
       });
-      const dados = (await resposta.json().catch(() => ({}))) as Partial<
-        RespostaIA & { erro: string }
-      >;
-      if (!resposta.ok || dados.erro) {
-        throw new Error(dados.erro ?? `Falha na IA (${resposta.status}).`);
+      if (!resposta.ok || !resposta.body) {
+        const falha = (await resposta.json().catch(() => ({}))) as {
+          erro?: string;
+        };
+        throw new Error(falha.erro ?? `Falha na IA (${resposta.status}).`);
       }
+      const dados = await lerRespostaComProgresso<RespostaIA>(
+        resposta.body,
+        (pct, texto) => setProgresso({ pct, texto, inicio }),
+      );
       for (const m of dados.midiasAlteradas ?? []) {
         editarMidia(m.id, m);
       }
@@ -171,7 +185,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     } catch (e) {
       partes.push(`⚠️ ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setPensando(null);
+      setProgresso(null);
     }
     adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
   };
@@ -366,13 +380,9 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
             </div>
           </div>
         ))}
-        {pensando ? (
+        {progresso ? (
           <div className="flex justify-start">
-            <div className="cartao-zine px-4 py-2.5">
-              <span className="animate-pulse font-marca text-spray">
-                {pensando}
-              </span>
-            </div>
+            <ProgressoIA estado={progresso} />
           </div>
         ) : null}
         <div ref={fimDaLista} />
@@ -486,7 +496,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
             disabled={ocupado || (!texto.trim() && envio.anexos.length === 0)}
             className="botao-spray"
           >
-            {envio.enviando ? "Enviando…" : pensando ? "Editando…" : "Enviar"}
+            {envio.enviando ? "Enviando…" : progresso ? "Editando…" : "Enviar"}
           </button>
         </div>
       </div>

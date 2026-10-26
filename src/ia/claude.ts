@@ -12,7 +12,10 @@ export const editarComClaude = async ({
   ferramentas,
   historico,
   pedido,
+  imagens,
+  aoPensar,
 }: Conversa) => {
+  aoPensar?.(0);
   const final = await new Anthropic().beta.messages.toolRunner({
     model: MODELO,
     max_tokens: 16000,
@@ -31,7 +34,25 @@ export const editarComClaude = async ({
           content: m.texto,
         }),
       ),
-      { role: "user", content: pedido },
+      {
+        role: "user",
+        content: imagens?.length
+          ? [
+              { type: "text", text: pedido },
+              ...imagens.flatMap((q): Anthropic.Beta.BetaContentBlockParam[] => [
+                { type: "text", text: q.legenda },
+                {
+                  type: "image",
+                  source: {
+                    type: "base64",
+                    media_type: "image/jpeg",
+                    data: q.base64,
+                  },
+                },
+              ]),
+            ]
+          : pedido,
+      },
     ],
   });
 

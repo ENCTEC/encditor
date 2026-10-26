@@ -1,22 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { enderecoInterno } from "@/servidor/endereco";
 import { exportarProjeto, lerTrabalho } from "@/servidor/exportar";
 import { IDS_FORMATO } from "@/timeline/formatos";
 
 // Exportar o MP4 final de um projeto.
 // POST { projetoId, nome?, formatos? } → { trabalhos }  (começam na fila)
 // GET ?trabalho=<id>        → { trabalho }   (progresso)
-
-// O renderizador busca os vídeos no próprio servidor: usa "localhost" (com
-// a mesma porta), seja qual for o nome usado no navegador (ex.:
-// enceditor.localhost).
-const enderecoInterno = (req: NextRequest) => {
-  const url = new URL(req.nextUrl.origin);
-  // 127.0.0.1 (e não "localhost", que pode virar ::1): o app só escuta no
-  // endereço local IPv4.
-  url.hostname = "127.0.0.1";
-  return url.origin;
-};
 
 export async function POST(req: NextRequest) {
   const corpo = z
