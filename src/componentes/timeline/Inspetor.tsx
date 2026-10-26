@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   EFEITOS_VISUAIS,
   ESTILOS_LEGENDA,
+  FUNDOS,
   MOTIONS,
   TRANSICOES,
 } from "@/catalogo/estilos";
@@ -11,8 +12,11 @@ import { useProjeto } from "@/projeto/ProjetoProvider";
 import { FORMATOS } from "@/timeline/formatos";
 import {
   AparenciaLegendas,
+  EstiloFundo,
+  estiloDoFundo,
   EstiloLegenda,
   PosicaoLegenda,
+  urlDoFundo,
 } from "@/timeline/schema";
 import {
   atualizarItem,
@@ -42,9 +46,11 @@ type Campo =
       opcional?: boolean;
     };
 
-// Cores de destaque dos motions (vazio = vermelho do encEditor).
+// Cores de destaque dos motions (vazio = a do modelo: vermelho do
+// encEditor; no kit neon, o degradê azul→roxo).
 const CORES_MOTION = [
-  { valor: "", rotulo: "Vermelho (padrão)" },
+  { valor: "", rotulo: "Padrão (vermelho / degradê no neon)" },
+  { valor: "#E1251B", rotulo: "Vermelho" },
   { valor: "#FFD60A", rotulo: "Amarelo" },
   { valor: "#FFFFFF", rotulo: "Branco" },
   { valor: "#111110", rotulo: "Preto" },
@@ -193,14 +199,14 @@ const CAMPOS: Record<Faixa, Campo[]> = {
     },
     {
       chave: "x",
-      rotulo: "Ponto X % (seta, círculo, selo, carimbo, nota, fio…)",
+      rotulo: "Ponto X % (seta, círculo, toque, curtida, brilho, fio…)",
       tipo: "numero",
       passo: 1,
       opcional: true,
     },
     {
       chave: "y",
-      rotulo: "Ponto Y % (seta, círculo, selo, carimbo, nota, fio…)",
+      rotulo: "Ponto Y % (seta, círculo, toque, curtida, brilho, fio…)",
       tipo: "numero",
       passo: 1,
       opcional: true,
@@ -556,6 +562,31 @@ export const Inspetor: React.FC<{
           )}
         </label>
       ))}
+
+      {faixa === "clipes" && item.tipo === "fundo" ? (
+        <label className="block">
+          <span className="mb-1 block text-xs text-zinc-400">
+            Fundo animado
+          </span>
+          <select
+            value={estiloDoFundo(String(item.url))}
+            onChange={(e) =>
+              aplicar((t) =>
+                atualizarItem(t, "clipes", indice, {
+                  url: urlDoFundo(e.target.value as EstiloFundo),
+                }),
+              )
+            }
+            className={estiloCampo}
+          >
+            {FUNDOS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.nome} ({f.tag})
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {faixa === "inserts" ? (
         <button

@@ -4,7 +4,6 @@ import {
   Easing,
   interpolate,
   Sequence,
-  spring,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -12,100 +11,28 @@ import { Motion } from "../../timeline/schema";
 import { segParaFrames } from "../../timeline/calculos";
 import { Alfinete } from "./Alfinete";
 import { FONTES } from "./fontes";
+import {
+  AMARELO,
+  BRANCO,
+  comDestaque,
+  CONTORNO,
+  Ctx,
+  entrada,
+  LIMITE,
+  Lugar,
+  PAPEL,
+  semAsteriscos,
+  tamanhoPeloTexto,
+  TINTA,
+  VERMELHO,
+} from "./motionBase";
+import { MODELOS_NEON, ehModeloNeon, COR_NEON } from "./MotionsNeon";
 
 // Motion graphics: textos e grafismos animados por cima do vídeo (acima
 // das cenas e inserts, abaixo das legendas). Tudo é medido em "u" = 1% do
 // lado menor do vídeo, então o mesmo modelo serve em 9:16, 16:9, 1:1 e 4:5.
 // Em qualquer texto, *palavra* entre asteriscos sai na cor de destaque.
-
-const TINTA = "#111110";
-const PAPEL = "#EBE8E1";
-const BRANCO = "#FFFFFF";
-const AMARELO = "#FFD60A";
-const VERMELHO = "#E1251B";
-
-const LIMITE = {
-  extrapolateLeft: "clamp",
-  extrapolateRight: "clamp",
-} as const;
-
-const CONTORNO = (u: number) =>
-  `0 ${u * 0.3}px ${u * 1.2}px rgba(0,0,0,0.55), 0 0 ${u * 0.25}px rgba(0,0,0,0.8)`;
-
-// "*palavra*" → palavra na cor de destaque.
-const comDestaque = (texto: string, cor: string) =>
-  texto.split(/(\*[^*]+\*)/g).map((parte, i) =>
-    parte.startsWith("*") && parte.endsWith("*") && parte.length > 2 ? (
-      <span key={i} style={{ color: cor }}>
-        {parte.slice(1, -1)}
-      </span>
-    ) : (
-      <React.Fragment key={i}>{parte}</React.Fragment>
-    ),
-  );
-
-const semAsteriscos = (texto: string) => texto.replace(/\*/g, "");
-
-// Letra menor para textos longos.
-const tamanhoPeloTexto = (texto: string, grande: number, u: number) => {
-  const n = semAsteriscos(texto).length;
-  return (
-    u *
-    (n <= 10
-      ? grande
-      : n <= 18
-        ? grande * 0.85
-        : n <= 28
-          ? grande * 0.7
-          : grande * 0.55)
-  );
-};
-
-type Ctx = {
-  motion: Motion;
-  frame: number;
-  fps: number;
-  duracao: number;
-  u: number;
-  largura: number;
-  altura: number;
-  cor: string;
-  // 1 → 0 nos últimos quadros.
-  saida: number;
-};
-
-const entrada = (c: Ctx, atraso = 0, rigidez = 170, amortecimento = 13) =>
-  spring({
-    frame: c.frame - atraso,
-    fps: c.fps,
-    config: { stiffness: rigidez, damping: amortecimento, mass: 0.7 },
-  });
-
-// Onde o bloco fica: topo / centro / base (a base fica acima das legendas).
-const Lugar: React.FC<{
-  posicao: Motion["posicao"];
-  padrao: NonNullable<Motion["posicao"]>;
-  children: React.ReactNode;
-  estilo?: React.CSSProperties;
-}> = ({ posicao, padrao, children, estilo }) => {
-  const p = posicao ?? padrao;
-  return (
-    <AbsoluteFill
-      style={{
-        justifyContent:
-          p === "topo" ? "flex-start" : p === "base" ? "flex-end" : "center",
-        alignItems: "center",
-        paddingTop: p === "topo" ? "13%" : 0,
-        paddingBottom: p === "base" ? "24%" : 0,
-        paddingLeft: "6%",
-        paddingRight: "6%",
-        ...estilo,
-      }}
-    >
-      {children}
-    </AbsoluteFill>
-  );
-};
+// Os modelos do kit "neon" (motion design falado) ficam em MotionsNeon.tsx.
 
 // ---------- modelos ----------
 
@@ -1483,6 +1410,7 @@ const MODELOS: Record<Motion["modelo"], React.FC<{ c: Ctx }>> = {
   ficha: Ficha,
   vigilancia: Vigilancia,
   marcador: Marcador,
+  ...MODELOS_NEON,
 };
 
 // Um motion, com o tempo contado do começo dele.
@@ -1509,7 +1437,10 @@ export const MotionAnimado: React.FC<{
         u: Math.min(width, height) / 100,
         largura: width,
         altura: height,
-        cor: motion.cor?.trim() || VERMELHO,
+        cor:
+          motion.cor?.trim() ||
+          (ehModeloNeon(motion.modelo) ? COR_NEON : VERMELHO),
+        corEscolhida: !!motion.cor?.trim(),
         saida,
       }}
     />

@@ -118,6 +118,21 @@ const SONS = [
     expr: `(0.7*sin(2*PI*(2600+900*mod(floor(t*2)\\,2))*t)+0.5*${ruido})*exp(-180*mod(t\\,0.5))`,
     filtros: "bandpass=f=2800:width_type=o:width=2,volume=1.6",
   },
+  {
+    id: "plim",
+    d: 0.9,
+    // Brilho: duas notas agudas (dó e sol) com um harmônico, e um eco curto
+    // que dá o "cintilar".
+    expr: "0.4*sin(2*PI*2093*t)*exp(-8*t)+0.4*sin(2*PI*3136*(t-0.07))*exp(-6*(t-0.07))*gte(t\\,0.07)+0.12*sin(2*PI*6272*(t-0.07))*exp(-11*(t-0.07))*gte(t\\,0.07)",
+    filtros: "aecho=0.8:0.5:45|80:0.25|0.15,volume=1.3",
+  },
+  {
+    id: "teclado",
+    d: 1.4,
+    // Teclas de plástico em ritmo rápido e irregular, sem o sino da máquina.
+    expr: `0.8*${ruido}*exp(-520*mod(t+0.012*sin(31*t)\\,0.074))*(0.55+0.45*sin(7*t)*sin(5*t))`,
+    filtros: "highpass=f=1800,lowpass=f=7500,volume=1.4",
+  },
 ];
 
 for (const som of SONS) {

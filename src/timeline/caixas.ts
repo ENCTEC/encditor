@@ -8,9 +8,11 @@ export type AcabamentoCaixa = {
   borda: boolean;
   cantos: boolean;
   sombra: boolean;
-  // Moldura de foto polaroid e alfinete do quadro de cortiça.
+  // Moldura de foto polaroid e alfinete do quadro de cortiça; celular = a
+  // imagem vira a tela de um celular.
   polaroid?: boolean;
   alfinete?: boolean;
+  celular?: boolean;
 };
 
 export const POSICOES = [
@@ -134,4 +136,27 @@ export const caixaParaPosicao = (
     proporcaoMidia,
     proporcaoVideo,
   );
+};
+
+// Caixa do celular: alto e estreito (proporção de iPhone), embaixo (deixa
+// o topo para a etiqueta).
+export const caixaDoCelular = (
+  proporcaoVideo: number,
+  lugar: string | null,
+): Caixa => {
+  const emPe = proporcaoVideo < 1;
+  const altura = emPe ? 74 : 76;
+  const largura = (altura * (9 / 19.5)) / proporcaoVideo;
+  const x =
+    lugar === "esquerda"
+      ? 6
+      : lugar === "direita"
+        ? 100 - largura - 6
+        : (100 - largura) / 2;
+  return {
+    x: r1(x),
+    y: r1(100 - altura - (emPe ? 3 : 4)),
+    largura: r1(largura),
+    altura,
+  };
 };

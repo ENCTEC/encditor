@@ -1,13 +1,16 @@
 import { calcularClipes, inicioDosClipes } from "./calculos";
 import { mudarFormato } from "./formatos";
+import { palavrasDoTexto } from "./palavras";
 import {
   AudioFaixa,
   Clipe,
   Efeito,
+  EstiloFundo,
   Insert,
   Legenda,
   Motion,
   Timeline,
+  urlDoFundo,
   Zoom,
 } from "./schema";
 
@@ -81,9 +84,26 @@ export const atualizarItem = <F extends Faixa>(
   itens[indice] = (
     faixa === "legendas" && "texto" in mudancas
       ? comTextoNovo(novo as unknown as Legenda, (novo as Legenda).texto)
-      : novo
+      : faixa === "motions" && "texto" in mudancas
+        ? motionComTextoNovo(novo as unknown as Motion)
+        : novo
   ) as ItensPorFaixa[F];
   return { ...t, [faixa]: itens };
+};
+
+// Motion com texto novo (ex.: corrigir uma palavra do "texto falado"): se o
+// número de palavras não mudou, cada uma continua no tempo da fala; senão
+// os tempos saem e as palavras entram num ritmo fixo.
+const motionComTextoNovo = (m: Motion): Motion => {
+  if (!m.palavras) return m;
+  const novas = palavrasDoTexto(m.texto);
+  return {
+    ...m,
+    palavras:
+      novas.length === m.palavras.length
+        ? m.palavras.map((p, i) => ({ ...p, texto: novas[i] }))
+        : undefined,
+  };
 };
 
 // Troca o texto de uma legenda que veio da fala. Se o número de palavras
@@ -257,6 +277,31 @@ export const colocarCena = (
     opcoes.posicao,
   );
 };
+
+// Fundo animado como cena (sem arquivo): fica "duracao" segundos na tela.
+export const colocarFundo = (
+  t: Timeline,
+  estilo: EstiloFundo,
+  duracao: number,
+  posicao?: number,
+): Timeline =>
+  inserirClipe(
+    t,
+    {
+      url: urlDoFundo(estilo),
+      tipo: "fundo",
+      inicio: 0,
+      fim: Math.max(0.5, Math.round(duracao * 100) / 100),
+      transicao: "corte",
+      volume: 0,
+    },
+    posicao,
+  );
+
+// Até onde vai a fala/música (o fim do último áudio), para um fundo cobrir
+// a narração inteira.
+export const fimDosAudios = (t: Timeline) =>
+  t.audios.reduce((maior, a) => Math.max(maior, a.fim), 0);
 
 // Troca um arquivo por outro em toda a timeline (ex.: versão com efeitos
 // de áudio no lugar da original).

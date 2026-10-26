@@ -5,6 +5,7 @@ import {
   arquivoDoSom,
   EFEITOS_VISUAIS,
   ESTILOS_LEGENDA,
+  FUNDOS,
   ItemCatalogo,
   MOTIONS,
   SONS,
@@ -16,10 +17,12 @@ import { useProjeto } from "@/projeto/ProjetoProvider";
 import {
   DEMO,
   DemoEfeito,
+  DemoFundo,
   DemoLegenda,
   DemoMotion,
   DemoTransicao,
   DURACAO_DEMO_EFEITO,
+  DURACAO_DEMO_FUNDO,
   DURACAO_DEMO_LEGENDA,
   DURACAO_DEMO_MOTION,
   DURACAO_DEMO_TRANSICAO,
@@ -223,6 +226,32 @@ export default function PaginaEstilos() {
                     componente={DemoMotion as React.FC<Record<string, unknown>>}
                     props={{ modelo: m.id }}
                     duracao={DURACAO_DEMO_MOTION}
+                  />
+                }
+                aplicar={null}
+              />
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className="rotulo-zine mb-1">Fundos animados</h2>
+          <p className="mb-3 text-sm text-zinc-500">
+            Cenas desenhadas pelo próprio vídeo (sem arquivo), para vídeos
+            feitos só de motion: o texto falado e os grafismos do kit neon
+            ficam por cima. Na Timeline, “+ Fundo animado”; no chat, por
+            exemplo <i>“anima o que eu falo na @narracao, estilo motion”</i>.
+          </p>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {FUNDOS.map((f) => (
+              <Cartao
+                key={f.id}
+                item={f}
+                exemplo={
+                  <Exemplo
+                    componente={DemoFundo as React.FC<Record<string, unknown>>}
+                    props={{ estilo: f.id }}
+                    duracao={DURACAO_DEMO_FUNDO}
                   />
                 }
                 aplicar={null}

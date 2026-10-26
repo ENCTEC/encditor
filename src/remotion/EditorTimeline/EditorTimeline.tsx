@@ -7,7 +7,11 @@ import {
   Sequence,
   useVideoConfig,
 } from "remotion";
-import { normalizarTimeline, Timeline } from "../../timeline/schema";
+import {
+  estiloDoFundo,
+  normalizarTimeline,
+  Timeline,
+} from "../../timeline/schema";
 import {
   calcularClipes,
   calcularDuracaoTotal,
@@ -16,6 +20,7 @@ import {
 } from "../../timeline/calculos";
 import { Audios } from "./Audios";
 import { Efeitos } from "./Efeitos";
+import { FundoAnimado } from "./Fundos";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
 import { Motions } from "./Motions";
@@ -69,7 +74,9 @@ export const EditorTimeline: React.FC<Timeline> = (recebida) => {
                 largura={width}
                 altura={height}
               >
-                {clipe.tipo === "imagem" ? (
+                {clipe.tipo === "fundo" ? (
+                  <FundoAnimado estilo={estiloDoFundo(clipe.url)} />
+                ) : clipe.tipo === "imagem" ? (
                   <Img
                     src={clipe.url}
                     style={{

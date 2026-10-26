@@ -17,9 +17,17 @@ import {
   ehTelaCheia,
   TAMANHOS,
 } from "@/timeline/caixas";
-import { IdSom, MOTIONS, SONS } from "@/catalogo/estilos";
+import { FUNDOS, IdSom, MOTIONS, SONS } from "@/catalogo/estilos";
+import { calcularClipes, calcularDuracaoTotal } from "@/timeline/calculos";
 import { adicionarSom } from "@/timeline/efeitosSonoros";
-import { adicionarItem, colocarCena, removerItem } from "@/timeline/operacoes";
+import {
+  adicionarItem,
+  colocarCena,
+  colocarFundo,
+  fimDosAudios,
+  removerItem,
+} from "@/timeline/operacoes";
+import { EstiloFundo } from "@/timeline/schema";
 
 const arredondar = (n: number) => Math.round(n * 100) / 100;
 
@@ -132,6 +140,19 @@ export default function PaginaTimeline() {
     }
   };
 
+  // Fundo animado no fim da trilha: cobre até o fim dos áudios (a narração
+  // inteira), ou 5s.
+  const adicionarFundo = (estilo: EstiloFundo) => {
+    const novoIndice = timeline.clipes.length;
+    const ocupado =
+      calcularDuracaoTotal(calcularClipes(timeline)) / timeline.fps;
+    const fimAudio = fimDosAudios(timeline);
+    const duracao = fimAudio > ocupado + 0.5 ? fimAudio - ocupado + 0.3 : 5;
+    if (aplicar((t) => colocarFundo(t, estilo, duracao))) {
+      setSelecao({ faixa: "clipes", indice: novoIndice });
+    }
+  };
+
   const colocarDaBiblioteca = (midia: Midia) => {
     if (midia.papel === "cena" && midia.formato === "video") {
       const novoIndice = timeline.clipes.length;
@@ -213,7 +234,7 @@ export default function PaginaTimeline() {
             timeline={timeline}
             className="min-h-0 flex-1"
           />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="tabular-nums text-sm text-zinc-400">
               {segundoAtual.toFixed(2)}s
             </span>
@@ -257,6 +278,23 @@ export default function PaginaTimeline() {
               {SONS.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.nome}
+                </option>
+              ))}
+            </select>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  adicionarFundo(e.target.value as EstiloFundo);
+                }
+              }}
+              className="border-2 border-tinta bg-papel px-2 py-1 font-mono text-xs tracking-wider uppercase"
+              title="Cena de fundo animado (sem arquivo) no fim da trilha; cobre até o fim dos áudios"
+            >
+              <option value="">+ Fundo animado…</option>
+              {FUNDOS.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.nome}
                 </option>
               ))}
             </select>

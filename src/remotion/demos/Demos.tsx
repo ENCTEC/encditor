@@ -3,12 +3,14 @@ import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
 import { linearTiming, TransitionSeries } from "@remotion/transitions";
 import { EFEITOS_VISUAIS, MOTIONS } from "../../catalogo/estilos";
 import {
+  EstiloFundo,
   EstiloLegenda,
   ModeloMotion,
   TipoEfeito,
   TipoTransicao,
 } from "../../timeline/schema";
 import { Efeitos } from "../EditorTimeline/Efeitos";
+import { FundoAnimado } from "../EditorTimeline/Fundos";
 import { MotionAnimado } from "../EditorTimeline/Motions";
 import { LegendaAnimada } from "../EditorTimeline/Legendas";
 import { FONTES } from "../EditorTimeline/fontes";
@@ -23,6 +25,7 @@ export const DURACAO_DEMO_TRANSICAO = 75; // 2,5s
 export const DURACAO_DEMO_LEGENDA = 105; // 3,5s
 export const DURACAO_DEMO_MOTION = 105; // 3,5s
 export const DURACAO_DEMO_EFEITO = 90; // 3s
+export const DURACAO_DEMO_FUNDO = 120; // 4s
 
 const Painel: React.FC<{ texto: string; fundo: string; cor: string }> = ({
   texto,
@@ -152,7 +155,11 @@ export const DemoMotion: React.FC<{ modelo: ModeloMotion }> = ({ modelo }) => {
   const duracao = DURACAO_DEMO_MOTION - 8;
   return (
     <AbsoluteFill>
-      <FundoEscuro comProduto={aponta} />
+      {item.neon ? (
+        <FundoAnimado estilo="neon" />
+      ) : (
+        <FundoEscuro comProduto={aponta} />
+      )}
       <Sequence from={6} durationInFrames={duracao}>
         <MotionAnimado
           duracaoFrames={duracao}
@@ -237,6 +244,28 @@ const CenaColorida: React.FC = () => (
     </span>
   </AbsoluteFill>
 );
+
+// Fundo animado com uma frase do kit neon por cima (para ver o conjunto).
+export const DemoFundo: React.FC<{ estilo: EstiloFundo }> = ({ estilo }) => {
+  const duracao = DURACAO_DEMO_FUNDO - 10;
+  return (
+    <AbsoluteFill>
+      <FundoAnimado estilo={estilo} />
+      <Sequence from={8} durationInFrames={duracao}>
+        <MotionAnimado
+          duracaoFrames={duracao}
+          motion={{
+            modelo: "fala",
+            inicio: 0,
+            fim: duracao / DEMO.fps,
+            texto: "o que você *fala*|vira *animação*",
+            ...(estilo === "papel" ? { cor: "#E1251B" } : {}),
+          }}
+        />
+      </Sequence>
+    </AbsoluteFill>
+  );
+};
 
 export const DemoEfeito: React.FC<{ tipo: TipoEfeito }> = ({ tipo }) => {
   const tipico = EFEITOS_VISUAIS.find((e) => e.id === tipo)?.duracao ?? 1;

@@ -15,7 +15,8 @@ import { z } from "zod";
 // (transicoesExtras.tsx): mergulho = zoom forte atravessando a cena;
 // chicote = passa rápido para o lado, borrado (whip pan); clarao = flash
 // branco; falha = glitch digital; borrao = desfoca uma e foca a outra;
-// giro = gira e aproxima.
+// giro = gira e aproxima; degrade = uma faixa em degradê (azul→roxo) varre a
+// tela e revela a cena nova.
 export const tipoTransicaoSchema = z.enum([
   "corte",
   "fade",
@@ -31,17 +32,27 @@ export const tipoTransicaoSchema = z.enum([
   "falha",
   "borrao",
   "giro",
+  "degrade",
 ]);
 
 // De onde a cena nova entra (vale para slide, cortina e virar).
 export const direcaoSchema = z.enum(["esquerda", "direita", "cima", "baixo"]);
 
+// Fundos animados do encEditor (desenhados pelo próprio vídeo, sem
+// arquivo): neon = escuro com brilhos roxo/azul e anéis; formas = o neon com
+// formas 3D flutuando; papel = papel claro com retícula (cara do encEditor).
+export const estiloFundoSchema = z.enum(["neon", "formas", "papel"]);
+
+// Prefixo da "url" de uma cena de fundo animado: "fundo:neon".
+export const PREFIXO_FUNDO = "fundo:";
+
 // Trilha principal: as cenas, em sequência.
 export const clipeSchema = z.object({
   url: z.string(),
-  // Cenas podem ser vídeos ou imagens paradas (sem valor = vídeo).
-  // Numa imagem, inicio/fim só definem quanto tempo ela fica na tela.
-  tipo: z.enum(["video", "imagem"]).optional(),
+  // Cenas podem ser vídeos, imagens paradas ou um fundo animado (sem valor
+  // = vídeo). Numa imagem ou fundo, inicio/fim só definem quanto tempo fica
+  // na tela. Fundo: url = "fundo:<estilo>" (ver estiloFundoSchema).
+  tipo: z.enum(["video", "imagem", "fundo"]).optional(),
   inicio: z.number().min(0),
   fim: z.number().min(0),
   transicao: tipoTransicaoSchema,
@@ -79,7 +90,10 @@ export const insertSchema = z.object({
     .optional(),
   // Acabamento da janela (quando não é tela cheia). polaroid = moldura de
   // foto instantânea (branca, faixa de baixo maior; ignora borda e cantos);
-  // alfinete = preso por um alfinete vermelho no topo (quadro de cortiça).
+  // alfinete = preso por um alfinete vermelho no topo (quadro de cortiça);
+  // celular = dentro de um celular (a imagem vira a tela; sobe de baixo ao
+  // entrar e, se outro insert de celular vem logo depois no mesmo lugar, só
+  // a tela troca).
   acabamento: z
     .object({
       borda: z.boolean(),
@@ -87,6 +101,7 @@ export const insertSchema = z.object({
       sombra: z.boolean(),
       polaroid: z.boolean().optional(),
       alfinete: z.boolean().optional(),
+      celular: z.boolean().optional(),
     })
     .optional(),
   // Inclinação da janela em graus (positivo = sentido horário).
@@ -163,7 +178,9 @@ export const aparenciaLegendasSchema = z.object({
 
 // Motion graphics: textos e grafismos animados por cima do vídeo (acima
 // das cenas e inserts, abaixo das legendas). Ver src/catalogo/estilos.ts.
-// Os de baixo formam o kit "investigação" (quadro de cortiça, perícia).
+// Depois vêm o kit "investigação" (quadro de cortiça, perícia) e o kit
+// "neon" (motion design falado: cada frase vira texto e grafismo no momento
+// em que é dita — ver MotionsNeon.tsx).
 export const modeloMotionSchema = z.enum([
   "frase",
   "preco",
@@ -182,6 +199,17 @@ export const modeloMotionSchema = z.enum([
   "ficha",
   "vigilancia",
   "marcador",
+  "fala",
+  "etiqueta",
+  "anel",
+  "digitando",
+  "barra",
+  "comentario",
+  "curtida",
+  "toque",
+  "brilho",
+  "microfone",
+  "confirmado",
 ]);
 
 export const motionSchema = z.object({
@@ -201,8 +229,16 @@ export const motionSchema = z.object({
   // Segundo ponto (% da tela): onde o fio termina.
   x2: z.number().min(0).max(100).optional(),
   y2: z.number().min(0).max(100).optional(),
-  // Cor de destaque (#rrggbb). Sem valor = vermelho do encEditor.
+  // Cor de destaque (#rrggbb). Sem valor = vermelho do encEditor (no kit
+  // neon, o degradê azul→roxo).
   cor: z.string().optional(),
+  // Tempo em que cada palavra do texto é FALADA, contado do início do
+  // motion, na ordem das palavras do texto (sem os "|"). Faz "fala" e
+  // "digitando" mostrarem cada palavra junto com a voz. Sem valor, as
+  // palavras entram num ritmo fixo.
+  palavras: z
+    .array(z.object({ texto: z.string(), de: z.number(), ate: z.number() }))
+    .optional(),
 });
 
 // Efeitos de imagem num trecho (como o zoom, valem para cenas e inserts).
@@ -250,6 +286,7 @@ export const timelineSchema = z.object({
 
 export type TipoTransicao = z.infer<typeof tipoTransicaoSchema>;
 export type Direcao = z.infer<typeof direcaoSchema>;
+export type EstiloFundo = z.infer<typeof estiloFundoSchema>;
 export type Clipe = z.infer<typeof clipeSchema>;
 export type Insert = z.infer<typeof insertSchema>;
 export type AudioFaixa = z.infer<typeof audioSchema>;
@@ -263,6 +300,13 @@ export type EstiloLegenda = z.infer<typeof estiloLegendaSchema>;
 export type PosicaoLegenda = z.infer<typeof posicaoLegendaSchema>;
 export type AparenciaLegendas = z.infer<typeof aparenciaLegendasSchema>;
 export type Timeline = z.infer<typeof timelineSchema>;
+
+// Cena de fundo animado: url "fundo:<estilo>" (estilo desconhecido = neon).
+export const urlDoFundo = (estilo: EstiloFundo) => `${PREFIXO_FUNDO}${estilo}`;
+export const estiloDoFundo = (url: string): EstiloFundo => {
+  const e = estiloFundoSchema.safeParse(url.slice(PREFIXO_FUNDO.length));
+  return e.success ? e.data : "neon";
+};
 
 // Timeline salva antes das faixas Motion e Efeitos: ganha as duas vazias.
 export const normalizarTimeline = (

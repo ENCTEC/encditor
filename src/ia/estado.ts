@@ -5,7 +5,7 @@ import {
   calcularDuracaoTotal,
   inicioDosClipes,
 } from "@/timeline/calculos";
-import { Timeline } from "@/timeline/schema";
+import { estiloDoFundo, Timeline } from "@/timeline/schema";
 
 // Descreve o projeto para o Claude em termos humanos: números começando
 // em 1, tempos em segundos na timeline FINAL e nomes da biblioteca
@@ -28,8 +28,11 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     aparencia_das_legendas: t.aparenciaLegendas ?? "padrão do estilo",
     cenas: clipes.map((c, i) => ({
       cena: i + 1,
-      arquivo: nome(c.url),
-      ...(c.tipo === "imagem" ? { tipo: "imagem" } : {}),
+      arquivo:
+        c.tipo === "fundo"
+          ? `fundo animado #fundo-${estiloDoFundo(c.url)}`
+          : nome(c.url),
+      ...(c.tipo === "imagem" || c.tipo === "fundo" ? { tipo: c.tipo } : {}),
       no_video_final: {
         de: s(inicios[i] / t.fps),
         ate: s((inicios[i] + c.duracaoFrames) / t.fps),
@@ -52,6 +55,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       posicao: x.posicao,
       ...(x.caixa ? { caixa_percent: x.caixa } : {}),
       ...(x.acabamento?.polaroid ? { moldura: "polaroid" } : {}),
+      ...(x.acabamento?.celular ? { moldura: "celular" } : {}),
       ...(x.acabamento?.alfinete ? { alfinete: true } : {}),
       ...(x.rotacao ? { inclinacao_graus: x.rotacao } : {}),
       ...(x.rotulo ? { rotulo: x.rotulo } : {}),
@@ -97,6 +101,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       ...(x.x !== undefined ? { x: x.x, y: x.y } : {}),
       ...(x.x2 !== undefined ? { x2: x.x2, y2: x.y2 } : {}),
       ...(x.cor ? { cor: x.cor } : {}),
+      ...(x.palavras ? { segue_a_fala: true } : {}),
     })),
     efeitos: (t.efeitos ?? []).map((x, i) => ({
       numero: i + 1,

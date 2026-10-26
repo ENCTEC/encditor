@@ -8,6 +8,7 @@ import { TAGS_DE_AUDIO_DO_PLAYER } from "@/remotion/EditorTimeline/premontar";
 import {
   AcabamentoCaixa,
   Caixa,
+  caixaDoCelular,
   caixaDoLayout,
   caixaNaGrade,
   Layout,
@@ -319,15 +320,29 @@ export const PopupPosicao: React.FC<{
                 ["sombra", "Sombra"],
                 ["polaroid", "Foto polaroid"],
                 ["alfinete", "Alfinete (quadro de cortiça)"],
+                ["celular", "Dentro de um celular"],
               ] as const
             ).map(([chave, rotulo]) => (
               <label key={chave} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={!!acabamento[chave]}
-                  onChange={(e) =>
-                    setAcabamento({ ...acabamento, [chave]: e.target.checked })
-                  }
+                  onChange={(e) => {
+                    setAcabamento({ ...acabamento, [chave]: e.target.checked });
+                    // Celular: caixa no formato de um celular, no mesmo
+                    // centro (de tela cheia, no lugar padrão).
+                    if (chave === "celular" && e.target.checked) {
+                      setCaixa((c) => {
+                        const cel = caixaDoCelular(proporcaoVideo, null);
+                        return telaCheia
+                          ? cel
+                          : limitarCaixa({
+                              ...cel,
+                              x: c.x + c.largura / 2 - cel.largura / 2,
+                            });
+                      });
+                    }
+                  }}
                   className="accent-spray"
                 />
                 {rotulo}

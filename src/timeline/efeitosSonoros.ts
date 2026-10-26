@@ -32,6 +32,7 @@ export const SOM_DA_TRANSICAO: Record<TipoTransicao, IdSom | null> = {
   impacto: "boom",
   clarao: "obturador",
   falha: "falha",
+  degrade: "whoosh",
 };
 
 // Sons "de passagem" chegam no auge no meio; os de batida começam no ponto.
@@ -66,7 +67,7 @@ export const adicionarSom = (
 };
 
 // Já há um efeito sonoro perto deste momento?
-const temSomPerto = (t: Timeline, momento: number, folga = 0.25) =>
+export const temSomPerto = (t: Timeline, momento: number, folga = 0.25) =>
   t.audios.some(
     (a) =>
       a.url.startsWith("/sons/") &&
@@ -81,15 +82,26 @@ const CHEGADA: Partial<Record<Motion["modelo"], number>> = {
   carimbo: 0.1,
   nota: 0.17,
   ficha: 0.27,
+  // Kit neon: a barra termina de encher (a subida acaba aí), o comentário
+  // começa a ser digitado, o dedo aperta, o botão de curtir é tocado.
+  barra: 1.05,
+  comentario: 0.33,
+  toque: 0.3,
+  curtida: 0.23,
+  anel: 0.2,
+  digitando: 0.2,
 };
 
 // Momento em que o motion "chega" na tela (o preço novo salta um pouco
-// depois do antigo; o contador termina de contar ~1,2s depois).
+// depois do antigo; o contador termina de contar ~1,2s depois; o cartão
+// digitando começa a escrever na 1ª palavra falada).
 export const momentoDoSomDoMotion = (m: Motion) =>
   m.inicio +
   (m.modelo === "preco" && m.detalhe?.trim()
     ? 0.55
-    : (CHEGADA[m.modelo] ?? 0.05));
+    : m.modelo === "digitando" && m.palavras?.length
+      ? Math.max(0, m.palavras[0].de)
+      : (CHEGADA[m.modelo] ?? 0.05));
 
 export const somDoMotion = (m: Motion) =>
   MOTIONS.find((x) => x.id === m.modelo)?.som ?? null;

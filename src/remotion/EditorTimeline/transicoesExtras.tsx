@@ -211,6 +211,41 @@ const Giro: React.FC<PropsDoEfeito> = (props) => {
   return <Camada estilo={estilo}>{children}</Camada>;
 };
 
+// Degradê: uma faixa azul→roxo atravessa a tela (de baixo para cima, salvo
+// outra direção), cobre a cena antiga e, ao passar, revela a nova.
+const Degrade: React.FC<PropsDoEfeito> = (props) => {
+  const { children, presentationProgress: p, passedProps } = props;
+  if (emRepouso(props) || props.presentationDirection === "exiting") {
+    return <Camada>{children}</Camada>;
+  }
+  // "direcao" = de onde a faixa vem (padrão: de baixo). A faixa tem 1,5
+  // tela de comprimento: a frente é sólida e a traseira some no
+  // transparente. Ela entra por um lado e sai pelo outro; no meio da
+  // transição cobre a tela toda e é aí que a cena troca.
+  const de = passedProps.direcao ?? "baixo";
+  const vertical = de === "baixo" || de === "cima";
+  const pos = de === "baixo" || de === "direita" ? 100 - p * 250 : -150 + p * 250;
+  const angulo = { baixo: 180, cima: 0, direita: 90, esquerda: 270 }[de];
+  return (
+    <Camada
+      estilo={{ opacity: p >= 0.5 ? 1 : 0 }}
+      porCima={
+        <div
+          style={{
+            position: "absolute",
+            ...(vertical
+              ? { left: 0, width: "100%", top: `${pos}%`, height: "150%" }
+              : { top: 0, height: "100%", left: `${pos}%`, width: "150%" }),
+            background: `linear-gradient(${angulo}deg, #2DD4FF 0%, #4F7BFF 40%, #A855F7 85%, rgba(168,85,247,0) 100%)`,
+          }}
+        />
+      }
+    >
+      {children}
+    </Camada>
+  );
+};
+
 const EFEITOS = {
   mergulho: Mergulho,
   chicote: Chicote,
@@ -218,6 +253,7 @@ const EFEITOS = {
   falha: Falha,
   borrao: Borrao,
   giro: Giro,
+  degrade: Degrade,
 };
 
 export type TransicaoExtra = keyof typeof EFEITOS;

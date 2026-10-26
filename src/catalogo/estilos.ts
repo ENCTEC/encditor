@@ -1,4 +1,5 @@
 import {
+  EstiloFundo,
   EstiloLegenda,
   ModeloMotion,
   TipoEfeito,
@@ -117,6 +118,46 @@ export const TRANSICOES: ItemCatalogo<TipoTransicao>[] = [
     descricao: "A imagem gira e aproxima até virar a cena nova.",
     quandoUsar: "Diversão, energia, mudança brusca de assunto.",
   },
+  {
+    id: "degrade",
+    tag: "#degrade",
+    nome: "Degradê",
+    descricao:
+      "Uma faixa em degradê azul→roxo atravessa a tela e revela a cena nova.",
+    quandoUsar:
+      "Vídeos de motion (kit neon), virada para o final/chamada. Direção = de onde a faixa vem (padrão: de baixo).",
+  },
+];
+
+// Fundos animados: cenas desenhadas pelo próprio vídeo (sem arquivo), para
+// vídeos feitos só de motion — o texto falado e os grafismos vão por cima.
+export const FUNDOS: ItemCatalogo<EstiloFundo>[] = [
+  {
+    id: "neon",
+    tag: "#fundo-neon",
+    nome: "Neon",
+    descricao:
+      "Escuro, com brilhos roxo e azul se mexendo devagar e anéis girando.",
+    quandoUsar:
+      "Motion design falado (kit neon), tecnologia, explicações, 'olha isso'.",
+  },
+  {
+    id: "formas",
+    tag: "#fundo-formas",
+    nome: "Formas 3D",
+    descricao:
+      "O neon com cubos, anéis, esferas e cápsulas 3D flutuando nas bordas.",
+    quandoUsar:
+      "Mais movimento no meio do vídeo (celular na tela, passo a passo).",
+  },
+  {
+    id: "papel",
+    tag: "#fundo-papel",
+    nome: "Papel",
+    descricao: "Papel claro com retícula e uma mancha vermelha de spray.",
+    quandoUsar:
+      "Explicações com a cara do encEditor; combina com os motions do kit básico (frase, título, lista).",
+  },
 ];
 
 // Motion graphics: textos e grafismos animados por cima do vídeo.
@@ -133,8 +174,11 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
     x2?: number;
     y2?: number;
   };
-  // Som que combina (adicionado junto pela IA e pela montagem).
-  som: IdSom;
+  // Som que combina (adicionado junto pela IA e pela montagem); null = sem
+  // som (aparece demais para ter som toda vez).
+  som: IdSom | null;
+  // Kit neon: o exemplo da aba Estilos roda sobre o fundo neon.
+  neon?: boolean;
 })[] = [
   {
     id: "frase",
@@ -328,6 +372,150 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
       "texto = número ou letra; detalhe = legenda embaixo (opcional); x/y = onde a plaquinha pisa.",
     exemplo: { texto: "1", detalhe: "prova", x: 50, y: 72 },
     som: "pop",
+  },
+  // Kit "neon": motion design FALADO (o que a pessoa diz acontece na tela).
+  // Combina com o fundo animado neon/formas, a transição #degrade e a
+  // ferramenta encenar_fala da IA.
+  {
+    id: "fala",
+    tag: "#fala",
+    nome: "Texto falado",
+    descricao:
+      "As palavras entram uma a uma no instante em que são ditas; as de destaque vêm enormes, em degradê azul→roxo.",
+    quandoUsar:
+      "O 'texto principal' de cada tela num vídeo de motion: substitui a legenda.",
+    campos:
+      "texto = as palavras EXATAS que são faladas (*palavra* = destaque grande; | quebra a linha); posicao = topo/centro/base.",
+    exemplo: { texto: "Rapaziada,|é *bizarro*|o que dá pra *fazer*" },
+    som: null,
+    neon: true,
+  },
+  {
+    id: "etiqueta",
+    tag: "#etiqueta",
+    nome: "Etiqueta de ação",
+    descricao: "Pílula em degradê que nomeia a ação ou o lugar.",
+    quandoUsar:
+      "'LÁ EM CIMA', 'CLICA NO CANAL', 'PASSO 2', 'ANTES', 'O SEGREDO'.",
+    campos:
+      "texto = 1 a 4 palavras; posicao (padrão topo) ou x/y = centro da pílula.",
+    exemplo: { texto: "Barra de pesquisa" },
+    som: "pop",
+    neon: true,
+  },
+  {
+    id: "anel",
+    tag: "#anel",
+    nome: "Anel brilhante",
+    descricao: "Círculo de luz que se desenha e pulsa, com o texto dentro.",
+    quandoUsar: "'Olha isso', 'atenção', a palavra que vira o assunto.",
+    campos: "texto = curto (| quebra a linha; *destaque*); x/y = centro.",
+    exemplo: { texto: "Olha|*isso.*", x: 50, y: 50 },
+    som: "swoosh",
+    neon: true,
+  },
+  {
+    id: "digitando",
+    tag: "#digitando",
+    nome: "Cartão digitando",
+    descricao:
+      "Cartão de vidro que escreve o texto junto com a voz, com ondinha de áudio.",
+    quandoUsar:
+      "Quando a pessoa dita um comando, uma pesquisa, uma mensagem ou um pedido.",
+    campos:
+      "texto = o que é dito (*destaque* = grande em degradê); detalhe = cabeçalho ('COMANDO DE VOZ', 'PESQUISA', 'MENSAGEM'); posicao (padrão topo).",
+    exemplo: {
+      texto: "Claude, faça uma *home do YouTube*",
+      detalhe: "Comando de voz",
+    },
+    som: "teclado",
+    neon: true,
+  },
+  {
+    id: "barra",
+    tag: "#barra",
+    nome: "Barra de nível",
+    descricao:
+      "Palavra grande e uma barra de segmentos que enche em degradê.",
+    quandoUsar: "'O nível', 'progresso', 'carregando', 'de 0 a 100'.",
+    campos:
+      "texto = a palavra grande ('NÍVEL'); detalhe = linha pequena em cima ('É ESSE O').",
+    exemplo: { texto: "Nível", detalhe: "É esse o" },
+    som: "subida",
+    neon: true,
+  },
+  {
+    id: "comentario",
+    tag: "#comentario",
+    nome: "Comentário",
+    descricao:
+      "Caixa de comentários: o texto é digitado, enviado e aparece publicado.",
+    quandoUsar: "Chamada final 'comente EU QUERO', 'me conta nos comentários'.",
+    campos:
+      "texto = o comentário ('EU QUERO'); detalhe = pílula acima ('COMENTE \"EU QUERO\"').",
+    exemplo: { texto: "Eu quero", detalhe: 'Comente "Eu quero"' },
+    som: "teclado",
+    neon: true,
+  },
+  {
+    id: "curtida",
+    tag: "#curtida",
+    nome: "Curtida",
+    descricao:
+      "Botão de curtir que é tocado, estoura em brilhinhos e solta uma mão maior.",
+    quandoUsar: "'Deixa o like', 'curte', 'aprovado pelo público'.",
+    campos:
+      "texto = número (o contador sobe 1 no toque) ou rótulo curto; x/y = onde fica o botão.",
+    exemplo: { texto: "3", x: 50, y: 50 },
+    som: "plim",
+    neon: true,
+  },
+  {
+    id: "toque",
+    tag: "#toque",
+    nome: "Toque na tela",
+    descricao: "Um 'dedo' (círculo claro) chega, aperta e solta uma onda.",
+    quandoUsar:
+      "'Clica aqui', 'toca no botão' — por cima de um print no celular ou de um botão.",
+    campos: "x/y = onde o dedo toca (% da tela). Sem texto.",
+    exemplo: { texto: "", x: 50, y: 50 },
+    som: "clique",
+    neon: true,
+  },
+  {
+    id: "brilho",
+    tag: "#brilho",
+    nome: "Brilho ✦",
+    descricao: "Estrela de brilho que gira e pisca, com duas pequenas.",
+    quandoUsar:
+      "Enfeitar uma palavra-chave ou um produto: 'novo', 'mágico', o nome da marca.",
+    campos: "x/y = onde brilha (perto da palavra). Sem texto.",
+    exemplo: { texto: "", x: 50, y: 50 },
+    som: "plim",
+    neon: true,
+  },
+  {
+    id: "microfone",
+    tag: "#microfone",
+    nome: "Microfone ouvindo",
+    descricao:
+      "Microfone num círculo em degradê com barrinhas de voz mexendo em volta.",
+    quandoUsar: "'Só com a minha voz', 'é só falar', 'ouvindo', áudio, podcast.",
+    campos: "x/y = centro (padrão no meio). Sem texto.",
+    exemplo: { texto: "", x: 50, y: 50 },
+    som: null,
+    neon: true,
+  },
+  {
+    id: "confirmado",
+    tag: "#confirmado",
+    nome: "Selo ✓",
+    descricao: "Selo inclinado com ✓ que chega girando.",
+    quandoUsar: "'Fechou?', 'pronto', 'aprovado', 'feito'.",
+    campos: "texto = 1 ou 2 palavras; posicao (padrão topo) ou x/y.",
+    exemplo: { texto: "Fechou?" },
+    som: "pop",
+    neon: true,
   },
 ];
 
@@ -576,6 +764,24 @@ export const SONS = [
     duracao: 2,
     volume: 0.45,
   },
+  {
+    id: "plim",
+    tag: "#som-plim",
+    nome: "Plim (brilho)",
+    descricao: "Duas notas agudas de brilho, com um leve eco.",
+    quandoUsar: "Brilho ✦, curtida, a palavra mágica — só em 2 a 4 momentos.",
+    duracao: 0.9,
+    volume: 0.35,
+  },
+  {
+    id: "teclado",
+    tag: "#som-teclado",
+    nome: "Teclado",
+    descricao: "Teclas de computador/celular sendo digitadas, baixinho.",
+    quandoUsar: "Cartão digitando, comentário, pesquisa sendo escrita.",
+    duracao: 1.4,
+    volume: 0.3,
+  },
 ] as const satisfies readonly (ItemCatalogo<string> & {
   duracao: number;
   volume: number;
@@ -674,6 +880,10 @@ export const catalogoParaIA = () =>
     ...EFEITOS_VISUAIS.map(
       (e) =>
         `- ${e.tag} = ${e.nome}: ${e.descricao} Uso: ${e.quandoUsar} (duração típica ${e.duracao}s)`,
+    ),
+    "Fundos animados — cena sem arquivo, para vídeo só de motion (cite com #; use colocar_fundo):",
+    ...FUNDOS.map(
+      (f) => `- ${f.tag} = ${f.nome}: ${f.descricao} Uso: ${f.quandoUsar}`,
     ),
     "Efeitos sonoros (cite com #; use adicionar_som):",
     ...SONS.map(

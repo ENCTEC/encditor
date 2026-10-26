@@ -1,8 +1,13 @@
-import { EFEITOS_VISUAIS, MOTIONS, somPorArquivo } from "@/catalogo/estilos";
+import {
+  EFEITOS_VISUAIS,
+  FUNDOS,
+  MOTIONS,
+  somPorArquivo,
+} from "@/catalogo/estilos";
 import { Midia } from "@/projeto/tipos";
 import { calcularClipes, inicioDosClipes } from "@/timeline/calculos";
 import { ehEfeitoSonoro, Faixa } from "@/timeline/operacoes";
-import { Timeline } from "@/timeline/schema";
+import { estiloDoFundo, Timeline } from "@/timeline/schema";
 
 // Converte a timeline em "blocos" para desenhar: cada item com sua posição
 // (em segundos) na timeline FINAL e um rótulo legível.
@@ -114,7 +119,10 @@ export const calcularBlocos = (
       indice: i,
       inicio: inicios[i] / t.fps,
       fim: (inicios[i] + c.duracaoFrames) / t.fps,
-      rotulo: nomePorUrl(c.url) ?? `Clipe ${i + 1}`,
+      rotulo:
+        c.tipo === "fundo"
+          ? `Fundo ${FUNDOS.find((f) => f.id === estiloDoFundo(c.url))?.nome ?? ""}`
+          : (nomePorUrl(c.url) ?? `Clipe ${i + 1}`),
     })),
     inserts: t.inserts.map((x, i) => ({
       faixa: "inserts",

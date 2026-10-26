@@ -11,11 +11,13 @@ import {
   atualizarItem,
   definirFormato,
   colocarCena,
+  colocarFundo,
   apararItem,
   cortarTrecho,
   dividirClipe,
   dividirItemNoTempo,
   duplicarItem,
+  fimDosAudios,
   juntarItens,
   sobreposicaoDeAudio,
   Faixa,
@@ -46,6 +48,7 @@ import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
 import {
   direcaoSchema,
   Efeito,
+  estiloFundoSchema,
   estiloLegendaSchema,
   modeloMotionSchema,
   Motion,
@@ -62,8 +65,11 @@ import {
   palavrasNoVideoFinal,
 } from "./conteudo";
 import { buscarNoBanco } from "./busca-banco";
+import { encenar, tempoDasPalavras } from "./encenar";
+import { palavrasDoTexto } from "@/timeline/palavras";
 import { resumoDoProjeto } from "./estado";
 import {
+  caixaDoCelular,
   caixaPadrao,
   caixaParaPosicao,
   ehTelaCheia,
@@ -136,19 +142,39 @@ const TIPOS_DE_ITEM = [
   "efeito",
 ] as const;
 
-// Quanto um motion fica na tela quando a IA não diz.
-const duracaoPadraoDoMotion = (modelo: Motion["modelo"], itens: number) =>
+// Quanto um motion fica na tela quando a IA não diz (itens = itens da
+// lista ou palavras do texto).
+const DURACAO_NEON: Partial<Record<Motion["modelo"], number>> = {
+  etiqueta: 2,
+  anel: 1.8,
+  digitando: 3,
+  barra: 2,
+  comentario: 3.2,
+  curtida: 1.8,
+  toque: 1,
+  brilho: 1.2,
+  microfone: 2,
+  confirmado: 1.6,
+};
+const duracaoPadraoDoMotion = (
+  modelo: Motion["modelo"],
+  itens: number,
+  palavras: number,
+) =>
   modelo === "lista"
     ? 1.2 + itens * 0.6 + 1
-    : modelo === "frase" || modelo === "selo"
-      ? 1.8
-      : modelo === "contador"
-        ? 2.6
-        : modelo === "ficha" || modelo === "vigilancia"
-          ? 4
-          : modelo === "fio" || modelo === "nota" || modelo === "fita"
-            ? 3
-            : 2.5;
+    : modelo === "fala"
+      ? Math.max(1.5, palavras * 0.35 + 0.8)
+      : (DURACAO_NEON[modelo] ??
+        (modelo === "frase" || modelo === "selo"
+          ? 1.8
+          : modelo === "contador"
+            ? 2.6
+            : modelo === "ficha" || modelo === "vigilancia"
+              ? 4
+              : modelo === "fio" || modelo === "nota" || modelo === "fita"
+                ? 3
+                : 2.5));
 
 export const criarFerramentas = (sessao: SessaoEdicao) => {
   const duracaoTotal = () =>
@@ -352,14 +378,14 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "acabamento_do_insert",
       description:
-        "Muda o acabamento de um insert em janela (não tela cheia): moldura de foto polaroid (com um texto escrito à mão embaixo), alfinete vermelho no topo (foto presa num quadro de cortiça — entra 'assentando' no quadro), inclinação, ou o visual comum (borda branca, cantos arredondados, sombra). Para um 'quadro de investigação': imagem de cortiça como cena de fundo, inserts polaroid com alfinete e motions fio/nota/carimbo/ficha. Campos null não mudam.",
+        "Muda o acabamento de um insert: dentro de um CELULAR (a imagem vira a tela; ele sobe de baixo — bom para prints de app, site, perfil), moldura de foto polaroid (com um texto escrito à mão embaixo), alfinete vermelho no topo (foto presa num quadro de cortiça — entra 'assentando' no quadro), inclinação, ou o visual comum (borda branca, cantos arredondados, sombra). Para um 'quadro de investigação': imagem de cortiça como cena de fundo, inserts polaroid com alfinete e motions fio/nota/carimbo/ficha. Campos null não mudam.",
       inputSchema: z.object({
         numero: z.number().int().min(1),
         moldura: z
-          .enum(["polaroid", "janela", "sem-moldura"])
+          .enum(["celular", "polaroid", "janela", "sem-moldura"])
           .nullable()
           .describe(
-            "polaroid = foto instantânea; janela = borda branca, cantos arredondados e sombra; sem-moldura = só a imagem.",
+            "celular = dentro de um celular (muda o tamanho para o de um celular, no mesmo centro; de tela cheia vai para o meio); polaroid = foto instantânea; janela = borda branca, cantos arredondados e sombra; sem-moldura = só a imagem.",
           ),
         alfinete: z.boolean().nullable(),
         inclinacao_graus: z
@@ -388,16 +414,53 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         };
         const acabamento = {
           ...atual,
-          ...(e.moldura === "polaroid"
-            ? { polaroid: true }
-            : e.moldura === "janela"
-              ? { polaroid: false, borda: true, cantos: true, sombra: true }
-              : e.moldura === "sem-moldura"
-                ? { polaroid: false, borda: false, cantos: false, sombra: false }
-                : {}),
+          ...(e.moldura === "celular"
+            ? {
+                celular: true,
+                polaroid: false,
+                borda: false,
+                cantos: false,
+                sombra: false,
+              }
+            : e.moldura === "polaroid"
+              ? { polaroid: true, celular: false }
+              : e.moldura === "janela"
+                ? {
+                    polaroid: false,
+                    celular: false,
+                    borda: true,
+                    cantos: true,
+                    sombra: true,
+                  }
+                : e.moldura === "sem-moldura"
+                  ? {
+                      polaroid: false,
+                      celular: false,
+                      borda: false,
+                      cantos: false,
+                      sombra: false,
+                    }
+                  : {}),
           ...(e.alfinete !== null ? { alfinete: e.alfinete } : {}),
         };
-        const caixa = insert.caixa ?? caixaPadrao(insert.posicao);
+        let caixa = insert.caixa ?? caixaPadrao(insert.posicao);
+        // Celular: caixa alta e estreita (proporção de celular), no mesmo
+        // centro; de tela cheia, no lugar padrão do celular.
+        if (e.moldura === "celular") {
+          const padrao = caixaDoCelular(
+            sessao.timeline.largura / sessao.timeline.altura,
+            null,
+          );
+          caixa = ehTelaCheia(caixa)
+            ? padrao
+            : {
+                ...padrao,
+                x: Math.min(
+                  100 - padrao.largura,
+                  Math.max(0, caixa.x + caixa.largura / 2 - padrao.largura / 2),
+                ),
+              };
+        }
         if (ehTelaCheia(caixa)) {
           throw new Error(
             `Insert ${e.numero} está em tela cheia: acabamento só vale para janela. Use posicionar_insert antes.`,
@@ -407,6 +470,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           (t) =>
             atualizarItem(t, "inserts", indice, {
               acabamento,
+              caixa,
+              posicao: "janela",
               ...(e.inclinacao_graus !== null
                 ? { rotacao: e.inclinacao_graus || undefined }
                 : {}),
@@ -415,6 +480,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
                 : {}),
             }),
           `insert ${e.numero}: ${[
+            acabamento.celular ? "dentro de um celular" : null,
             acabamento.polaroid ? "polaroid" : null,
             acabamento.alfinete ? "com alfinete" : null,
             e.inclinacao_graus !== null ? `${e.inclinacao_graus}°` : null,
@@ -901,7 +967,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_motion",
       description:
-        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
+        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). Kit neon (motion design falado; para um vídeo inteiro prefira encenar_fala): fala (as palavras faladas entram uma a uma junto com a voz; *destaque* enorme em degradê; | quebra linha), etiqueta (pílula da ação no topo), anel (círculo de luz com texto em x/y), digitando (cartão que escreve o que é dito; detalhe = cabeçalho), barra (palavra grande + barra que enche; detalhe = linha de cima), comentario (caixa: texto digitado e publicado; detalhe = pílula acima), curtida (botão de like tocado em x/y; texto = número que sobe 1), toque (dedo tocando em x/y), brilho (✦ em x/y), microfone (microfone com ondas em x/y), confirmado (selo ✓ inclinado). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
       inputSchema: z.object({
         modelo: modeloMotionSchema,
         de: z
@@ -929,7 +995,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .max(100)
           .nullable()
           .describe(
-            "seta/circulo/selo/carimbo/nota/marcador/fio: ponto em % da largura.",
+            "seta/circulo/selo/carimbo/nota/marcador/fio e anel/curtida/toque/brilho/microfone (e etiqueta/confirmado, opcional): ponto em % da largura.",
           ),
         y: z
           .number()
@@ -937,7 +1003,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .max(100)
           .nullable()
           .describe(
-            "seta/circulo/selo/carimbo/nota/marcador/fio: ponto em % da altura; fita/ficha: altura.",
+            "Os mesmos do x: ponto em % da altura; fita/ficha: altura.",
           ),
         x2: z
           .number()
@@ -954,7 +1020,9 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         cor: z
           .string()
           .nullable()
-          .describe("Cor de destaque #rrggbb. null = vermelho do encEditor."),
+          .describe(
+            "Cor de destaque #rrggbb. null = vermelho do encEditor (kit neon: degradê azul→roxo).",
+          ),
         com_som: z
           .boolean()
           .describe(
@@ -966,10 +1034,27 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           throw new Error("Cor inválida: use #rrggbb (ex.: #FFD60A).");
         }
         const itens = (e.detalhe ?? e.texto).split("|").filter(Boolean).length;
+        // Texto falado e cartão digitando: cada palavra no tempo da fala.
+        const palavras =
+          e.modelo === "fala" || e.modelo === "digitando"
+            ? tempoDasPalavras(
+                e.texto,
+                palavrasNoVideoFinal(sessao.timeline, sessao.biblioteca),
+                e.de,
+              )
+            : undefined;
         const motion: Motion = {
           modelo: e.modelo,
           inicio: s(e.de),
-          fim: s(e.ate ?? e.de + duracaoPadraoDoMotion(e.modelo, itens)),
+          fim: s(
+            e.ate ??
+              e.de +
+                duracaoPadraoDoMotion(
+                  e.modelo,
+                  itens,
+                  palavrasDoTexto(e.texto).length,
+                ),
+          ),
           texto: e.texto,
           ...(e.detalhe ? { detalhe: e.detalhe } : {}),
           ...(e.posicao ? { posicao: e.posicao } : {}),
@@ -978,6 +1063,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           ...(e.x2 !== null ? { x2: e.x2 } : {}),
           ...(e.y2 !== null ? { y2: e.y2 } : {}),
           ...(e.cor ? { cor: e.cor } : {}),
+          ...(palavras ? { palavras } : {}),
         };
         const som = e.com_som ? somDoMotion(motion) : null;
         const nome = MOTIONS.find((m) => m.id === e.modelo)?.nome ?? e.modelo;
@@ -990,6 +1076,224 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           },
           `motion "${nome}" ("${e.texto}") de ${motion.inicio}s a ${motion.fim}s${som ? ` com o som ${som}` : ""}`,
         );
+      },
+    }),
+
+    ferramenta({
+      name: "colocar_fundo",
+      description:
+        "Põe um FUNDO ANIMADO do encEditor como cena da trilha principal (desenhado pelo próprio vídeo, sem arquivo): neon (escuro, brilhos roxo/azul e anéis), formas (o neon com formas 3D flutuando nas bordas) ou papel (claro, com retícula). Serve para vídeos só de motion, sem filmagem: o texto falado e os grafismos ficam por cima. Sem duração, cobre até o fim dos áudios (a narração inteira).",
+      inputSchema: z.object({
+        estilo: estiloFundoSchema,
+        duracao_s: z
+          .number()
+          .min(0.5)
+          .nullable()
+          .describe(
+            "Quanto tempo fica. null = até o fim dos áudios (5s se não houver áudio).",
+          ),
+        posicao: z
+          .number()
+          .int()
+          .min(1)
+          .nullable()
+          .describe("Vira a cena número X. null = no fim da trilha."),
+        substituir_cenas: z
+          .boolean()
+          .describe(
+            "true = o fundo vira a trilha inteira (apaga as cenas atuais).",
+          ),
+        virada_no_segundo: z
+          .number()
+          .min(0)
+          .nullable()
+          .describe(
+            "Segundo do vídeo final em que o fundo 'vira' com a transição #degrade (ex.: a passagem para a chamada final). Divide o fundo em dois, sem mudar a duração total. null = sem virada.",
+          ),
+        estilo_depois: estiloFundoSchema
+          .nullable()
+          .describe("Fundo depois da virada. null = o mesmo."),
+      }),
+      run: (e) => {
+        const base = e.substituir_cenas
+          ? { ...sessao.timeline, clipes: [] }
+          : sessao.timeline;
+        const ocupado =
+          calcularDuracaoTotal(calcularClipes(base)) / base.fps;
+        const fimAudio = fimDosAudios(base);
+        const duracao =
+          e.duracao_s ??
+          (fimAudio > ocupado + 0.5 ? fimAudio - ocupado + 0.3 : 5);
+        const posicao = e.posicao === null ? undefined : e.posicao - 1;
+        if (e.virada_no_segundo === null) {
+          return aplicar(
+            () => colocarFundo(base, e.estilo, duracao, posicao),
+            `fundo animado ${e.estilo} com ${s(duracao)}s${e.substituir_cenas ? " (no lugar das cenas)" : ""}`,
+          );
+        }
+        // Dois fundos com a transição no meio exatamente na virada: a
+        // transição sobrepõe os dois, então cada um ganha metade dela.
+        const transicao = 0.7;
+        const inicioDoFundo =
+          posicao === undefined
+            ? ocupado
+            : inicioDosClipes(calcularClipes(base))[posicao] / base.fps || 0;
+        const virada = e.virada_no_segundo - inicioDoFundo;
+        if (virada < 1 || virada > duracao - 1) {
+          throw new Error(
+            `A virada precisa ficar entre ${s(inicioDoFundo + 1)}s e ${s(inicioDoFundo + duracao - 1)}s.`,
+          );
+        }
+        const indice = posicao ?? base.clipes.length;
+        return aplicar(
+          () => {
+            const um = colocarFundo(
+              base,
+              e.estilo,
+              virada + transicao / 2,
+              posicao,
+            );
+            const dois = colocarFundo(
+              um,
+              e.estilo_depois ?? e.estilo,
+              duracao - virada + transicao / 2,
+              indice + 1,
+            );
+            return atualizarItem(dois, "clipes", indice + 1, {
+              transicao: "degrade",
+              duracaoTransicao: transicao,
+            });
+          },
+          `fundo animado ${e.estilo} com ${s(duracao)}s, virando com #degrade em ${s(e.virada_no_segundo)}s${e.estilo_depois && e.estilo_depois !== e.estilo ? ` para o ${e.estilo_depois}` : ""}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "encenar_fala",
+      description:
+        "Monta de uma vez um vídeo de MOTION DESIGN FALADO: o que a pessoa diz vai ACONTECENDO na tela, sincronizado com a narração transcrita (ela precisa estar na timeline). Divida a fala em TELAS curtas, na ordem em que são ditas (uma ideia cada, ~1 a 3s). Cada tela começa quando o seu primeiro item é dito e acaba quando a próxima começa. Em cada tela: um motion 'fala' com as palavras ditas (menos quando um celular/cartão ocupa a tela) + 1 ou 2 itens que ENCENAM o que é dito (etiqueta, toque, digitando, barra, curtida, comentario, microfone, anel, brilho, confirmado, ou um print/foto/vídeo da biblioteca no celular). Faça o vídeo inteiro numa chamada só: os tempos saem da fala sozinhos e 'fala'/'digitando' acompanham cada palavra.",
+      inputSchema: z.object({
+        telas: z
+          .array(
+            z.object({
+              itens: z
+                .array(
+                  z.object({
+                    quando: z
+                      .string()
+                      .min(1)
+                      .describe(
+                        "Palavras EXATAS ditas no instante em que o item aparece (2 a 5 palavras copiadas da fala).",
+                      ),
+                    modelo: modeloMotionSchema
+                      .nullable()
+                      .describe("Modelo do motion. null = o item é uma mídia."),
+                    texto: z
+                      .string()
+                      .nullable()
+                      .describe(
+                        "Texto do motion (veja o modelo). Em 'fala': as palavras EXATAS ditas na tela, *destaque* nas fortes, | quebra a linha (até ~8 palavras).",
+                      ),
+                    detalhe: z.string().nullable(),
+                    posicao: z.enum(["topo", "centro", "base"]).nullable(),
+                    x: z.number().min(0).max(100).nullable(),
+                    y: z.number().min(0).max(100).nullable(),
+                    x2: z.number().min(0).max(100).nullable(),
+                    y2: z.number().min(0).max(100).nullable(),
+                    cor: z.string().nullable(),
+                    midia: z
+                      .string()
+                      .nullable()
+                      .describe(
+                        "Imagem ou vídeo da biblioteca (@apelido): print de app/site/perfil, foto do produto. null = o item é um motion.",
+                      ),
+                    moldura: z
+                      .enum(["celular", "janela", "polaroid", "tela-cheia"])
+                      .nullable()
+                      .describe(
+                        "Só com midia. celular = dentro de um celular (padrão); janela = caixa com borda; polaroid; tela-cheia.",
+                      ),
+                    lugar: z
+                      .string()
+                      .nullable()
+                      .describe(
+                        "Só com midia. celular: esquerda/centro/direita; janela/polaroid: topo, centro, base, canto-sup-esq… null = centro.",
+                      ),
+                    tamanho: tamanhoSchema.nullable(),
+                    ate_dizer: z
+                      .string()
+                      .nullable()
+                      .describe(
+                        "Some quando estas palavras terminam de ser ditas. null = até a tela acabar.",
+                      ),
+                    fica_ate_tela: z
+                      .number()
+                      .int()
+                      .min(1)
+                      .nullable()
+                      .describe(
+                        "Continua até o fim da tela N (ex.: o celular que fica enquanto as etiquetas mudam). null = só nesta tela.",
+                      ),
+                    com_som: z
+                      .boolean()
+                      .describe(
+                        "true = efeito sonoro que combina. Só nos momentos-chave.",
+                      ),
+                  }),
+                )
+                .min(1),
+            }),
+          )
+          .min(1),
+        substituir_tudo: z
+          .boolean()
+          .describe(
+            "true = apaga antes os motions, inserts e efeitos sonoros atuais (para refazer a encenação).",
+          ),
+      }),
+      run: (e) => {
+        const faladas = palavrasNoVideoFinal(
+          sessao.timeline,
+          sessao.biblioteca,
+        );
+        if (!faladas.length) {
+          throw new Error(
+            "Não há fala transcrita na timeline: coloque a narração (colocar_audio) e confira se ela já foi transcrita.",
+          );
+        }
+        const telas = e.telas.map((tela) => ({
+          itens: tela.itens.map((item) => {
+            if (!item.midia) return { ...item, midia: null, moldura: null };
+            const m = acharMidia(item.midia);
+            if (m.formato === "audio") {
+              throw new Error(`"${m.nome}" é áudio; use colocar_audio.`);
+            }
+            return {
+              ...item,
+              midia: {
+                url: m.url,
+                nome: m.nome,
+                formato: m.formato,
+                largura: m.largura,
+                altura: m.altura,
+                duracao: m.duracao,
+              },
+              moldura: item.moldura ?? ("celular" as const),
+            };
+          }),
+        }));
+        const total = duracaoTotal();
+        const ultima = faladas[faladas.length - 1].ate;
+        const r = encenar(sessao.timeline, telas, faladas, {
+          substituir: e.substituir_tudo,
+          fimDoVideo: total > ultima ? total : ultima + 0.8,
+        });
+        const ok = aplicar(
+          () => r.timeline,
+          `fala encenada em ${r.telas.length} telas: ${r.motions} motion(s), ${r.inserts} imagem(ns)/vídeo(s) e ${r.sons} efeito(s) sonoro(s)`,
+        );
+        return `${ok} Telas: ${r.telas.map((x) => `${x.tela}) ${x.de}–${x.ate}s`).join(", ")}.${r.aproximados.length ? ` Achados por aproximação (confira): ${r.aproximados.join(", ")}.` : ""}${r.avisos.length ? ` Avisos: ${r.avisos.join("; ")}.` : ""}${total < ultima ? ` ATENÇÃO: a fala vai até ${s(ultima)}s e o vídeo só tem ${total}s — estique a cena/fundo (colocar_fundo ou aparar_cena).` : ""}`;
       },
     }),
 

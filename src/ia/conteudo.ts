@@ -182,6 +182,10 @@ const normalizar = (texto: string) =>
     .split(/\s+/)
     .filter(Boolean);
 
+// Palavras comparáveis de um texto falado (minúsculas, sem acento nem
+// pontuação).
+export const tokensDaFala = normalizar;
+
 // Acha onde um trecho de fala aparece no vídeo final. Primeiro procura a
 // frase exata; se não achar, as janelas com mais palavras em comum.
 export const buscarFala = (palavras: PalavraFinal[], trecho: string) => {

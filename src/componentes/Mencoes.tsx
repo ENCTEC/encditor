@@ -4,6 +4,7 @@ import {
   EFEITOS_AUDIO,
   EFEITOS_VISUAIS,
   ESTILOS_LEGENDA,
+  FUNDOS,
   MOTIONS,
   SONS,
   TRANSICOES,
@@ -32,6 +33,7 @@ const CATALOGO = [
   ...MOTIONS.map((m) => ({ ...m, grupo: "motion" })),
   ...EFEITOS_VISUAIS.map((e) => ({ ...e, grupo: "efeito" })),
   ...SONS.map((s) => ({ ...s, grupo: "som" })),
+  ...FUNDOS.map((f) => ({ ...f, grupo: "fundo" })),
 ];
 
 const PADRAO = /([@#][a-z0-9_-]+)/gi;
