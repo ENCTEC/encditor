@@ -46,24 +46,48 @@ export const comAlfa = (cor: string, alfa: number) => {
 
 // Mistura duas cores #rrggbb (t = 0 → a, 1 → b).
 export const misturar = (a: string, b: string, t: number) => {
-  const ca = /^#(..)(..)(..)$/.exec(a)!.slice(1).map((x) => parseInt(x, 16));
-  const cb = /^#(..)(..)(..)$/.exec(b)!.slice(1).map((x) => parseInt(x, 16));
+  const ler = (cor: string) =>
+    (/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cor.trim()) ?? [
+      "",
+      "7c",
+      "3a",
+      "ed",
+    ])
+      .slice(1)
+      .map((x) => parseInt(x, 16));
+  const ca = ler(a);
+  const cb = ler(b);
   const [r, g, bl] = ca.map((v, i) => Math.round(v + (cb[i] - v) * t));
   return `rgb(${r}, ${g}, ${bl})`;
 };
+
+// As 3 cores do kit: a cor escolhida no motion (lisa), ou a paleta da
+// direção de arte do vídeo, ou o azul→roxo padrão.
+const paletaDo = (c: Ctx) => {
+  const p = c.paleta?.length ? c.paleta : [CIANO, AZUL, ROXO];
+  return p.length >= 3 ? p : [p[0], p[1] ?? p[0], p[1] ?? p[0]];
+};
+export const corDe = (c: Ctx, i: 0 | 1 | 2) =>
+  c.corEscolhida ? c.cor : paletaDo(c)[i];
 
 // Degradê do kit (ou a cor escolhida, lisa) e a cor do brilho.
 export const degrade = (c: Ctx, angulo = 90) =>
   c.corEscolhida
     ? `linear-gradient(${angulo}deg, ${c.cor}, ${c.cor})`
-    : `linear-gradient(${angulo}deg, ${CIANO} 0%, ${AZUL} 48%, ${ROXO} 100%)`;
-export const corDoBrilho = (c: Ctx) => (c.corEscolhida ? c.cor : COR_NEON);
+    : `linear-gradient(${angulo}deg, ${corDe(c, 0)} 0%, ${corDe(c, 1)} 48%, ${corDe(c, 2)} 100%)`;
+export const corDoBrilho = (c: Ctx) =>
+  c.corEscolhida ? c.cor : c.paleta?.length ? corDe(c, 2) : COR_NEON;
 export const corNaPosicao = (c: Ctx, t: number) =>
   c.corEscolhida
     ? c.cor
     : t < 0.5
-      ? misturar(CIANO, AZUL, t * 2)
-      : misturar(AZUL, ROXO, (t - 0.5) * 2);
+      ? misturar(corDe(c, 0), corDe(c, 1), t * 2)
+      : misturar(corDe(c, 1), corDe(c, 2), (t - 0.5) * 2);
+
+// Texto solto (fora de cartão/pílula): branco no escuro, quase preto no
+// fundo claro.
+export const corDoTexto = (c: Ctx, alfa = 1) =>
+  c.claro ? `rgba(21, 19, 26, ${alfa})` : `rgba(255, 255, 255, ${alfa})`;
 
 // Texto em degradê com brilho. Sombra de texto não serve aqui (cobriria o
 // degradê): o brilho e o "fantasma" colorido da entrada usam drop-shadow.
@@ -81,7 +105,8 @@ export const TextoDegrade: React.FC<{
       color: "transparent",
       WebkitTextFillColor: "transparent",
       ...estilo,
-      filter: `${filtroExtra ?? ""} drop-shadow(0 0 ${c.u * 1.1}px ${comAlfa(corDoBrilho(c), 0.55)})`,
+      // Sombra escura suave (lê bem até em fundo da mesma cor) + o brilho.
+      filter: `${filtroExtra ?? ""} drop-shadow(0 ${c.u * 0.25}px ${c.u * 0.5}px rgba(0,0,0,${c.claro ? 0.22 : 0.45})) drop-shadow(0 0 ${c.u * 1.1}px ${comAlfa(corDoBrilho(c), 0.55)})`,
     }}
   >
     {children}

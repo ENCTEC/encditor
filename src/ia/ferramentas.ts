@@ -46,10 +46,15 @@ import {
 import { nomeDaUrl } from "@/servidor/armazenamento";
 import { aplicarEfeitos } from "@/servidor/efeitos";
 import { envelopeDoArquivo } from "@/servidor/envelope";
+import { estudarExemplo } from "@/servidor/estudarExemplo";
+import { medirVoz } from "@/servidor/medirVoz";
+import { salvarDirecaoDoCliente } from "@/servidor/banco";
+import { lerAnaliseSalva } from "@/servidor/armazenamento";
 import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
 import {
   acaoDaConversaSchema,
   direcaoSchema,
+  DirecaoDeArte,
   Efeito,
   estiloFundoSchema,
   estiloLegendaSchema,
@@ -59,6 +64,7 @@ import {
   Timeline,
   tipoEfeitoSchema,
   tipoTransicaoSchema,
+  urlDoFundo,
 } from "@/timeline/schema";
 import {
   buscarFala,
@@ -113,7 +119,29 @@ export type SessaoEdicao = {
   insertsParaPosicionar?: number[];
   // Frases curtas do que foi feito, para mostrar no chat.
   acoes: string[];
+  // Cliente do projeto (para guardar a direção de arte dele).
+  clienteId?: string;
+  // Exemplos enviados no Planejar (para estudar_exemplo).
+  exemplosDoPlano?: {
+    url: string;
+    formato: "video" | "imagem";
+    duracao: number | null;
+    finalidade: string;
+    detalhe: string;
+  }[];
 };
+
+// Energia da direção de arte → quanto o fundo animado se mexe.
+const ENERGIA = { calma: 0.25, media: 0.5, alta: 0.85 } as const;
+
+// O ritmo que combina com cada energia (devolvido para a IA seguir).
+const RITMO_DA_ENERGIA = {
+  calma:
+    "telas de 2,5 a 4s, um grafismo por tela, transições suaves, só 2 ou 3 efeitos sonoros.",
+  media:
+    "telas de 1,5 a 3s, grafismos variados, sons em 3 a 6 momentos-chave.",
+  alta: "telas de 1 a 2s, mais etiquetas/toques e impactos, sons nos momentos fortes (sem poluir).",
+} as const;
 
 const s = (n: number) => Math.round(n * 100) / 100;
 
@@ -243,6 +271,64 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       );
     }
     return cena - 1;
+  };
+
+  // Volume da narração num trecho do vídeo final (para o fundo pulsar).
+  const ondaDoTrecho = async (t: Timeline, de: number, ate: number) => {
+    const audio = t.audios.find(
+      (a) =>
+        !ehEfeitoSonoro(a.url) &&
+        a.inicio < ate &&
+        a.fim > de &&
+        sessao.biblioteca.some(
+          (x) => x.url === a.url && x.analise?.transcricao,
+        ),
+    );
+    if (!audio) return undefined;
+    const comeco = Math.max(de, audio.inicio);
+    const desde = audio.origemInicio + (comeco - audio.inicio);
+    try {
+      const valores = await envelopeDoArquivo(
+        audio.url,
+        desde,
+        desde + (Math.min(ate, audio.fim) - comeco),
+        15,
+      );
+      return { de: s(comeco - de), taxa: 15, valores };
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Ajustes (cores, energia, pulsar com a voz) nas cenas de fundo animado:
+  // "indices" = só essas cenas; null = todas.
+  const ajustarFundos = async (
+    t: Timeline,
+    indices: number[] | null,
+    ajustes: { cores?: string[]; energia?: number; pulsar?: boolean },
+  ): Promise<Timeline> => {
+    const clipes = calcularClipes(t);
+    const inicios = inicioDosClipes(clipes);
+    const novos = await Promise.all(
+      t.clipes.map(async (c, i) => {
+        if (c.tipo !== "fundo" || (indices && !indices.includes(i))) return c;
+        const de = inicios[i] / t.fps;
+        const ate = de + clipes[i].duracaoFrames / t.fps;
+        const fundo = {
+          ...c.fundo,
+          ...(ajustes.cores ? { cores: ajustes.cores } : {}),
+          ...(ajustes.energia !== undefined ? { energia: ajustes.energia } : {}),
+        };
+        if (ajustes.pulsar) {
+          const onda = await ondaDoTrecho(t, de, ate);
+          if (onda) fundo.onda = onda;
+        } else if (ajustes.pulsar === false) {
+          delete fundo.onda;
+        }
+        return { ...c, fundo };
+      }),
+    );
+    return { ...t, clipes: novos };
   };
 
   // Onda do áudio "gravado" numa conversa: o volume da narração entre os
@@ -1118,11 +1204,161 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     }),
 
     ferramenta({
+      name: "ler_voz",
+      description:
+        "Mede COMO a pessoa fala na narração: palavras por segundo, pausas, quanto o volume varia e a energia (calma, media, alta). Use antes de definir_direcao na direção automática: fala calma pede telas mais longas e poucos sons; fala animada pede ritmo rápido e mais impacto.",
+      inputSchema: z.object({}),
+      run: async () => {
+        const medidas = await medirVoz(sessao.timeline, sessao.biblioteca);
+        if (!medidas) {
+          throw new Error(
+            "Não há fala transcrita na timeline para medir (coloque a narração com colocar_audio).",
+          );
+        }
+        return JSON.stringify(medidas);
+      },
+    }),
+
+    ferramenta({
+      name: "estudar_exemplo",
+      description:
+        "Estuda um vídeo ou imagem de EXEMPLO que o usuário quer copiar (da biblioteca/banco, ou um exemplo enviado no Planejar): quantos cortes e de quantos em quantos segundos, as cores dominantes, se é claro ou escuro, os textos que aparecem na tela e o que acontece em cada momento. Use quando o usuário mandar um exemplo/inspiração, e siga os detalhes com definir_direcao (origem 'exemplo') e na montagem.",
+      inputSchema: z.object({
+        midia: z
+          .string()
+          .nullable()
+          .describe("@apelido ou nome de um vídeo/imagem da biblioteca ou do banco."),
+        exemplo_do_plano: z
+          .number()
+          .int()
+          .min(1)
+          .nullable()
+          .describe("Número do exemplo enviado no Planejar (1, 2…)."),
+      }),
+      run: async (e) => {
+        if (e.exemplo_do_plano !== null) {
+          const x = sessao.exemplosDoPlano?.[e.exemplo_do_plano - 1];
+          if (!x) {
+            throw new Error(
+              `O plano não tem o exemplo ${e.exemplo_do_plano} (tem ${sessao.exemplosDoPlano?.length ?? 0}).`,
+            );
+          }
+          const analise = (await lerAnaliseSalva(nomeDaUrl(x.url)).catch(
+            () => null,
+          )) as Midia["analise"] | null;
+          const estudo = await estudarExemplo({
+            url: x.url,
+            formato: x.formato,
+            duracao: x.duracao,
+            nome: `exemplo ${e.exemplo_do_plano} do plano`,
+            analise: analise ?? undefined,
+          });
+          return JSON.stringify({
+            ...estudo,
+            finalidade: x.finalidade,
+            o_que_copiar: x.detalhe || "(o usuário não disse)",
+          });
+        }
+        if (!e.midia) {
+          throw new Error("Diga a midia (@apelido) ou o exemplo_do_plano.");
+        }
+        const m = acharMidia(e.midia);
+        if (m.formato === "audio") {
+          throw new Error(`"${m.nome}" é áudio; o exemplo precisa ser vídeo ou imagem.`);
+        }
+        return JSON.stringify(await estudarExemplo(m));
+      },
+    }),
+
+    ferramenta({
+      name: "definir_direcao",
+      description:
+        "Define a DIREÇÃO DE ARTE do vídeo: o que você entendeu (tema, nicho, público, tom, energia) e a cara escolhida (paleta de 2 a 3 cores e o tipo de fundo animado). As cores passam a valer nos fundos animados e em todo o kit neon (texto falado, etiquetas, barras, cartões). origem: 'pedido' = o usuário disse o estilo (no chat ou no plano); 'exemplo' = copiado de um vídeo/imagem (use estudar_exemplo antes); 'automatica' = ninguém disse nada e você decidiu pelo áudio (use ler_voz antes).",
+      inputSchema: z.object({
+        origem: z.enum(["automatica", "pedido", "exemplo"]),
+        tema: z.string().describe("Do que o vídeo fala."),
+        nicho: z.string().describe("Ramo do negócio (ex.: salão de beleza, loja de eletrônicos)."),
+        publico: z.string().describe("Para quem é (ex.: mulheres 25–45 que fazem química no cabelo)."),
+        tom: z
+          .string()
+          .describe("Como o vídeo deve parecer (ex.: 'animado e direto', 'sofisticado e calmo')."),
+        energia: z.enum(["calma", "media", "alta"]),
+        cores: z
+          .array(z.string())
+          .min(2)
+          .max(3)
+          .describe(
+            "Paleta #rrggbb das cores de DESTAQUE (textos em degradê, grafismos, luzes do fundo): [principal, secundária, destaque]. Combine com o nicho/marca (beleza = rosa + dourado; tecnologia = azul + roxo; luxo = dourados claros; saúde = verde + azul claro; comida = vermelho + amarelo). Nada de preto/quase preto na paleta: o escuro vem do fundo (neon, brilhos, grade…). Em fundo escuro use cores vivas e claras; no fundo claro/papel, cores mais fortes.",
+          ),
+        fundo: estiloFundoSchema.describe(
+          "neon, formas, brilhos (bokeh suave, beleza/sofisticado), ondas (som, música, voz), grade (tecnologia), gradiente (vivo, jovem), claro (limpo: beleza, saúde, lifestyle), papel (zine).",
+        ),
+        observacoes: z
+          .string()
+          .nullable()
+          .describe("O que seguir à risca: o pedido do usuário ou o que copiar do exemplo."),
+        aplicar_nos_fundos: z
+          .boolean()
+          .describe(
+            "true = as cenas de fundo animado que já existem ganham o tipo de fundo e a energia (e passam a pulsar com a voz, se pedido).",
+          ),
+        pulsar_com_a_voz: z
+          .boolean()
+          .describe("true = o fundo pulsa com o volume da fala (ótimo em vídeo só de motion)."),
+        salvar_no_cliente: z
+          .boolean()
+          .describe(
+            "true = vira a identidade do cliente para os próximos vídeos (direção automática, ou quando o usuário disser que é a cara da marca). false = só neste vídeo.",
+          ),
+      }),
+      run: async (e) => {
+        const cores = e.cores.map((c) => c.trim());
+        if (cores.some((c) => !/^#[0-9a-f]{6}$/i.test(c))) {
+          throw new Error("Cores inválidas: use #rrggbb (ex.: #F472B6).");
+        }
+        const direcao: DirecaoDeArte = {
+          origem: e.origem,
+          tema: e.tema,
+          nicho: e.nicho,
+          publico: e.publico,
+          tom: e.tom,
+          energia: e.energia,
+          cores,
+          fundo: e.fundo,
+          ...(e.observacoes?.trim() ? { observacoes: e.observacoes.trim() } : {}),
+        };
+        let nova: Timeline = { ...sessao.timeline, direcaoDeArte: direcao };
+        if (e.aplicar_nos_fundos) {
+          nova = {
+            ...nova,
+            clipes: nova.clipes.map((c) =>
+              c.tipo === "fundo" ? { ...c, url: urlDoFundo(e.fundo) } : c,
+            ),
+          };
+          nova = await ajustarFundos(nova, null, {
+            energia: ENERGIA[e.energia],
+            pulsar: e.pulsar_com_a_voz,
+          });
+        }
+        if (e.salvar_no_cliente && sessao.clienteId) {
+          salvarDirecaoDoCliente(sessao.clienteId, direcao);
+        }
+        const ok = aplicar(
+          () => nova,
+          `direção de arte (${e.origem}): ${e.nicho}, tom ${e.tom}, energia ${e.energia}, cores ${cores.join(" ")}, fundo ${e.fundo}${e.salvar_no_cliente ? " — salva como identidade do cliente" : ""}`,
+        );
+        return `${ok} Ritmo para esta energia: ${RITMO_DA_ENERGIA[e.energia]}`;
+      },
+    }),
+
+    ferramenta({
       name: "colocar_fundo",
       description:
-        "Põe um FUNDO ANIMADO do encEditor como cena da trilha principal (desenhado pelo próprio vídeo, sem arquivo): neon (escuro, brilhos roxo/azul e anéis), formas (o neon com formas 3D flutuando nas bordas) ou papel (claro, com retícula). Serve para vídeos só de motion, sem filmagem: o texto falado e os grafismos ficam por cima. Sem duração, cobre até o fim dos áudios (a narração inteira).",
+        "Põe um FUNDO ANIMADO do encEditor como cena da trilha principal (desenhado pelo próprio vídeo, sem arquivo), nas cores da direção de arte do vídeo: neon, formas (3D flutuando), brilhos (bokeh), ondas (de luz, parecem som), grade (tecnologia), gradiente (vivo), claro (limpo) ou papel. Serve para vídeos só de motion, sem filmagem: o texto falado e os grafismos ficam por cima. Sem duração, cobre até o fim dos áudios (a narração inteira).",
       inputSchema: z.object({
-        estilo: estiloFundoSchema,
+        estilo: estiloFundoSchema
+          .nullable()
+          .describe("null = o fundo da direção de arte do vídeo (ou neon)."),
         duracao_s: z
           .number()
           .min(0.5)
@@ -1151,8 +1387,26 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         estilo_depois: estiloFundoSchema
           .nullable()
           .describe("Fundo depois da virada. null = o mesmo."),
+        cores: z
+          .array(z.string())
+          .min(2)
+          .max(3)
+          .nullable()
+          .describe("Paleta só deste fundo (#rrggbb). null = a da direção de arte."),
+        energia: z
+          .enum(["calma", "media", "alta"])
+          .nullable()
+          .describe("Quanto o fundo se mexe. null = a da direção de arte (ou média)."),
+        pulsar_com_a_voz: z
+          .boolean()
+          .describe("true = o fundo pulsa com o volume da fala."),
       }),
-      run: (e) => {
+      run: async (e) => {
+        if (e.cores?.some((c) => !/^#[0-9a-f]{6}$/i.test(c.trim()))) {
+          throw new Error("Cores inválidas: use #rrggbb.");
+        }
+        const direcao = sessao.timeline.direcaoDeArte;
+        const estilo = e.estilo ?? direcao?.fundo ?? "neon";
         const base = e.substituir_cenas
           ? { ...sessao.timeline, clipes: [] }
           : sessao.timeline;
@@ -1163,10 +1417,21 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           e.duracao_s ??
           (fimAudio > ocupado + 0.5 ? fimAudio - ocupado + 0.3 : 5);
         const posicao = e.posicao === null ? undefined : e.posicao - 1;
+        const indice = posicao ?? base.clipes.length;
+        const ajustes = {
+          ...(e.cores ? { cores: e.cores.map((c) => c.trim()) } : {}),
+          energia: ENERGIA[e.energia ?? direcao?.energia ?? "media"],
+          pulsar: e.pulsar_com_a_voz,
+        };
         if (e.virada_no_segundo === null) {
+          const nova = await ajustarFundos(
+            colocarFundo(base, estilo, duracao, posicao),
+            [indice],
+            ajustes,
+          );
           return aplicar(
-            () => colocarFundo(base, e.estilo, duracao, posicao),
-            `fundo animado ${e.estilo} com ${s(duracao)}s${e.substituir_cenas ? " (no lugar das cenas)" : ""}`,
+            () => nova,
+            `fundo animado ${estilo} com ${s(duracao)}s${e.pulsar_com_a_voz ? ", pulsando com a voz" : ""}${e.substituir_cenas ? " (no lugar das cenas)" : ""}`,
           );
         }
         // Dois fundos com a transição no meio exatamente na virada: a
@@ -1182,27 +1447,24 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
             `A virada precisa ficar entre ${s(inicioDoFundo + 1)}s e ${s(inicioDoFundo + duracao - 1)}s.`,
           );
         }
-        const indice = posicao ?? base.clipes.length;
+        const um = colocarFundo(base, estilo, virada + transicao / 2, posicao);
+        const dois = colocarFundo(
+          um,
+          e.estilo_depois ?? estilo,
+          duracao - virada + transicao / 2,
+          indice + 1,
+        );
+        const nova = await ajustarFundos(
+          atualizarItem(dois, "clipes", indice + 1, {
+            transicao: "degrade",
+            duracaoTransicao: transicao,
+          }),
+          [indice, indice + 1],
+          ajustes,
+        );
         return aplicar(
-          () => {
-            const um = colocarFundo(
-              base,
-              e.estilo,
-              virada + transicao / 2,
-              posicao,
-            );
-            const dois = colocarFundo(
-              um,
-              e.estilo_depois ?? e.estilo,
-              duracao - virada + transicao / 2,
-              indice + 1,
-            );
-            return atualizarItem(dois, "clipes", indice + 1, {
-              transicao: "degrade",
-              duracaoTransicao: transicao,
-            });
-          },
-          `fundo animado ${e.estilo} com ${s(duracao)}s, virando com #degrade em ${s(e.virada_no_segundo)}s${e.estilo_depois && e.estilo_depois !== e.estilo ? ` para o ${e.estilo_depois}` : ""}`,
+          () => nova,
+          `fundo animado ${estilo} com ${s(duracao)}s, virando com #degrade em ${s(e.virada_no_segundo)}s${e.estilo_depois && e.estilo_depois !== estilo ? ` para o ${e.estilo_depois}` : ""}${e.pulsar_com_a_voz ? ", pulsando com a voz" : ""}`,
         );
       },
     }),

@@ -39,12 +39,44 @@ export const tipoTransicaoSchema = z.enum([
 export const direcaoSchema = z.enum(["esquerda", "direita", "cima", "baixo"]);
 
 // Fundos animados do encEditor (desenhados pelo próprio vídeo, sem
-// arquivo): neon = escuro com brilhos roxo/azul e anéis; formas = o neon com
-// formas 3D flutuando; papel = papel claro com retícula (cara do encEditor).
-export const estiloFundoSchema = z.enum(["neon", "formas", "papel"]);
+// arquivo), todos nas cores da paleta do vídeo: neon = escuro com brilhos e
+// anéis; formas = o neon com formas 3D flutuando; papel = papel claro com
+// retícula (cara do encEditor); brilhos = luzes desfocadas passeando (bokeh);
+// ondas = faixas de luz ondulando; grade = grade em perspectiva (tecnologia);
+// gradiente = degradê de cor que se mexe; claro = fundo claro e limpo com
+// manchas suaves de cor (beleza, saúde, lifestyle).
+export const estiloFundoSchema = z.enum([
+  "neon",
+  "formas",
+  "papel",
+  "brilhos",
+  "ondas",
+  "grade",
+  "gradiente",
+  "claro",
+]);
 
 // Prefixo da "url" de uma cena de fundo animado: "fundo:neon".
 export const PREFIXO_FUNDO = "fundo:";
+
+// Volume da voz (0 a 1) "taxa" vezes por segundo, a partir de "de"
+// segundos do início do item (onda da conversa, fundo pulsando com a voz).
+export const ondaSchema = z.object({
+  de: z.number(),
+  taxa: z.number().positive(),
+  valores: z.array(z.number().min(0).max(1)),
+});
+
+// Ajustes de uma cena de fundo animado. Sem valor = paleta da direção de
+// arte do vídeo (ou a padrão do estilo).
+export const ajustesDoFundoSchema = z.object({
+  // Paleta #rrggbb: [principal, secundária, destaque].
+  cores: z.array(z.string()).min(2).max(3).optional(),
+  // 0 = calmo (se mexe devagar), 1 = agitado. Sem valor = 0,5.
+  energia: z.number().min(0).max(1).optional(),
+  // Pulsa com a voz: o volume da fala no tempo da cena.
+  onda: ondaSchema.optional(),
+});
 
 // Trilha principal: as cenas, em sequência.
 export const clipeSchema = z.object({
@@ -65,6 +97,8 @@ export const clipeSchema = z.object({
   // Velocidade do vídeo (sem valor = 1). 0.8 = câmera lenta leve: o trecho
   // inicio–fim do arquivo ocupa (fim - inicio) / 0.8 no vídeo final.
   velocidade: z.number().min(0.25).max(4).optional(),
+  // Só no fundo animado: cores, energia e pulsar com a voz.
+  fundo: ajustesDoFundoSchema.optional(),
 });
 
 // Vídeo ou imagem por cima da trilha principal (B-roll, insert).
@@ -283,13 +317,7 @@ export const motionSchema = z.object({
   // Volume da voz (0 a 1) "taxa" vezes por segundo, a partir de "de"
   // segundos do início do motion: desenha a onda do áudio gravado na
   // conversa com a voz de verdade.
-  onda: z
-    .object({
-      de: z.number(),
-      taxa: z.number().positive(),
-      valores: z.array(z.number().min(0).max(1)),
-    })
-    .optional(),
+  onda: ondaSchema.optional(),
 });
 
 // Efeitos de imagem num trecho (como o zoom, valem para cenas e inserts).
@@ -316,6 +344,25 @@ export const efeitoSchema = z.object({
   intensidade: z.number().min(0.1).max(1).optional(),
 });
 
+// Direção de arte do vídeo: o que a IA entendeu do áudio (ou do que o
+// usuário pediu / do exemplo) e a cara escolhida. As cores valem para os
+// fundos animados e para o kit neon.
+export const direcaoDeArteSchema = z.object({
+  // automatica = a IA decidiu pelo áudio; pedido = o usuário disse no chat
+  // ou no plano; exemplo = copiada de um vídeo de exemplo.
+  origem: z.enum(["automatica", "pedido", "exemplo"]),
+  tema: z.string(),
+  nicho: z.string(),
+  publico: z.string(),
+  tom: z.string(),
+  energia: z.enum(["calma", "media", "alta"]),
+  // Paleta #rrggbb: [principal, secundária, destaque].
+  cores: z.array(z.string()).min(2).max(3),
+  fundo: estiloFundoSchema,
+  // O que seguir à risca (pedido do usuário / o que copiar do exemplo).
+  observacoes: z.string().optional(),
+});
+
 export const timelineSchema = z.object({
   fps: z.number().int().positive(),
   largura: z.number().int().positive(),
@@ -333,11 +380,15 @@ export const timelineSchema = z.object({
   // Estilo padrão das legendas (sem valor = clássico).
   estiloLegenda: estiloLegendaSchema.optional(),
   aparenciaLegendas: aparenciaLegendasSchema.optional(),
+  direcaoDeArte: direcaoDeArteSchema.optional(),
 });
 
 export type TipoTransicao = z.infer<typeof tipoTransicaoSchema>;
 export type Direcao = z.infer<typeof direcaoSchema>;
 export type EstiloFundo = z.infer<typeof estiloFundoSchema>;
+export type AjustesDoFundo = z.infer<typeof ajustesDoFundoSchema>;
+export type Onda = z.infer<typeof ondaSchema>;
+export type DirecaoDeArte = z.infer<typeof direcaoDeArteSchema>;
 export type Clipe = z.infer<typeof clipeSchema>;
 export type Insert = z.infer<typeof insertSchema>;
 export type AudioFaixa = z.infer<typeof audioSchema>;

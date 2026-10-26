@@ -10,12 +10,12 @@ import {
   semAsteriscos,
 } from "./motionBase";
 import {
-  AZUL,
   CIANO,
   CINZA,
   comAlfa,
-  COR_NEON,
+  corDe,
   corDoBrilho,
+  corDoTexto,
   corNaPosicao,
   degrade,
   IconeMicrofone,
@@ -29,7 +29,6 @@ import {
   Pedaco,
   pedacos,
   quadrosDasPalavras,
-  ROXO,
   TextoDegrade,
   TextoNeon,
   VIDRO,
@@ -89,8 +88,10 @@ const PalavraFalada: React.FC<{
     <span
       style={{
         ...estilo,
-        color: BRANCO,
-        textShadow: `0 ${c.u * 0.3}px ${c.u * 1.4}px rgba(0,0,0,0.5)`,
+        color: corDoTexto(c),
+        textShadow: c.claro
+          ? "none"
+          : `0 ${c.u * 0.3}px ${c.u * 1.4}px rgba(0,0,0,0.5)`,
         filter: borrao,
       }}
     >
@@ -138,7 +139,7 @@ export const Segmentos: React.FC<{ c: Ctx; comeca: number; largura: number }> = 
               opacity: aceso > 0 ? 0.35 + 0.65 * aceso : 1,
               boxShadow:
                 aceso > 0.6
-                  ? `0 0 ${u * 1.2}px ${comAlfa(c.corEscolhida ? c.cor : COR_NEON, 0.5)}`
+                  ? `0 0 ${u * 1.2}px ${comAlfa(corDoBrilho(c), 0.5)}`
                   : "none",
             }}
           />
@@ -343,14 +344,14 @@ const Anel: React.FC<{ c: Ctx }> = ({ c }) => {
               position: "absolute",
               inset: 0,
               overflow: "visible",
-              filter: `drop-shadow(0 0 ${u * 1.6}px ${comAlfa(c.corEscolhida ? c.cor : CIANO, 0.8)})`,
+              filter: `drop-shadow(0 0 ${u * 1.6}px ${comAlfa(corDe(c, 0), 0.8)})`,
             }}
           >
             <circle r={raio} fill="rgba(10, 14, 30, 0.55)" />
             <circle
               r={raio}
               fill="none"
-              stroke={c.corEscolhida ? c.cor : CIANO}
+              stroke={corDe(c, 0)}
               strokeWidth={u * 0.7}
               strokeDasharray={circ}
               strokeDashoffset={circ * (1 - desenho)}
@@ -359,7 +360,7 @@ const Anel: React.FC<{ c: Ctx }> = ({ c }) => {
             <circle
               r={raio * 0.86}
               fill="none"
-              stroke={comAlfa(c.corEscolhida ? c.cor : CIANO, 0.45)}
+              stroke={comAlfa(corDe(c, 0), 0.45)}
               strokeWidth={u * 0.18}
               strokeDasharray={`${u * 0.6} ${u * 1.2}`}
               transform={`rotate(${frame * 1.5})`}
@@ -514,7 +515,7 @@ const Digitando: React.FC<{ c: Ctx }> = ({ c }) => {
                   key={pd.indice}
                   style={{
                     ...estilo,
-                    color: pd.indice === 0 ? CIANO : BRANCO,
+                    color: pd.indice === 0 ? corDe(c, 0) : BRANCO,
                   }}
                 >
                   {pd.texto}
@@ -528,7 +529,7 @@ const Digitando: React.FC<{ c: Ctx }> = ({ c }) => {
                   width: u * 0.5,
                   height: u * 6,
                   alignSelf: "center",
-                  backgroundColor: CIANO,
+                  backgroundColor: corDe(c, 0),
                   opacity:
                     visiveis < todas.length || Math.floor(frame / 8) % 2 === 0
                       ? 1
@@ -570,7 +571,7 @@ const Barra: React.FC<{ c: Ctx }> = ({ c }) => {
             fontFamily: FONTES.forte,
             fontWeight: 800,
             fontSize: u * 5.4,
-            color: "rgba(255,255,255,0.78)",
+            color: corDoTexto(c, 0.78),
             textTransform: "uppercase",
             opacity: Math.min(1, s * 2),
           }}
@@ -585,7 +586,7 @@ const Barra: React.FC<{ c: Ctx }> = ({ c }) => {
             fontWeight: 900,
             fontSize: u * Math.min(19, 90 / Math.max(1, maior * 0.74)),
             lineHeight: 0.95,
-            color: BRANCO,
+            color: corDoTexto(c),
             textTransform: "uppercase",
             transform: `scale(${0.7 + 0.3 * s})`,
             opacity: Math.min(1, s * 2),
@@ -613,7 +614,7 @@ const Barra: React.FC<{ c: Ctx }> = ({ c }) => {
                 backgroundColor: aceso > 0 ? cor : "rgba(255,255,255,0.07)",
                 opacity: aceso > 0 ? 0.35 + 0.65 * aceso : 1,
                 boxShadow:
-                  aceso > 0.6 ? `0 0 ${u * 1.2}px ${comAlfa(c.corEscolhida ? c.cor : COR_NEON, 0.5)}` : "none",
+                  aceso > 0.6 ? `0 0 ${u * 1.2}px ${comAlfa(corDoBrilho(c), 0.5)}` : "none",
               }}
             />
           );
@@ -865,10 +866,10 @@ const Curtida: React.FC<{ c: Ctx }> = ({ c }) => {
               top: -raio * 1.2 - sobe * raio * 1.4,
               opacity: tocou ? interpolate(sobe, [0, 0.08, 0.75, 1], [0, 1, 1, 0]) : 0,
               transform: `scale(${0.6 + sobe * 0.7}) rotate(${-12 + sobe * 10}deg)`,
-              filter: `drop-shadow(0 0 ${u * 1.5}px ${comAlfa(c.corEscolhida ? c.cor : CIANO, 0.9)})`,
+              filter: `drop-shadow(0 0 ${u * 1.5}px ${comAlfa(corDe(c, 0), 0.9)})`,
             }}
           >
-            <path d={MAO} fill={c.corEscolhida ? c.cor : CIANO} />
+            <path d={MAO} fill={corDe(c, 0)} />
           </svg>
           {rotulo ? (
             <div
@@ -880,7 +881,7 @@ const Curtida: React.FC<{ c: Ctx }> = ({ c }) => {
                 fontFamily: FONTES.forte,
                 fontWeight: 900,
                 fontSize: u * 4.6,
-                color: BRANCO,
+                color: corDoTexto(c),
                 whiteSpace: "nowrap",
                 textTransform: "uppercase",
               }}
@@ -914,7 +915,7 @@ const Toque: React.FC<{ c: Ctx }> = ({ c }) => {
       easing: Easing.out(Easing.cubic),
     });
   const raio = u * 3.4;
-  const corOnda = c.corEscolhida ? c.cor : CIANO;
+  const corOnda = corDe(c, 0);
   return (
     <AbsoluteFill style={{ opacity: c.saida }}>
       <NoPonto c={c} x={50} y={50}>
@@ -981,13 +982,13 @@ const Brilho: React.FC<{ c: Ctx }> = ({ c }) => {
           top: dy - tamanho,
           overflow: "visible",
           transform: `scale(${s * pisca}) rotate(${(1 - s) * -90}deg)`,
-          filter: `drop-shadow(0 0 ${u * 1.4}px ${comAlfa(c.corEscolhida ? c.cor : CIANO, 0.95)})`,
+          filter: `drop-shadow(0 0 ${u * 1.4}px ${comAlfa(corDe(c, 0), 0.95)})`,
         }}
       >
         <path d={ESTRELA} fill={frame < atraso ? "transparent" : "#E9FBFF"} />
         <path
           d={ESTRELA}
-          fill={c.corEscolhida ? c.cor : CIANO}
+          fill={corDe(c, 0)}
           transform="scale(0.55)"
         />
       </svg>
@@ -1015,8 +1016,8 @@ const Microfone: React.FC<{ c: Ctx }> = ({ c }) => {
   const lado = raio * 4.4;
   const barras = 56;
   const passo = c.duracao > 1 ? frame / c.duracao : 0;
-  const corA = c.corEscolhida ? c.cor : misturar(CIANO, ROXO, passo);
-  const corB = c.corEscolhida ? c.cor : misturar(AZUL, "#7C3AED", passo);
+  const corA = c.corEscolhida ? c.cor : misturar(corDe(c, 0), corDe(c, 2), passo);
+  const corB = c.corEscolhida ? c.cor : misturar(corDe(c, 1), corDe(c, 2), passo);
   return (
     <AbsoluteFill style={{ opacity: c.saida }}>
       {/* No vídeo deitado fica mais baixo, para caber o texto em cima. */}
@@ -1060,7 +1061,7 @@ const Microfone: React.FC<{ c: Ctx }> = ({ c }) => {
             <circle
               r={raio * 1.1}
               fill="none"
-              stroke={comAlfa(c.corEscolhida ? c.cor : CIANO, 0.5)}
+              stroke={comAlfa(corDe(c, 0), 0.5)}
               strokeWidth={u * 0.25}
             />
           </svg>
@@ -1073,7 +1074,7 @@ const Microfone: React.FC<{ c: Ctx }> = ({ c }) => {
               height: raio * 2,
               borderRadius: "50%",
               backgroundImage: `linear-gradient(135deg, ${corA}, ${corB})`,
-              boxShadow: `0 0 ${u * 5}px ${comAlfa(c.corEscolhida ? c.cor : COR_NEON, 0.6)}, inset 0 0 0 ${u * 0.3}px rgba(255,255,255,0.25)`,
+              boxShadow: `0 0 ${u * 5}px ${comAlfa(corDoBrilho(c), 0.6)}, inset 0 0 0 ${u * 0.3}px rgba(255,255,255,0.25)`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

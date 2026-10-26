@@ -20,7 +20,8 @@ import {
 } from "../../timeline/calculos";
 import { Audios } from "./Audios";
 import { Efeitos } from "./Efeitos";
-import { FundoAnimado } from "./Fundos";
+import { FundoAnimado, FUNDOS_CLAROS } from "./Fundos";
+import { TemaContexto } from "./motionBase";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
 import { Motions } from "./Motions";
@@ -52,6 +53,23 @@ export const EditorTimeline: React.FC<Timeline> = (recebida) => {
   const inicios = inicioDosClipes(clipes);
   const duracaoTotal = calcularDuracaoTotal(clipes);
   const { width, height } = useVideoConfig();
+  // Tema para os motions: a paleta da direção de arte e quando o fundo
+  // atrás deles é claro (o texto solto fica escuro).
+  const paleta = timeline.direcaoDeArte?.cores;
+  const tema = {
+    cores: paleta ?? null,
+    fundoClaroEm: (segundo: number) => {
+      const quadro = segundo * timeline.fps;
+      const i = clipes.findIndex(
+        (c, k) => quadro >= inicios[k] && quadro < inicios[k] + c.duracaoFrames,
+      );
+      return (
+        i >= 0 &&
+        clipes[i].tipo === "fundo" &&
+        FUNDOS_CLAROS.includes(estiloDoFundo(clipes[i].url))
+      );
+    },
+  };
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
@@ -75,7 +93,11 @@ export const EditorTimeline: React.FC<Timeline> = (recebida) => {
                 altura={height}
               >
                 {clipe.tipo === "fundo" ? (
-                  <FundoAnimado estilo={estiloDoFundo(clipe.url)} />
+                  <FundoAnimado
+                    estilo={estiloDoFundo(clipe.url)}
+                    ajustes={clipe.fundo}
+                    paleta={paleta}
+                  />
                 ) : clipe.tipo === "imagem" ? (
                   <Img
                     src={clipe.url}
@@ -105,7 +127,9 @@ export const EditorTimeline: React.FC<Timeline> = (recebida) => {
           <Inserts inserts={timeline.inserts} />
         </Zoom>
       </Efeitos>
-      <Motions motions={timeline.motions} />
+      <TemaContexto.Provider value={tema}>
+        <Motions motions={timeline.motions} />
+      </TemaContexto.Provider>
       <Legendas
         legendas={timeline.legendas}
         estiloPadrao={timeline.estiloLegenda}

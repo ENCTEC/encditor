@@ -25,6 +25,7 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
     duracao_total_s: s(calcularDuracaoTotal(clipes) / t.fps),
     duracao_padrao_transicao_s: t.duracaoTransicao,
     estilo_das_legendas: t.estiloLegenda ?? "classico",
+    direcao_de_arte: t.direcaoDeArte ?? "nenhuma (ainda não definida)",
     aparencia_das_legendas: t.aparenciaLegendas ?? "padrão do estilo",
     cenas: clipes.map((c, i) => ({
       cena: i + 1,
@@ -33,6 +34,15 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
           ? `fundo animado #fundo-${estiloDoFundo(c.url)}`
           : nome(c.url),
       ...(c.tipo === "imagem" || c.tipo === "fundo" ? { tipo: c.tipo } : {}),
+      ...(c.fundo
+        ? {
+            fundo: {
+              ...(c.fundo.cores ? { cores: c.fundo.cores } : {}),
+              ...(c.fundo.energia !== undefined ? { energia: c.fundo.energia } : {}),
+              ...(c.fundo.onda ? { pulsa_com_a_voz: true } : {}),
+            },
+          }
+        : {}),
       no_video_final: {
         de: s(inicios[i] / t.fps),
         ate: s((inicios[i] + c.duracaoFrames) / t.fps),

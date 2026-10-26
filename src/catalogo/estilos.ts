@@ -138,7 +138,7 @@ export const FUNDOS: ItemCatalogo<EstiloFundo>[] = [
     tag: "#fundo-neon",
     nome: "Neon",
     descricao:
-      "Escuro, com brilhos roxo e azul se mexendo devagar e anéis girando.",
+      "Escuro, com duas luzes nas cores do vídeo passeando e anéis girando.",
     quandoUsar:
       "Motion design falado (kit neon), tecnologia, explicações, 'olha isso'.",
   },
@@ -147,15 +147,52 @@ export const FUNDOS: ItemCatalogo<EstiloFundo>[] = [
     tag: "#fundo-formas",
     nome: "Formas 3D",
     descricao:
-      "O neon com cubos, anéis, esferas e cápsulas 3D flutuando nas bordas.",
+      "O neon com cubos, anéis, esferas e cápsulas 3D (nas cores do vídeo) flutuando nas bordas.",
     quandoUsar:
       "Mais movimento no meio do vídeo (celular na tela, passo a passo).",
+  },
+  {
+    id: "brilhos",
+    tag: "#fundo-brilhos",
+    nome: "Brilhos",
+    descricao: "Luzes desfocadas (bokeh) subindo devagar e piscando.",
+    quandoUsar: "Beleza, moda, festa, algo sofisticado ou emocionante.",
+  },
+  {
+    id: "ondas",
+    tag: "#fundo-ondas",
+    nome: "Ondas de luz",
+    descricao:
+      "Faixas de luz ondulando como som — sobem com a voz quando o fundo pulsa.",
+    quandoUsar: "Voz, música, podcast, áudio, algo fluido.",
+  },
+  {
+    id: "grade",
+    tag: "#fundo-grade",
+    nome: "Grade",
+    descricao: "Grade em perspectiva correndo para a frente, com horizonte brilhando.",
+    quandoUsar: "Tecnologia, games, futuro, velocidade.",
+  },
+  {
+    id: "gradiente",
+    tag: "#fundo-gradiente",
+    nome: "Gradiente vivo",
+    descricao: "Manchas grandes das cores do vídeo se misturando e passeando.",
+    quandoUsar: "Jovem, alegre, colorido, promoções.",
+  },
+  {
+    id: "claro",
+    tag: "#fundo-claro",
+    nome: "Claro",
+    descricao:
+      "Fundo claro e limpo com manchas suaves de cor (o texto fica escuro).",
+    quandoUsar: "Beleza, saúde, bem-estar, lifestyle, algo leve.",
   },
   {
     id: "papel",
     tag: "#fundo-papel",
     nome: "Papel",
-    descricao: "Papel claro com retícula e uma mancha vermelha de spray.",
+    descricao: "Papel claro com retícula e uma mancha de spray.",
     quandoUsar:
       "Explicações com a cara do encEditor; combina com os motions do kit básico (frase, título, lista).",
   },

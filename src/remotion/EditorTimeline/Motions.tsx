@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext } from "react";
 import {
   AbsoluteFill,
   Easing,
@@ -23,6 +23,7 @@ import {
   PAPEL,
   semAsteriscos,
   tamanhoPeloTexto,
+  TemaContexto,
   TINTA,
   VERMELHO,
 } from "./motionBase";
@@ -1423,6 +1424,7 @@ export const MotionAnimado: React.FC<{
 }> = ({ motion, duracaoFrames }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
+  const tema = useContext(TemaContexto);
   const Modelo = MODELOS[motion.modelo];
   const saida = interpolate(
     frame,
@@ -1445,6 +1447,8 @@ export const MotionAnimado: React.FC<{
           (ehModeloNeon(motion.modelo) ? COR_NEON : VERMELHO),
         corEscolhida: !!motion.cor?.trim(),
         saida,
+        paleta: tema.cores,
+        claro: tema.fundoClaroEm(motion.inicio + 0.1),
       }}
     />
   );

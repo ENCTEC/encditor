@@ -354,6 +354,59 @@ const AjustesDasLegendas: React.FC<{
   </div>
 );
 
+const ORIGEM_DA_DIRECAO = {
+  automatica: "a IA decidiu pelo áudio",
+  pedido: "do seu pedido",
+  exemplo: "copiada do exemplo",
+} as const;
+
+// Direção de arte do vídeo (cores, fundo, tom): de onde veio e as cores.
+// "Apagar" deixa a IA decidir de novo no próximo pedido.
+const DirecaoDoVideo: React.FC = () => {
+  const { projeto, aplicar } = useProjeto();
+  const d = projeto.timeline.direcaoDeArte;
+  return (
+    <div className="space-y-1.5 border-l-2 border-zinc-700 pl-3">
+      <p className="text-xs text-zinc-400">Direção de arte</p>
+      {d ? (
+        <>
+          <div className="flex items-center gap-1.5">
+            {d.cores.map((c) => (
+              <span
+                key={c}
+                title={c}
+                className="h-5 w-5 border-2 border-tinta"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+            <span className="ml-1 font-mono text-[11px] text-zinc-500">
+              fundo {d.fundo} · energia {d.energia}
+            </span>
+          </div>
+          <p className="text-xs">
+            <b>{d.nicho}</b> — {d.tom}. Para: {d.publico}.
+          </p>
+          <p className="font-mono text-[10px] tracking-wider text-zinc-500 uppercase">
+            {ORIGEM_DA_DIRECAO[d.origem]}
+          </p>
+          <button
+            onClick={() => aplicar((t) => ({ ...t, direcaoDeArte: undefined }))}
+            className="border border-zinc-700 px-2 py-0.5 text-[11px] hover:border-violet-500"
+          >
+            Apagar (a IA decide de novo)
+          </button>
+        </>
+      ) : (
+        <p className="text-xs text-zinc-500">
+          Nenhuma ainda. No chat, diga o estilo ("preto e dourado, calmo") ou
+          mande um exemplo; se não disser nada, a IA escolhe pelo áudio quando
+          montar o vídeo.
+        </p>
+      )}
+    </div>
+  );
+};
+
 const CampoEditavel: React.FC<{
   valor: string;
   numerico: boolean;
@@ -505,6 +558,7 @@ export const Inspetor: React.FC<{
             })
           }
         />
+        <DirecaoDoVideo />
         <p className="text-xs text-zinc-500">
           Clique num item da timeline para editar. Veja os exemplos de cada
           estilo na aba Estilos.

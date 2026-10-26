@@ -1,4 +1,4 @@
-import React from "react";
+import React, { createContext } from "react";
 import { AbsoluteFill, spring } from "remotion";
 import { Motion } from "../../timeline/schema";
 
@@ -63,7 +63,22 @@ export type Ctx = {
   corEscolhida: boolean;
   // 1 → 0 nos últimos quadros.
   saida: number;
+  // Paleta da direção de arte do vídeo ([principal, secundária, destaque])
+  // e se o fundo atrás do motion é claro (texto solto fica escuro).
+  paleta: string[] | null;
+  claro: boolean;
 };
+
+// Tema do vídeo para os motions: a paleta da direção de arte e quando o
+// fundo é claro (papel, claro). Vem do EditorTimeline.
+export type TemaDoVideo = {
+  cores: string[] | null;
+  fundoClaroEm: (segundo: number) => boolean;
+};
+export const TemaContexto = createContext<TemaDoVideo>({
+  cores: null,
+  fundoClaroEm: () => false,
+});
 
 export const entrada = (c: Ctx, atraso = 0, rigidez = 170, amortecimento = 13) =>
   spring({

@@ -9,8 +9,13 @@ import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
 import { Midia } from "@/projeto/tipos";
 import { timelineSchema } from "@/timeline/schema";
 import { chaveCena, chaveInsert } from "@/plano/pendencias";
-import { lerPlanoSalvo } from "@/plano/tipos";
-import { lerMidiasDoCliente, lerPlano, lerProjeto } from "@/servidor/banco";
+import { FINALIDADES_EXEMPLO, lerPlanoSalvo } from "@/plano/tipos";
+import {
+  lerDirecaoDoCliente,
+  lerMidiasDoCliente,
+  lerPlano,
+  lerProjeto,
+} from "@/servidor/banco";
 import { enderecoInterno } from "@/servidor/endereco";
 import { renderizarQuadros } from "@/servidor/quadros";
 import {
@@ -153,7 +158,42 @@ export async function POST(req: NextRequest) {
     ? resumoDoPlano(projetoId, banco ?? (biblioteca as Midia[]))
     : null;
 
-  const sessao: SessaoEdicao = { timeline, biblioteca, banco, acoes: [] };
+  // O que o usuário pediu de estilo no Planejar (ideia, observações,
+  // exemplos e o que copiar de cada um) e a direção de arte salva do
+  // cliente: a IA segue isso antes de decidir sozinha.
+  const briefing = projetoId
+    ? lerPlanoSalvo(lerPlano(projetoId)).briefing
+    : null;
+  const exemplosDoPlano = (briefing?.exemplos ?? []).map((x) => ({
+    url: x.url,
+    formato: x.formato,
+    duracao: x.duracao,
+    finalidade: FINALIDADES_EXEMPLO[x.finalidade],
+    detalhe: x.detalhe,
+  }));
+  const pedidosDoPlano = briefing
+    ? [
+        briefing.ideia.trim() ? `Ideia: ${briefing.ideia.trim()}` : "",
+        briefing.objetivo.trim() ? `Objetivo: ${briefing.objetivo.trim()}` : "",
+        briefing.observacoes.trim()
+          ? `Observações: ${briefing.observacoes.trim()}`
+          : "",
+        ...exemplosDoPlano.map(
+          (x, i) =>
+            `Exemplo ${i + 1} (${x.formato}; finalidade: ${x.finalidade}): copiar "${x.detalhe || "não disse"}" — use estudar_exemplo com exemplo_do_plano ${i + 1}.`,
+        ),
+      ].filter(Boolean)
+    : [];
+  const direcaoDoCliente = clienteId ? lerDirecaoDoCliente(clienteId) : null;
+
+  const sessao: SessaoEdicao = {
+    timeline,
+    biblioteca,
+    banco,
+    acoes: [],
+    clienteId: clienteId ?? undefined,
+    exemplosDoPlano,
+  };
 
   // Histórico só em texto; a conversa precisa começar pelo usuário.
   const anteriores = historico
@@ -171,6 +211,13 @@ export async function POST(req: NextRequest) {
     plano
       ? `Plano do vídeo (feito na aba Planejar; siga o que foi imaginado quando o pedido for vago):
 ${plano}`
+      : "",
+    pedidosDoPlano.length
+      ? `PEDIDOS DE ESTILO DO USUÁRIO NO PLANEJAR (siga à risca, nos detalhes):
+${pedidosDoPlano.join("\n")}`
+      : "",
+    direcaoDoCliente
+      ? `Direção de arte salva do cliente (a identidade dele; mantenha salvo pedido diferente): ${JSON.stringify(direcaoDoCliente)}`
       : "",
     anexos.length ? `Anexados nesta mensagem: ${anexos.join(", ")}.` : "",
     `Pedido: ${pedido}`,

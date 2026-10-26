@@ -25,7 +25,7 @@ const global = globalThis as unknown as {
 
 // Suba este número ao criar tabelas/colunas: a conexão guardada (em
 // desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
-const VERSAO_ESQUEMA = 3;
+const VERSAO_ESQUEMA = 4;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -155,6 +155,11 @@ const banco = () => {
     CREATE TABLE IF NOT EXISTS aprendizados (
       cliente_id TEXT PRIMARY KEY,
       fonte TEXT NOT NULL,
+      dados TEXT NOT NULL,
+      atualizado_em INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS direcoes (
+      cliente_id TEXT PRIMARY KEY,
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
     );
@@ -821,6 +826,26 @@ export const salvarAprendizados = (
        ON CONFLICT(cliente_id) DO UPDATE SET fonte = excluded.fonte, dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
     )
     .run(clienteId, fonte, JSON.stringify(dados), Date.now());
+};
+
+// ---------- Direção de arte do cliente ----------
+// A última direção de arte usada nos vídeos do cliente (cores, fundo, tom):
+// os próximos vídeos mantêm a mesma identidade, salvo pedido diferente.
+
+export const lerDirecaoDoCliente = (clienteId: string): unknown => {
+  const l = banco()
+    .prepare("SELECT dados FROM direcoes WHERE cliente_id = ?")
+    .get(clienteId) as { dados: string } | undefined;
+  return l ? JSON.parse(l.dados) : null;
+};
+
+export const salvarDirecaoDoCliente = (clienteId: string, dados: unknown) => {
+  banco()
+    .prepare(
+      `INSERT INTO direcoes (cliente_id, dados, atualizado_em) VALUES (?, ?, ?)
+       ON CONFLICT(cliente_id) DO UPDATE SET dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
+    )
+    .run(clienteId, JSON.stringify(dados), Date.now());
 };
 
 // ---------- Conexões (contas do cliente para ler métricas) ----------
