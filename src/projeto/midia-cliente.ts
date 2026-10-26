@@ -192,6 +192,17 @@ export const extrairAudioDoVideo = async (
   return corpo.url;
 };
 
+// Áudio gravado no navegador (webm/ogg da gravação do app): o arquivo não
+// traz a duração e nem todo lugar toca webm — vira mp3 no servidor.
+export const ehGravacaoDoNavegador = (arquivo: File) =>
+  arquivo.type.startsWith("audio/") &&
+  /\.(webm|ogg|opus)$/i.test(arquivo.name);
+
+export const gravacaoParaMp3 = async (url: string) => {
+  const mp3 = await extrairAudioDoVideo(url, true);
+  return { url: mp3, duracao: await lerDuracaoDaUrl(mp3) };
+};
+
 // Proxies (cópias leves para o preview), um por vez. Os que falharam não
 // são tentados de novo nesta aba (o preview usa o original).
 const proxiesEmAndamento = new Set<string>();

@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
+import { FalaDoRoteiro, GravadorDeAudio } from "@/componentes/GravadorDeAudio";
 import {
+  ehGravacaoDoNavegador,
   enviarArquivo,
   extrairAudioDoVideo,
   formatoDoArquivo,
   gerarApelido,
+  gravacaoParaMp3,
   lerDuracaoDaUrl,
   lerMetadados,
   podeAnalisar,
@@ -96,7 +99,12 @@ const useEnviarItem = (uso: UsoPlano) => {
       let url = await enviarArquivo(arquivo, (f) =>
         setProgresso((p) => ({ ...p, [item.chave]: f })),
       );
-      if (somenteAudio && formato === "video") {
+      if (ehGravacaoDoNavegador(arquivo)) {
+        // Gravado no app (webm/ogg): vira mp3, com a duração certa.
+        const mp3 = await gravacaoParaMp3(url);
+        url = mp3.url;
+        meta = { duracao: mp3.duracao ?? meta.duracao, largura: null, altura: null };
+      } else if (somenteAudio && formato === "video") {
         url = await extrairAudioDoVideo(url, true);
         formato = "audio";
         meta = {
@@ -145,8 +153,12 @@ const AcoesDoItem: React.FC<{
   item: ItemPlano;
   biblioteca: Midia[];
   envio: ReturnType<typeof useEnviarItem>;
-}> = ({ item, biblioteca, envio }) => {
+  // Só na narração: as falas do plano para ler enquanto grava no app.
+  roteiro?: FalaDoRoteiro[];
+  dica?: string;
+}> = ({ item, biblioteca, envio, roteiro, dica }) => {
   const input = useRef<HTMLInputElement>(null);
+  const [gravador, setGravador] = useState(false);
   const progresso = envio.progresso[item.chave];
   const compativeis = biblioteca.filter((m) =>
     item.tipo === "narracao" || item.tipo === "musica"
@@ -175,6 +187,29 @@ const AcoesDoItem: React.FC<{
             ? "trocar"
             : `Enviar ${item.tipo === "narracao" ? "narração" : item.tipo === "musica" ? "música" : "take"}`}
       </button>
+      {item.tipo === "narracao" ? (
+        <button
+          onClick={() => setGravador(true)}
+          disabled={progresso !== undefined}
+          className={
+            item.midia
+              ? "border-2 border-tinta px-2 py-1 font-mono text-[10px] uppercase hover:bg-tinta hover:text-papel"
+              : "botao-spray !px-3 !py-1 !text-sm"
+          }
+          title="Gravar a narração aqui, lendo o roteiro na tela"
+        >
+          🎙 {item.midia ? "regravar" : "Gravar aqui"}
+        </button>
+      ) : null}
+      {gravador ? (
+        <GravadorDeAudio
+          titulo="Gravar a narração"
+          roteiro={roteiro}
+          dica={dica}
+          aoSalvar={(arquivo) => envio.enviar(item, arquivo)}
+          aoFechar={() => setGravador(false)}
+        />
+      ) : null}
       <select
         value=""
         onChange={(e) => {
@@ -484,7 +519,8 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
               </div>
               {item.tipo === "narracao" ? (
                 <p className="text-xs text-zinc-400">
-                  Grave a copy acima.{" "}
+                  Grave a copy acima — aqui mesmo (🎙 Gravar aqui, com o
+                  roteiro na tela) ou fora do app.{" "}
                   {g.narracao?.orientacoes
                     ? `Dica: ${g.narracao.orientacoes}`
                     : ""}{" "}
@@ -502,6 +538,22 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
                   item={item}
                   biblioteca={biblioteca}
                   envio={envio}
+                  roteiro={
+                    item.tipo === "narracao"
+                      ? g.cenas
+                          .filter((c) => c.fala.trim())
+                          .map((c) => ({
+                            fala: c.fala,
+                            enfase: c.enfase,
+                            pausa: c.pausa_depois_s,
+                          }))
+                      : undefined
+                  }
+                  dica={
+                    item.tipo === "narracao" && g.narracao?.orientacoes
+                      ? `Tom: ${g.narracao.orientacoes}`
+                      : undefined
+                  }
                 />
                 {item.tipo === "musica" && !item.midia ? (
                   <button

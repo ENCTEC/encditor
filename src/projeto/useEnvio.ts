@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
 import {
+  ehGravacaoDoNavegador,
   enviarArquivo,
   extrairAudioDoVideo,
   formatoDoArquivo,
   gerarApelido,
+  gravacaoParaMp3,
   lerDuracaoDaUrl,
   lerMetadados,
   normalizarApelido,
@@ -110,7 +112,11 @@ export const useEnvio = () => {
         );
         // Vídeo enviado como "Só o áudio": guarda só o som, em mp3.
         const soAudio = anexo.formato === "video" && anexo.papel === "audio";
-        if (soAudio) {
+        if (ehGravacaoDoNavegador(anexo.arquivo)) {
+          const mp3 = await gravacaoParaMp3(url);
+          url = mp3.url;
+          meta = { duracao: mp3.duracao ?? meta.duracao, largura: null, altura: null };
+        } else if (soAudio) {
           url = await extrairAudioDoVideo(url, true);
           meta = {
             duracao: (await lerDuracaoDaUrl(url)) ?? meta.duracao,
@@ -155,12 +161,47 @@ export const useEnvio = () => {
     return { enviados, ok: true };
   };
 
+  // Gravação feita no app (GravadorDeAudio): vai direto para a biblioteca
+  // como áudio, em mp3, e é transcrita (é quase sempre narração).
+  const enviarGravacao = async (arquivo: File, apelido: string) => {
+    setEnviando(true);
+    setErro(null);
+    try {
+      const enviado = await enviarArquivo(arquivo, () => {});
+      const mp3 = await gravacaoParaMp3(enviado);
+      const biblioteca = obterBiblioteca();
+      const desejado = normalizarApelido(apelido);
+      const midia: Midia = {
+        id: novoId(),
+        nome: proximoNome(biblioteca, "audio"),
+        apelido:
+          desejado && !biblioteca.some((m) => m.apelido === desejado)
+            ? desejado
+            : gerarApelido(desejado || "gravacao", biblioteca),
+        usarIA: true,
+        papel: "audio",
+        formato: "audio",
+        url: mp3.url,
+        nomeArquivo: arquivo.name,
+        duracao: mp3.duracao,
+        largura: null,
+        altura: null,
+      };
+      adicionarMidia(midia);
+      if (podeAnalisar(midia)) iniciarAnalise(midia, atualizarAnalise);
+      return midia;
+    } finally {
+      setEnviando(false);
+    }
+  };
+
   return {
     anexos,
     anexar,
     atualizarAnexo,
     removerAnexo,
     enviarTodos,
+    enviarGravacao,
     enviando,
     erro,
     setErro,

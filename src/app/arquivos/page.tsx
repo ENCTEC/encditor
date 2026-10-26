@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { formatarTempo } from "@/componentes/Biblioteca";
+import { GravadorDeAudio } from "@/componentes/GravadorDeAudio";
 import { iniciarAnalise } from "@/componentes/AnaliseAutomatica";
 import { ListaDeAnexos } from "@/componentes/ListaDeAnexos";
 import { gerarLegendas, palavrasDaMidia } from "@/ia/conteudo";
@@ -272,6 +273,7 @@ export default function PaginaArquivos() {
   const { projeto, carregado, meta } = useProjeto();
   const envio = useEnvio();
   const [arrastando, setArrastando] = useState(false);
+  const [gravando, setGravando] = useState(false);
   const inputArquivo = useRef<HTMLInputElement>(null);
 
   if (!carregado) return null;
@@ -337,6 +339,30 @@ export default function PaginaArquivos() {
               e.target.value = "";
             }}
           />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setGravando(true)}
+              disabled={envio.enviando}
+              className="botao-spray disabled:opacity-40"
+            >
+              🎙 Gravar áudio aqui
+            </button>
+            <span className="text-xs text-zinc-500">
+              Narração ou locução direto pelo microfone: vira um Áudio do
+              projeto, transcrito sozinho (dá para legendar e usar no chat com o
+              @apelido).
+            </span>
+          </div>
+          {gravando ? (
+            <GravadorDeAudio
+              titulo="Gravar áudio"
+              apelidoInicial={gerarApelido("narracao", projeto.biblioteca)}
+              aoSalvar={async (arquivo, apelido) => {
+                await envio.enviarGravacao(arquivo, apelido);
+              }}
+              aoFechar={() => setGravando(false)}
+            />
+          ) : null}
 
           {envio.anexos.length ? (
             <div className="mt-4 space-y-3">
