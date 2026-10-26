@@ -210,7 +210,37 @@ export const modeloMotionSchema = z.enum([
   "brilho",
   "microfone",
   "confirmado",
+  "conversa",
+  "edicao",
+  "rec",
 ]);
+
+// Ações de um motion "conversa" (chat estilo WhatsApp dentro de um
+// celular), cada uma num momento: lista = a lista de conversas se monta;
+// abrir = entra na conversa; toque = dedo tocando (texto = alvo: conversa,
+// microfone, enviar, campo); gravar = começa a gravar um áudio (a onda vem
+// de motion.onda); enviar_audio = manda o áudio gravado; digitando = o
+// contato está digitando; recebe = chega uma mensagem do contato (texto);
+// escreve = eu escrevo no campo (texto, palavra por palavra); envia = mando
+// o que escrevi; joinha = chega um 👍; zoom = aproxima uma parte do
+// celular (texto = topo, meio, mensagens, baixo ou normal).
+export const acaoDaConversaSchema = z.enum([
+  "lista",
+  "abrir",
+  "toque",
+  "gravar",
+  "enviar_audio",
+  "digitando",
+  "recebe",
+  "escreve",
+  "envia",
+  "joinha",
+  "zoom",
+]);
+
+const palavrasSchema = z.array(
+  z.object({ texto: z.string(), de: z.number(), ate: z.number() }),
+);
 
 export const motionSchema = z.object({
   modelo: modeloMotionSchema,
@@ -236,8 +266,29 @@ export const motionSchema = z.object({
   // motion, na ordem das palavras do texto (sem os "|"). Faz "fala" e
   // "digitando" mostrarem cada palavra junto com a voz. Sem valor, as
   // palavras entram num ritmo fixo.
-  palavras: z
-    .array(z.object({ texto: z.string(), de: z.number(), ate: z.number() }))
+  palavras: palavrasSchema.optional(),
+  // Roteiro de um motion "conversa": o que acontece e quando (segundos
+  // contados do início do motion). "palavras" = tempo de cada palavra
+  // falada de uma mensagem (recebe/escreve), contado do início do motion.
+  eventos: z
+    .array(
+      z.object({
+        de: z.number().min(0),
+        acao: acaoDaConversaSchema,
+        texto: z.string().optional(),
+        palavras: palavrasSchema.optional(),
+      }),
+    )
+    .optional(),
+  // Volume da voz (0 a 1) "taxa" vezes por segundo, a partir de "de"
+  // segundos do início do motion: desenha a onda do áudio gravado na
+  // conversa com a voz de verdade.
+  onda: z
+    .object({
+      de: z.number(),
+      taxa: z.number().positive(),
+      valores: z.array(z.number().min(0).max(1)),
+    })
     .optional(),
 });
 
@@ -294,6 +345,8 @@ export type Zoom = z.infer<typeof zoomSchema>;
 export type Legenda = z.infer<typeof legendaSchema>;
 export type ModeloMotion = z.infer<typeof modeloMotionSchema>;
 export type Motion = z.infer<typeof motionSchema>;
+export type AcaoDaConversa = z.infer<typeof acaoDaConversaSchema>;
+export type EventoDaConversa = NonNullable<Motion["eventos"]>[number];
 export type TipoEfeito = z.infer<typeof tipoEfeitoSchema>;
 export type Efeito = z.infer<typeof efeitoSchema>;
 export type EstiloLegenda = z.infer<typeof estiloLegendaSchema>;

@@ -17,6 +17,7 @@ import {
   dividirClipe,
   dividirItemNoTempo,
   duplicarItem,
+  ehEfeitoSonoro,
   fimDosAudios,
   juntarItens,
   sobreposicaoDeAudio,
@@ -44,8 +45,10 @@ import {
 } from "@/timeline/efeitosSonoros";
 import { nomeDaUrl } from "@/servidor/armazenamento";
 import { aplicarEfeitos } from "@/servidor/efeitos";
+import { envelopeDoArquivo } from "@/servidor/envelope";
 import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
 import {
+  acaoDaConversaSchema,
   direcaoSchema,
   Efeito,
   estiloFundoSchema,
@@ -155,6 +158,9 @@ const DURACAO_NEON: Partial<Record<Motion["modelo"], number>> = {
   brilho: 1.2,
   microfone: 2,
   confirmado: 1.6,
+  conversa: 8,
+  edicao: 3,
+  rec: 2,
 };
 const duracaoPadraoDoMotion = (
   modelo: Motion["modelo"],
@@ -237,6 +243,38 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       );
     }
     return cena - 1;
+  };
+
+  // Onda do áudio "gravado" numa conversa: o volume da narração entre os
+  // eventos gravar e enviar_audio (se não der, fica a onda inventada).
+  const ondaDaConversa = async (t: Timeline, m: Motion): Promise<Motion> => {
+    const gravar = m.eventos?.find((e) => e.acao === "gravar");
+    const enviar = m.eventos?.find(
+      (e) => e.acao === "enviar_audio" && !!gravar && e.de > gravar.de,
+    );
+    if (m.modelo !== "conversa" || m.onda || !gravar || !enviar) return m;
+    const de = m.inicio + gravar.de;
+    const audio = t.audios.find(
+      (a) =>
+        !ehEfeitoSonoro(a.url) &&
+        a.inicio <= de &&
+        a.fim > de &&
+        sessao.biblioteca.some(
+          (x) => x.url === a.url && x.analise?.transcricao,
+        ),
+    );
+    if (!audio) return m;
+    try {
+      const desde = audio.origemInicio + (de - audio.inicio);
+      const valores = await envelopeDoArquivo(
+        audio.url,
+        desde,
+        desde + (enviar.de - gravar.de) + 0.2,
+      );
+      return { ...m, onda: { de: gravar.de, taxa: 30, valores } };
+    } catch {
+      return m;
+    }
   };
 
   // Aplica a operação, valida e registra. Se der erro, nada muda e o erro
@@ -967,7 +1005,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_motion",
       description:
-        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). Kit neon (motion design falado; para um vídeo inteiro prefira encenar_fala): fala (as palavras faladas entram uma a uma junto com a voz; *destaque* enorme em degradê; | quebra linha), etiqueta (pílula da ação no topo), anel (círculo de luz com texto em x/y), digitando (cartão que escreve o que é dito; detalhe = cabeçalho), barra (palavra grande + barra que enche; detalhe = linha de cima), comentario (caixa: texto digitado e publicado; detalhe = pílula acima), curtida (botão de like tocado em x/y; texto = número que sobe 1), toque (dedo tocando em x/y), brilho (✦ em x/y), microfone (microfone com ondas em x/y), confirmado (selo ✓ inclinado). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
+        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). Kit neon (motion design falado; para um vídeo inteiro prefira encenar_fala): fala (as palavras faladas entram uma a uma junto com a voz; *destaque* enorme em degradê; | quebra linha), etiqueta (pílula da ação no topo), anel (círculo de luz com texto em x/y), digitando (cartão que escreve o que é dito; detalhe = cabeçalho), barra (palavra grande + barra que enche; detalhe = linha de cima), comentario (caixa: texto digitado e publicado; detalhe = pílula acima), curtida (botão de like tocado em x/y; texto = número que sobe 1), toque (dedo tocando em x/y), brilho (✦ em x/y), microfone (microfone com ondas em x/y), confirmado (selo ✓ inclinado), rec (cartão de gravação com REC e relógio; texto no meio), edicao (timeline de edição se montando; detalhe = cabeçalho), conversa (chat estilo WhatsApp no celular — o roteiro só dá para montar com encenar_fala). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
       inputSchema: z.object({
         modelo: modeloMotionSchema,
         de: z
@@ -1240,6 +1278,26 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
                       .describe(
                         "true = efeito sonoro que combina. Só nos momentos-chave.",
                       ),
+                    eventos: z
+                      .array(
+                        z.object({
+                          quando: z
+                            .string()
+                            .min(1)
+                            .describe("Palavras ditas quando a ação acontece."),
+                          acao: acaoDaConversaSchema,
+                          texto: z
+                            .string()
+                            .nullable()
+                            .describe(
+                              "recebe/escreve: a mensagem; toque: conversa, microfone, enviar ou campo; zoom: mensagens, baixo, topo ou normal; lista: null.",
+                            ),
+                        }),
+                      )
+                      .nullable()
+                      .describe(
+                        "Só no modelo conversa (chat estilo WhatsApp no celular; detalhe = nome do contato): o roteiro, na ordem da fala. Ex.: lista → toque conversa → abrir → toque microfone → gravar → zoom baixo → toque enviar → enviar_audio → zoom normal → digitando → zoom mensagens → recebe → toque campo → escreve → envia → joinha. null nos outros modelos.",
+                      ),
                   }),
                 )
                 .min(1),
@@ -1252,7 +1310,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
             "true = apaga antes os motions, inserts e efeitos sonoros atuais (para refazer a encenação).",
           ),
       }),
-      run: (e) => {
+      run: async (e) => {
         const faladas = palavrasNoVideoFinal(
           sessao.timeline,
           sessao.biblioteca,
@@ -1289,8 +1347,13 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           substituir: e.substituir_tudo,
           fimDoVideo: total > ultima ? total : ultima + 0.8,
         });
+        // Conversa com áudio gravado: a onda vem da voz de verdade (o
+        // trecho da narração entre "gravar" e "enviar_audio").
+        const motions = await Promise.all(
+          r.timeline.motions.map((m) => ondaDaConversa(r.timeline, m)),
+        );
         const ok = aplicar(
-          () => r.timeline,
+          () => ({ ...r.timeline, motions }),
           `fala encenada em ${r.telas.length} telas: ${r.motions} motion(s), ${r.inserts} imagem(ns)/vídeo(s) e ${r.sons} efeito(s) sonoro(s)`,
         );
         return `${ok} Telas: ${r.telas.map((x) => `${x.tela}) ${x.de}–${x.ate}s`).join(", ")}.${r.aproximados.length ? ` Achados por aproximação (confira): ${r.aproximados.join(", ")}.` : ""}${r.avisos.length ? ` Avisos: ${r.avisos.join("; ")}.` : ""}${total < ultima ? ` ATENÇÃO: a fala vai até ${s(ultima)}s e o vídeo só tem ${total}s — estique a cena/fundo (colocar_fundo ou aparar_cena).` : ""}`;

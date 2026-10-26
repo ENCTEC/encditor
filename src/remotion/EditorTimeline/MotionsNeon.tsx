@@ -1,6 +1,5 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, random, spring } from "remotion";
-import { ModeloMotion } from "../../timeline/schema";
 import { FONTES } from "./fontes";
 import {
   BRANCO,
@@ -10,6 +9,31 @@ import {
   Lugar,
   semAsteriscos,
 } from "./motionBase";
+import {
+  AZUL,
+  CIANO,
+  CINZA,
+  comAlfa,
+  COR_NEON,
+  corDoBrilho,
+  corNaPosicao,
+  degrade,
+  IconeMicrofone,
+  LINHA_VIDRO,
+  linhasDoTexto,
+  MAGENTA,
+  MAO,
+  misturar,
+  ModeloNeon,
+  NoPonto,
+  Pedaco,
+  pedacos,
+  quadrosDasPalavras,
+  ROXO,
+  TextoDegrade,
+  TextoNeon,
+  VIDRO,
+} from "./neonBase";
 
 // Kit "neon": motion design FALADO, como nos vídeos feitos só com
 // animação — cada frase vira texto na tela no momento em que é dita e um
@@ -18,153 +42,6 @@ import {
 // Visual: letra Montserrat Black, palavras fortes em degradê azul→roxo com
 // brilho, cartões de vidro escuro. Combina com o fundo animado "neon".
 // "fala" e "digitando" seguem o tempo de cada palavra (motion.palavras).
-
-export const COR_NEON = "#8B5CF6";
-const CIANO = "#2DD4FF";
-const AZUL = "#4F7BFF";
-const ROXO = "#A855F7";
-const MAGENTA = "#FF3DCB";
-const VIDRO = "rgba(14, 16, 32, 0.88)";
-const LINHA_VIDRO = "rgba(255, 255, 255, 0.13)";
-const CINZA = "rgba(255, 255, 255, 0.62)";
-
-export const MODELOS_DO_KIT_NEON = [
-  "fala",
-  "etiqueta",
-  "anel",
-  "digitando",
-  "barra",
-  "comentario",
-  "curtida",
-  "toque",
-  "brilho",
-  "microfone",
-  "confirmado",
-] as const satisfies readonly ModeloMotion[];
-type ModeloNeon = (typeof MODELOS_DO_KIT_NEON)[number];
-
-export const ehModeloNeon = (m: ModeloMotion): m is ModeloNeon =>
-  (MODELOS_DO_KIT_NEON as readonly string[]).includes(m);
-
-// "#rrggbb" → rgba com transparência (outra cor qualquer fica como está).
-const comAlfa = (cor: string, alfa: number) => {
-  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cor);
-  return m
-    ? `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alfa})`
-    : cor;
-};
-
-// Mistura duas cores #rrggbb (t = 0 → a, 1 → b).
-const misturar = (a: string, b: string, t: number) => {
-  const ca = /^#(..)(..)(..)$/.exec(a)!.slice(1).map((x) => parseInt(x, 16));
-  const cb = /^#(..)(..)(..)$/.exec(b)!.slice(1).map((x) => parseInt(x, 16));
-  const [r, g, bl] = ca.map((v, i) => Math.round(v + (cb[i] - v) * t));
-  return `rgb(${r}, ${g}, ${bl})`;
-};
-
-// Degradê do kit (ou a cor escolhida, lisa) e a cor do brilho.
-const degrade = (c: Ctx, angulo = 90) =>
-  c.corEscolhida
-    ? `linear-gradient(${angulo}deg, ${c.cor}, ${c.cor})`
-    : `linear-gradient(${angulo}deg, ${CIANO} 0%, ${AZUL} 48%, ${ROXO} 100%)`;
-const corDoBrilho = (c: Ctx) => (c.corEscolhida ? c.cor : COR_NEON);
-const corNaPosicao = (c: Ctx, t: number) =>
-  c.corEscolhida
-    ? c.cor
-    : t < 0.5
-      ? misturar(CIANO, AZUL, t * 2)
-      : misturar(AZUL, ROXO, (t - 0.5) * 2);
-
-// Texto em degradê com brilho. Sombra de texto não serve aqui (cobriria o
-// degradê): o brilho e o "fantasma" colorido da entrada usam drop-shadow.
-const TextoDegrade: React.FC<{
-  c: Ctx;
-  children: React.ReactNode;
-  estilo?: React.CSSProperties;
-  filtroExtra?: string;
-}> = ({ c, children, estilo, filtroExtra }) => (
-  <span
-    style={{
-      backgroundImage: degrade(c),
-      WebkitBackgroundClip: "text",
-      backgroundClip: "text",
-      color: "transparent",
-      WebkitTextFillColor: "transparent",
-      ...estilo,
-      filter: `${filtroExtra ?? ""} drop-shadow(0 0 ${c.u * 1.1}px ${comAlfa(corDoBrilho(c), 0.55)})`,
-    }}
-  >
-    {children}
-  </span>
-);
-
-// Texto com *destaque* em degradê (o resto na cor normal).
-const TextoNeon: React.FC<{ c: Ctx; texto: string }> = ({ c, texto }) => (
-  <>
-    {texto.split(/(\*[^*]+\*)/g).map((parte, i) =>
-      parte.startsWith("*") && parte.endsWith("*") && parte.length > 2 ? (
-        <TextoDegrade key={i} c={c}>
-          {parte.slice(1, -1)}
-        </TextoDegrade>
-      ) : (
-        <React.Fragment key={i}>{parte}</React.Fragment>
-      ),
-    )}
-  </>
-);
-
-// Palavras do texto em linhas ("|" quebra a linha), cada uma sabendo se
-// está em *destaque*. "*muito bom*" marca as duas palavras. O "indice" é a
-// posição da palavra no texto todo (a mesma de motion.palavras).
-type Pedaco = { texto: string; destaque: boolean; indice: number };
-const pedacos = (texto: string): Pedaco[][] => {
-  let indice = 0;
-  let dentro = false;
-  return texto.split("|").map((linha) =>
-    linha
-      .split(/\s+/)
-      .filter(Boolean)
-      .flatMap((bruto) => {
-        const destaque = dentro || bruto.startsWith("*");
-        if ((bruto.match(/\*/g)?.length ?? 0) % 2 === 1) dentro = !dentro;
-        const limpo = bruto.replace(/\*/g, "");
-        return limpo ? [{ texto: limpo, destaque, indice: indice++ }] : [];
-      }),
-  );
-};
-
-// Quadro (contado do início do motion) em que cada palavra aparece: o da
-// fala, quando o motion sabe o tempo de cada palavra; senão um ritmo fixo.
-const quadrosDasPalavras = (c: Ctx, n: number, primeiro = 2) => {
-  const ditas = c.motion.palavras;
-  if (ditas && ditas.length === n) {
-    return ditas.map((p) => Math.max(0, Math.round(p.de * c.fps)));
-  }
-  const ritmo = Math.max(
-    2,
-    Math.min(0.3 * c.fps, (c.duracao * 0.5) / Math.max(1, n)),
-  );
-  return Array.from({ length: n }, (_, i) => Math.round(primeiro + i * ritmo));
-};
-
-// Em x/y (% da tela), centrado; sem x/y, no lugar padrão.
-const NoPonto: React.FC<{
-  c: Ctx;
-  x: number;
-  y: number;
-  children: React.ReactNode;
-}> = ({ c, x, y, children }) => (
-  <div
-    style={{
-      position: "absolute",
-      left: ((c.motion.x ?? x) / 100) * c.largura,
-      top: ((c.motion.y ?? y) / 100) * c.altura,
-      transform: "translate(-50%, -50%)",
-    }}
-  >
-    {children}
-  </div>
-);
 
 // ---------- modelos ----------
 
@@ -222,10 +99,69 @@ const PalavraFalada: React.FC<{
   );
 };
 
+// Barra de segmentos que enche em degradê (o "nível"), começando no quadro
+// "comeca" e enchendo em ~0,9 s.
+export const Segmentos: React.FC<{ c: Ctx; comeca: number; largura: number }> = ({
+  c,
+  comeca,
+  largura,
+}) => {
+  const { u, frame, fps } = c;
+  const enche = interpolate(frame, [comeca, comeca + fps * 0.9], [0, 1], {
+    ...LIMITE,
+    easing: Easing.out(Easing.cubic),
+  });
+  const segmentos = 16;
+  const espaco = u * 0.75;
+  const lado = (largura - espaco * (segmentos - 1)) / segmentos;
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: espaco,
+        opacity: interpolate(frame, [comeca - 4, comeca], [0, 1], LIMITE),
+      }}
+    >
+      {Array.from({ length: segmentos }, (_, i) => {
+        const aceso = interpolate(enche * segmentos - i, [0, 1], [0, 1], LIMITE);
+        return (
+          <div
+            key={i}
+            style={{
+              width: lado,
+              height: u * 2.8,
+              borderRadius: u * 0.5,
+              backgroundColor:
+                aceso > 0
+                  ? corNaPosicao(c, i / (segmentos - 1))
+                  : "rgba(255,255,255,0.07)",
+              opacity: aceso > 0 ? 0.35 + 0.65 * aceso : 1,
+              boxShadow:
+                aceso > 0.6
+                  ? `0 0 ${u * 1.2}px ${comAlfa(c.corEscolhida ? c.cor : COR_NEON, 0.5)}`
+                  : "none",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+// Saída fluida dos textos: sobem um pouco, desfocam e somem.
+export const estiloDaSaida = (c: Ctx): React.CSSProperties =>
+  c.saida < 1
+    ? {
+        opacity: c.saida,
+        transform: `translateY(${-(1 - c.saida) * c.u * 4}px)`,
+        filter: `blur(${(1 - c.saida) * c.u * 0.9}px)`,
+      }
+    : {};
+
 const Fala: React.FC<{ c: Ctx }> = ({ c }) => {
   const { u, motion, largura } = c;
-  const linhas = pedacos(motion.texto);
-  const todas = linhas.flat();
+  const linhas = linhasDoTexto(motion.texto);
+  const todas = linhas.flatMap((l) => l.pedacos);
   const quadros = quadrosDasPalavras(c, todas.length);
   const temDestaque = todas.some((p) => p.destaque);
   const grande = 16;
@@ -238,15 +174,31 @@ const Fala: React.FC<{ c: Ctx }> = ({ c }) => {
       estilo={{
         flexDirection: "column",
         gap: u * 0.4,
-        opacity: c.saida,
+        ...estiloDaSaida(c),
         ...(motion.posicao === "topo" ? { paddingTop: "9%" } : {}),
       }}
     >
       {linhas.map((linha, l) => {
+        if (linha.barra) {
+          // Enche logo depois da palavra de antes dela.
+          const antes = linhas
+            .slice(0, l)
+            .flatMap((x) => x.pedacos)
+            .at(-1);
+          return (
+            <div key={l} style={{ margin: `${u * 1.2}px 0` }}>
+              <Segmentos
+                c={c}
+                comeca={(antes ? quadros[antes.indice] : 0) + 3}
+                largura={Math.min(largura * 0.72, u * 72)}
+              />
+            </div>
+          );
+        }
         // Largura aproximada do Montserrat Black em maiúsculas: a linha
         // diminui se não couber (até 62%); se ainda assim não couber, quebra
         // em duas (as palavras nunca se encavalam).
-        const larguraDaLinha = linha.reduce(
+        const larguraDaLinha = linha.pedacos.reduce(
           (soma, p) =>
             soma + (p.texto.length * 0.8 + 0.4) * (p.destaque ? grande : normal) * u,
           0,
@@ -257,7 +209,9 @@ const Fala: React.FC<{ c: Ctx }> = ({ c }) => {
         );
         // Espaço entre palavras do tamanho de um espaço da letra maior da
         // linha.
-        const maiorLetra = linha.some((p) => p.destaque) ? grande : normal;
+        const maiorLetra = linha.pedacos.some((p) => p.destaque)
+          ? grande
+          : normal;
         return (
           <div
             key={l}
@@ -271,7 +225,7 @@ const Fala: React.FC<{ c: Ctx }> = ({ c }) => {
               whiteSpace: "nowrap",
             }}
           >
-            {linha.map((p) => (
+            {linha.pedacos.map((p) => (
               <PalavraFalada
                 key={p.indice}
                 c={c}
@@ -441,23 +395,6 @@ const Anel: React.FC<{ c: Ctx }> = ({ c }) => {
     </AbsoluteFill>
   );
 };
-
-// Ícone de microfone (desenho próprio), centrado em (0, 0), altura ~2.
-const IconeMicrofone: React.FC<{ tamanho: number; cor?: string }> = ({
-  tamanho,
-  cor = BRANCO,
-}) => (
-  <svg width={tamanho} height={tamanho} viewBox="-12 -12 24 24">
-    <rect x={-3.6} y={-10} width={7.2} height={12.5} rx={3.6} fill={cor} />
-    <path
-      d="M -7 0 A 7 7 0 0 0 7 0 M 0 7 L 0 10.5 M -4 10.5 L 4 10.5"
-      fill="none"
-      stroke={cor}
-      strokeWidth={2.2}
-      strokeLinecap="round"
-    />
-  </svg>
-);
 
 // Cartão de vidro que "digita" o texto junto com a voz (comando de voz,
 // pesquisa, mensagem). detalhe = cabeçalho (padrão "COMANDO DE VOZ").
@@ -841,10 +778,6 @@ const Comentario: React.FC<{ c: Ctx }> = ({ c }) => {
     </Lugar>
   );
 };
-
-// Mão de "curtir" (desenho próprio) num quadrado 24×24.
-const MAO =
-  "M2 10.5h4.2V21H2z M7.6 21h9.6a2.1 2.1 0 0 0 2-1.6l1.6-6.6a2.1 2.1 0 0 0-2-2.6h-5.3l0.9-4.2a1.9 1.9 0 0 0-3.4-1.5L7.6 10.4z";
 
 // Botão de curtir: aparece, é tocado, estoura em brilhinhos e uma mão maior
 // sobe. Texto numérico = contador que sobe 1 no toque; outro texto = rótulo.
@@ -1238,7 +1171,10 @@ const Confirmado: React.FC<{ c: Ctx }> = ({ c }) => {
   );
 };
 
-export const MODELOS_NEON: Record<ModeloNeon, React.FC<{ c: Ctx }>> = {
+export const MODELOS_NEON: Record<
+  Exclude<ModeloNeon, "conversa" | "edicao" | "rec">,
+  React.FC<{ c: Ctx }>
+> = {
   fala: Fala,
   etiqueta: Etiqueta,
   anel: Anel,

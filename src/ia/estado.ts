@@ -102,6 +102,9 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       ...(x.x2 !== undefined ? { x2: x.x2, y2: x.y2 } : {}),
       ...(x.cor ? { cor: x.cor } : {}),
       ...(x.palavras ? { segue_a_fala: true } : {}),
+      ...(x.eventos?.length
+        ? { roteiro: x.eventos.map((e) => `${e.acao}@${e.de}s`).join(", ") }
+        : {}),
     })),
     efeitos: (t.efeitos ?? []).map((x, i) => ({
       numero: i + 1,

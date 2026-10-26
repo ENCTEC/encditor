@@ -26,7 +26,9 @@ import {
   TINTA,
   VERMELHO,
 } from "./motionBase";
-import { MODELOS_NEON, ehModeloNeon, COR_NEON } from "./MotionsNeon";
+import { MODELOS_NEON } from "./MotionsNeon";
+import { MODELOS_TELAS } from "./MotionsTelas";
+import { COR_NEON, ehModeloNeon } from "./neonBase";
 
 // Motion graphics: textos e grafismos animados por cima do vídeo (acima
 // das cenas e inserts, abaixo das legendas). Tudo é medido em "u" = 1% do
@@ -1411,6 +1413,7 @@ const MODELOS: Record<Motion["modelo"], React.FC<{ c: Ctx }>> = {
   vigilancia: Vigilancia,
   marcador: Marcador,
   ...MODELOS_NEON,
+  ...MODELOS_TELAS,
 };
 
 // Um motion, com o tempo contado do começo dele.

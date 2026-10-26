@@ -1,5 +1,12 @@
 import React from "react";
-import { AbsoluteFill, random, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  AbsoluteFill,
+  Easing,
+  interpolate,
+  random,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
 import { EstiloFundo } from "../../timeline/schema";
 
 // Fundos animados: cenas da trilha principal desenhadas pelo próprio vídeo
@@ -159,6 +166,12 @@ const Formas: React.FC<{ t: number; lado: number }> = ({ t, lado }) => (
       const tamanho = lado * (longe ? 0.04 + r("t") * 0.03 : 0.07 + r("t") * 0.07);
       const flutua = Math.sin(t * (0.6 + r("v")) + r("f") * 6.28) * lado * 0.02;
       const giro = (r("g") - 0.5) * 60 + t * (r("gv") - 0.5) * 30;
+      // Chegam crescendo, uma depois da outra, no começo da cena.
+      const chega = interpolate(t, [i * 0.04, i * 0.04 + 0.55], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: Easing.out(Easing.back(1.7)),
+      });
       return (
         <div
           key={i}
@@ -166,7 +179,7 @@ const Formas: React.FC<{ t: number; lado: number }> = ({ t, lado }) => (
             position: "absolute",
             left: `${x}%`,
             top: `${y}%`,
-            transform: `translate(-50%, calc(-50% + ${flutua}px)) rotate(${giro}deg)`,
+            transform: `translate(-50%, calc(-50% + ${flutua + (1 - chega) * lado * 0.08}px)) rotate(${giro - (1 - chega) * 90}deg) scale(${chega})`,
             filter: longe ? `blur(${lado * 0.004}px)` : undefined,
             opacity: longe ? 0.55 : 0.95,
           }}

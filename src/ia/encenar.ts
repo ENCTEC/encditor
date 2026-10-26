@@ -16,7 +16,13 @@ import {
 } from "@/timeline/efeitosSonoros";
 import { adicionarItem, ehEfeitoSonoro } from "@/timeline/operacoes";
 import { palavrasDoTexto } from "@/timeline/palavras";
-import { Insert, ModeloMotion, Motion, Timeline } from "@/timeline/schema";
+import {
+  AcaoDaConversa,
+  Insert,
+  ModeloMotion,
+  Motion,
+  Timeline,
+} from "@/timeline/schema";
 import { PalavraFinal, tokensDaFala } from "./conteudo";
 
 // "Encenar a fala": monta um vídeo de motion design FALADO a partir da
@@ -159,6 +165,65 @@ export type ItemDaTela = {
   ate_dizer: string | null;
   fica_ate_tela: number | null;
   com_som: boolean;
+  // Só no motion "conversa": o roteiro do chat, cada ação no instante em
+  // que o seu trecho é dito (na ordem da fala).
+  eventos?: { quando: string; acao: AcaoDaConversa; texto: string | null }[] | null;
+};
+
+// O toque (dedo) vem um pouco antes da ação que ele "provoca".
+const ANTES_DO_TOQUE = 0.3;
+
+// Roteiro da conversa em segundos contados do início do motion. Recebe e
+// escreve ganham o tempo de cada palavra (a mensagem aparece junto com a
+// voz). Devolve também os trechos que não foram achados na fala.
+const eventosDaConversa = (
+  item: ItemDaTela,
+  faladas: PalavraFinal[],
+  inicio: number,
+) => {
+  const naoAchados: string[] = [];
+  let desde = Math.max(0, inicio - 0.1);
+  const eventos = (item.eventos ?? []).map((ev) => {
+    const achado = acharFalaDepois(faladas, ev.quando, desde);
+    if (!achado) naoAchados.push(`"${ev.quando}" (${ev.acao})`);
+    const momento = Math.max(
+      inicio,
+      (achado?.de ?? desde) - ANTECIPA - (ev.acao === "toque" ? ANTES_DO_TOQUE : 0),
+    );
+    if (achado) desde = achado.de;
+    const de = r2(momento - inicio);
+    const palavras =
+      (ev.acao === "recebe" || ev.acao === "escreve") && ev.texto
+        ? tempoDasPalavras(ev.texto, faladas, momento)?.map((p) => ({
+            ...p,
+            de: r2(p.de + de),
+            ate: r2(p.ate + de),
+          }))
+        : undefined;
+    return {
+      de,
+      acao: ev.acao,
+      ...(ev.texto ? { texto: ev.texto } : {}),
+      ...(palavras ? { palavras } : {}),
+    };
+  });
+  // "envia" só depois da última palavra escrita (e o toque no enviar logo
+  // antes dele), mesmo que o trecho citado comece antes.
+  let fimDaEscrita = -Infinity;
+  eventos.forEach((e, i) => {
+    if (e.acao === "escreve") {
+      fimDaEscrita = Math.max(e.de, ...(e.palavras ?? []).map((p) => p.de));
+    } else if (e.acao === "envia" && e.de < fimDaEscrita + 0.25) {
+      e.de = r2(fimDaEscrita + 0.25);
+      const toque = eventos
+        .slice(0, i)
+        .reverse()
+        .find((x) => x.acao === "toque" && x.texto === "enviar");
+      if (toque && toque.de > e.de - 1.5) toque.de = r2(e.de - ANTES_DO_TOQUE);
+    }
+  });
+  eventos.sort((a, b) => a.de - b.de);
+  return { eventos, naoAchados };
 };
 
 const caixaDoItem = (item: ItemDaTela, t: Timeline): Caixa => {
@@ -192,6 +257,9 @@ const MEIO: ModeloMotion[] = [
   "frase",
   "lista",
   "titulo",
+  "conversa",
+  "edicao",
+  "rec",
 ];
 const ocupaOMeio = (item: ItemDaTela) =>
   !!item.midia ||
@@ -357,6 +425,15 @@ export const encenar = (
       const palavras = sincroniza
         ? tempoDasPalavras(texto, faladas, inicio)
         : undefined;
+      const roteiro =
+        item.modelo === "conversa" && item.eventos?.length
+          ? eventosDaConversa(item, faladas, inicio)
+          : null;
+      if (roteiro?.naoAchados.length) {
+        throw new Error(
+          `tela ${k + 1}: na conversa, não achei na fala ${roteiro.naoAchados.join(", ")} (depois de "${item.quando}", na ordem). Copie as palavras como foram ditas.`,
+        );
+      }
       const motion: Motion = {
         modelo: item.modelo,
         inicio,
@@ -370,6 +447,7 @@ export const encenar = (
         ...(item.y2 !== null ? { y2: item.y2 } : {}),
         ...(item.cor ? { cor: item.cor } : {}),
         ...(palavras ? { palavras } : {}),
+        ...(roteiro ? { eventos: roteiro.eventos } : {}),
       };
       nova = adicionarItem(nova, "motions", motion);
       novos.add(motion);

@@ -2,6 +2,7 @@ import {
   EstiloFundo,
   EstiloLegenda,
   ModeloMotion,
+  Motion,
   TipoEfeito,
   TipoTransicao,
 } from "@/timeline/schema";
@@ -173,6 +174,7 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
     y?: number;
     x2?: number;
     y2?: number;
+    eventos?: Motion["eventos"];
   };
   // Som que combina (adicionado junto pela IA e pela montagem); null = sem
   // som (aparece demais para ter som toda vez).
@@ -515,6 +517,55 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
     campos: "texto = 1 ou 2 palavras; posicao (padrão topo) ou x/y.",
     exemplo: { texto: "Fechou?" },
     som: "pop",
+    neon: true,
+  },
+  {
+    id: "conversa",
+    tag: "#conversa",
+    nome: "Conversa no celular",
+    descricao:
+      "Chat no estilo WhatsApp montado num celular: lista de conversas, abrir, gravar áudio com a onda da voz, enviar, digitando…, mensagens chegando, 👍 e zoom.",
+    quandoUsar:
+      "Quando a fala conta uma conversa: 'ele me mandou', 'respondi', 'gravei um áudio', atendimento no WhatsApp.",
+    campos:
+      "detalhe = nome do contato; o roteiro vai em eventos (lista, abrir, toque, gravar, enviar_audio, digitando, recebe, escreve, envia, joinha, zoom) — use encenar_fala.",
+    exemplo: {
+      texto: "",
+      detalhe: "Cristiano",
+      eventos: [
+        { de: 0.1, acao: "lista" },
+        { de: 0.6, acao: "toque", texto: "conversa" },
+        { de: 0.9, acao: "abrir" },
+        { de: 1.3, acao: "digitando" },
+        { de: 1.9, acao: "recebe", texto: "Que vídeo bom!" },
+        { de: 2.5, acao: "joinha" },
+      ],
+    },
+    som: null,
+    neon: true,
+  },
+  {
+    id: "edicao",
+    tag: "#edicao",
+    nome: "Timeline de edição",
+    descricao:
+      "Cartão de timeline (V2, V1, A1) se montando sozinho: os blocos entram, a onda do áudio aparece e o cursor corre.",
+    quandoUsar: "'Está editando', 'editado', 'montando o vídeo', bastidores da edição.",
+    campos: "detalhe = cabeçalho (padrão 'TIMELINE · EDIÇÃO AUTOMÁTICA'); posicao.",
+    exemplo: { texto: "" },
+    som: "teclado",
+    neon: true,
+  },
+  {
+    id: "rec",
+    tag: "#rec",
+    nome: "Gravando (REC)",
+    descricao:
+      "Cartão de gravação com ● REC piscando, relógio correndo e um texto no meio.",
+    quandoUsar: "'Esse vídeo', 'gravando', 'ao vivo', 'agora mesmo'.",
+    campos: "texto = o que aparece no meio (*destaque*); posicao.",
+    exemplo: { texto: "Esse *vídeo*" },
+    som: null,
     neon: true,
   },
 ];

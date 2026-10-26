@@ -169,6 +169,7 @@ export const DemoMotion: React.FC<{ modelo: ModeloMotion }> = ({ modelo }) => {
             fim: duracao / DEMO.fps,
             texto: item.exemplo.texto,
             ...(item.exemplo.detalhe ? { detalhe: item.exemplo.detalhe } : {}),
+            ...(item.exemplo.eventos ? { eventos: item.exemplo.eventos } : {}),
             ...(aponta ? { x: 62, y: 52 } : {}),
             ...(item.exemplo.x !== undefined
               ? {
