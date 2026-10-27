@@ -30,6 +30,8 @@ export const MODELOS_DO_KIT_NEON = [
   "conversa",
   "edicao",
   "rec",
+  "marca",
+  "desenho",
 ] as const satisfies readonly ModeloMotion[];
 export type ModeloNeon = (typeof MODELOS_DO_KIT_NEON)[number];
 
@@ -61,10 +63,38 @@ export const misturar = (a: string, b: string, t: number) => {
   return `rgb(${r}, ${g}, ${bl})`;
 };
 
+// Luminância (0 = preto, 1 = branco) de uma cor #rrggbb.
+const luminancia = (cor: string) => {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(cor.trim());
+  if (!m) return 0.5;
+  const [r, g, b] = m.slice(1).map((x) => {
+    const v = parseInt(x, 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const paraHex = (rgb: string) =>
+  `#${(rgb.match(/\d+/g) ?? []).slice(0, 3).map((v) => Number(v).toString(16).padStart(2, "0")).join("")}`;
+
+// A cor da paleta, legível no fundo: no escuro, cor escura demais clareia;
+// no claro, cor clara demais escurece (aos poucos, até dar para ler).
+export const legivel = (cor: string, claro: boolean) => {
+  if (!/^#[0-9a-f]{6}$/i.test(cor.trim())) return cor;
+  let atual = cor;
+  for (let t = 0.12; t <= 0.85; t += 0.12) {
+    const l = luminancia(atual);
+    if (claro ? l <= 0.42 : l >= 0.2) break;
+    atual = paraHex(misturar(cor, claro ? "#111110" : "#ffffff", t));
+  }
+  return atual;
+};
+
 // As 3 cores do kit: a cor escolhida no motion (lisa), ou a paleta da
-// direção de arte do vídeo, ou o azul→roxo padrão.
+// direção de arte do vídeo, ou o azul→roxo padrão — legíveis no fundo.
 const paletaDo = (c: Ctx) => {
-  const p = c.paleta?.length ? c.paleta : [CIANO, AZUL, ROXO];
+  const p = (c.paleta?.length ? c.paleta : [CIANO, AZUL, ROXO]).map((x) =>
+    legivel(x, c.claro),
+  );
   return p.length >= 3 ? p : [p[0], p[1] ?? p[0], p[1] ?? p[0]];
 };
 export const corDe = (c: Ctx, i: 0 | 1 | 2) =>

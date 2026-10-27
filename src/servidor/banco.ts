@@ -25,7 +25,7 @@ const global = globalThis as unknown as {
 
 // Suba este número ao criar tabelas/colunas: a conexão guardada (em
 // desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
-const VERSAO_ESQUEMA = 4;
+const VERSAO_ESQUEMA = 5;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -162,6 +162,13 @@ const banco = () => {
       cliente_id TEXT PRIMARY KEY,
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS padroes (
+      nome TEXT NOT NULL,
+      cliente_id TEXT NOT NULL,
+      dados TEXT NOT NULL,
+      atualizado_em INTEGER NOT NULL,
+      PRIMARY KEY (cliente_id, nome)
     );
     CREATE TABLE IF NOT EXISTS conexoes (
       cliente_id TEXT NOT NULL,
@@ -846,6 +853,35 @@ export const salvarDirecaoDoCliente = (clienteId: string, dados: unknown) => {
        ON CONFLICT(cliente_id) DO UPDATE SET dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
     )
     .run(clienteId, JSON.stringify(dados), Date.now());
+};
+
+// ---------- Padrões de animação (motions "desenho" salvos) ----------
+// A IA guarda as cenas desenhadas que ficaram boas para reusar: do cliente
+// (cliente_id) ou para todos (cliente_id = "*").
+
+export type PadraoSalvo = {
+  nome: string;
+  descricao: string;
+  duracao: number;
+  camadas: unknown[];
+};
+
+export const lerPadroes = (clienteId: string | null): PadraoSalvo[] =>
+  (
+    banco()
+      .prepare(
+        "SELECT dados FROM padroes WHERE cliente_id = ? OR cliente_id = ? ORDER BY atualizado_em",
+      )
+      .all("*", clienteId ?? "*") as { dados: string }[]
+  ).map((l) => JSON.parse(l.dados));
+
+export const salvarPadrao = (clienteId: string | null, padrao: PadraoSalvo) => {
+  banco()
+    .prepare(
+      `INSERT INTO padroes (nome, cliente_id, dados, atualizado_em) VALUES (?, ?, ?, ?)
+       ON CONFLICT(cliente_id, nome) DO UPDATE SET dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
+    )
+    .run(padrao.nome, clienteId ?? "*", JSON.stringify(padrao), Date.now());
 };
 
 // ---------- Conexões (contas do cliente para ler métricas) ----------

@@ -247,6 +247,8 @@ export const modeloMotionSchema = z.enum([
   "conversa",
   "edicao",
   "rec",
+  "marca",
+  "desenho",
 ]);
 
 // Ações de um motion "conversa" (chat estilo WhatsApp dentro de um
@@ -271,6 +273,87 @@ export const acaoDaConversaSchema = z.enum([
   "joinha",
   "zoom",
 ]);
+
+// Animação DESENHADA pela IA (modelo "desenho"): camadas simples — caixa,
+// círculo, texto, emoji, imagem, traço — cada uma com entrada, movimento e
+// repetição. Assim a IA cria cenas novas (um celular com um app, um
+// gráfico, um contrato) sem programar. Camada solta: x/y = centro em % da
+// tela e l/a = tamanho em u (1% do lado menor). Camada "dentro" de outra
+// (índice de uma camada ANTERIOR): x/y/l/a em % da caixa da camada mãe, e
+// ela anda junto com a mãe. Letra (tamanho) sempre em u.
+export const efeitoDaCamadaSchema = z.enum([
+  "surge",
+  "sobe",
+  "desce",
+  "esquerda",
+  "direita",
+  "zoom",
+  "pula",
+  "gira",
+  "cresce",
+  "desenha",
+  "digita",
+]);
+export const camadaSchema = z.object({
+  tipo: z.enum(["caixa", "circulo", "texto", "emoji", "imagem", "traco"]),
+  dentro: z.number().int().min(0).optional(),
+  x: z.number(),
+  y: z.number(),
+  l: z.number().min(0),
+  a: z.number().min(0),
+  // #rrggbb, "paleta1", "paleta2", "paleta3", "degrade" (da direção de
+  // arte) ou "texto" (escuro no fundo claro, claro no escuro).
+  cor: z.string().optional(),
+  // Cor da borda (caixa/círculo); espessura = da borda ou do traço, em u.
+  borda: z.string().optional(),
+  espessura: z.number().min(0).optional(),
+  cantos: z.number().min(0).optional(),
+  // As camadas de dentro não passam da borda (tela de celular, cartão).
+  recorta: z.boolean().optional(),
+  sombra: z.boolean().optional(),
+  brilho: z.boolean().optional(),
+  opacidade: z.number().min(0).max(1).optional(),
+  rotacao: z.number().optional(),
+  // Texto (ou emoji). *palavra* = destaque em degradê; | quebra a linha.
+  texto: z.string().optional(),
+  tamanho: z.number().min(0).optional(),
+  peso: z.number().optional(),
+  fonte: z.enum(["forte", "interface", "condensada", "mono", "marcador"]).optional(),
+  alinhar: z.enum(["esquerda", "centro", "direita"]).optional(),
+  // Imagem: o endereço de um arquivo da biblioteca.
+  imagem: z.string().optional(),
+  ajuste: z.enum(["conter", "cobrir"]).optional(),
+  // Traço: caminho SVG com coordenadas de 0 a 100 dentro da caixa.
+  d: z.string().optional(),
+  // Quando entra e sai (segundos contados do início do motion) e como.
+  entra: z.number().min(0).optional(),
+  efeito: efeitoDaCamadaSchema.optional(),
+  sai: z.number().min(0).optional(),
+  // Anda de um ponto a outro (mesmas medidas de x/y), cresce ou gira entre
+  // "de" e "ate" segundos.
+  move: z
+    .object({
+      de: z.number().min(0),
+      ate: z.number().min(0),
+      x: z.number().optional(),
+      y: z.number().optional(),
+      escala: z.number().optional(),
+      rotacao: z.number().optional(),
+    })
+    .optional(),
+  repete: z.enum(["pulsa", "flutua", "gira", "pisca", "balanca"]).optional(),
+  // Número que conta de "de" até "ate" (no texto: antes + número + depois).
+  conta: z
+    .object({
+      de: z.number(),
+      ate: z.number(),
+      casas: z.number().int().min(0).max(2).optional(),
+      antes: z.string().optional(),
+      depois: z.string().optional(),
+      duracao: z.number().min(0).optional(),
+    })
+    .optional(),
+});
 
 const palavrasSchema = z.array(
   z.object({ texto: z.string(), de: z.number(), ate: z.number() }),
@@ -318,6 +401,10 @@ export const motionSchema = z.object({
   // segundos do início do motion: desenha a onda do áudio gravado na
   // conversa com a voz de verdade.
   onda: ondaSchema.optional(),
+  // Imagem do motion "marca" (a logo): o endereço de um arquivo.
+  imagem: z.string().optional(),
+  // Camadas do motion "desenho".
+  camadas: z.array(camadaSchema).max(60).optional(),
 });
 
 // Efeitos de imagem num trecho (como o zoom, valem para cenas e inserts).
@@ -396,6 +483,7 @@ export type Zoom = z.infer<typeof zoomSchema>;
 export type Legenda = z.infer<typeof legendaSchema>;
 export type ModeloMotion = z.infer<typeof modeloMotionSchema>;
 export type Motion = z.infer<typeof motionSchema>;
+export type Camada = z.infer<typeof camadaSchema>;
 export type AcaoDaConversa = z.infer<typeof acaoDaConversaSchema>;
 export type EventoDaConversa = NonNullable<Motion["eventos"]>[number];
 export type TipoEfeito = z.infer<typeof tipoEfeitoSchema>;

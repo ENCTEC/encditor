@@ -421,6 +421,18 @@ export default function PaginaArquivos() {
                       >
                         {m.nomeArquivo}
                       </div>
+                      {m.fonte ? (
+                        // Baixado da web pela IA: de onde veio e a licença.
+                        <a
+                          href={m.fonte.pagina}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-violet-400 underline"
+                          title={m.fonte.autor ? `Autor: ${m.fonte.autor}` : undefined}
+                        >
+                          🌐 da web · {m.fonte.licenca}
+                        </a>
+                      ) : null}
                     </td>
                     <td className="py-2 pr-3">
                       <CampoApelido midia={m} />

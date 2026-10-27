@@ -33,6 +33,15 @@ export type Midia = {
   // Projeto em que o arquivo foi enviado. A biblioteca de um projeto mostra
   // os enviados nele + os do banco do cliente que ele usa (doProjeto.ts).
   projetoId?: string;
+  // Baixado da web pela IA (buscar_na_web): de onde veio, a licença e a
+  // busca que o trouxe (para não baixar de novo).
+  fonte?: {
+    site: string;
+    pagina: string;
+    licenca: string;
+    autor?: string;
+    consulta: string;
+  };
 };
 
 export type Mensagem = {

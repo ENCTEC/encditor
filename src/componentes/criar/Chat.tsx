@@ -47,6 +47,8 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     obterArquivosDoProjeto,
     limparChat,
     editarMidia,
+    adicionarMidia,
+    obterBiblioteca,
     meta,
   } = useProjeto();
   const envio = useEnvio();
@@ -171,6 +173,11 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
       );
       for (const m of dados.midiasAlteradas ?? []) {
         editarMidia(m.id, m);
+      }
+      // Baixados da web pela IA (logos, fotos): já estão no banco do
+      // cliente; aqui entram na biblioteca aberta.
+      for (const m of dados.midiasNovas ?? []) {
+        if (!obterBiblioteca().some((x) => x.id === m.id)) adicionarMidia(m);
       }
       if (dados.timeline) {
         const nova = dados.timeline;

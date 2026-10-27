@@ -22,6 +22,7 @@ import {
   conferirVideo,
   quadrosDosAchados,
 } from "@/servidor/conferirVideo";
+import { listaDePadroes } from "@/ia/padroes";
 import {
   ehEdicaoGrande,
   focoDaEdicao,
@@ -101,6 +102,16 @@ const corpoSchema = z.object({
       largura: z.number().nullable(),
       altura: z.number().nullable(),
       analise: analiseSchema.optional(),
+      // Baixado da web (buscar_na_web): para não baixar de novo.
+      fonte: z
+        .object({
+          site: z.string(),
+          pagina: z.string(),
+          licenca: z.string(),
+          autor: z.string().optional(),
+          consulta: z.string(),
+        })
+        .optional(),
     }),
   ),
 });
@@ -109,6 +120,8 @@ export type RespostaIA = {
   resposta: string;
   // Arquivos alterados pela IA (ex.: efeitos de áudio aplicados).
   midiasAlteradas?: Midia[];
+  // Arquivos criados pela IA (ex.: logo baixada da web).
+  midiasNovas?: Midia[];
   // Inserts que o usuário deve posicionar no popup.
   insertsParaPosicionar?: number[];
   timeline: z.infer<typeof timelineSchema> | null;
@@ -228,6 +241,7 @@ export async function POST(req: NextRequest) {
     acoes: [],
     clienteId: clienteId ?? undefined,
     exemplosDoPlano,
+    projetoId,
   };
 
   // Histórico só em texto; a conversa precisa começar pelo usuário.
@@ -254,6 +268,8 @@ ${pedidosDoPlano.join("\n")}`
     direcaoDoCliente
       ? `Direção de arte salva do cliente (a identidade dele; mantenha salvo pedido diferente): ${JSON.stringify(direcaoDoCliente)}`
       : "",
+    `PADRÕES DE ANIMAÇÃO (usar_padrao; ver_padrao mostra as camadas):
+${listaDePadroes(clienteId)}`,
     anexos.length ? `Anexados nesta mensagem: ${anexos.join(", ")}.` : "",
     `Pedido: ${pedido}`,
   ]
@@ -427,6 +443,7 @@ ${pedidosDoPlano.join("\n")}`
       timeline: sessao.acoes.length ? sessao.timeline : null,
       acoes: sessao.acoes,
       midiasAlteradas: sessao.midiasAlteradas,
+      midiasNovas: sessao.midiasNovas,
       insertsParaPosicionar: sessao.insertsParaPosicionar,
     };
   };

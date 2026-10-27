@@ -1,3 +1,4 @@
+import { PADROES_INICIAIS } from "./padroesIniciais";
 import {
   EstiloFundo,
   EstiloLegenda,
@@ -212,6 +213,8 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
     x2?: number;
     y2?: number;
     eventos?: Motion["eventos"];
+    imagem?: string;
+    camadas?: Motion["camadas"];
   };
   // Som que combina (adicionado junto pela IA e pela montagem); null = sem
   // som (aparece demais para ter som toda vez).
@@ -602,6 +605,32 @@ export const MOTIONS: (ItemCatalogo<ModeloMotion> & {
     quandoUsar: "'Esse vídeo', 'gravando', 'ao vivo', 'agora mesmo'.",
     campos: "texto = o que aparece no meio (*destaque*); posicao.",
     exemplo: { texto: "Esse *vídeo*" },
+    som: null,
+    neon: true,
+  },
+  {
+    id: "marca",
+    tag: "#marca",
+    nome: "Logo (marca)",
+    descricao:
+      "A logo de uma marca (imagem da biblioteca) entrando num cartão branco com o brilho das cores do vídeo; texto curto embaixo, se quiser.",
+    quandoUsar:
+      "Sempre que a fala citar uma marca, banco, loja ou produto que tenha logo nos arquivos (ou buscada na web).",
+    campos: "imagem = @apelido da logo; texto = legenda curta (opcional); posicao ou x/y.",
+    exemplo: { texto: "", imagem: "/exemplos/logo-exemplo.svg" },
+    som: "plim",
+    neon: true,
+  },
+  {
+    id: "desenho",
+    tag: "#desenho",
+    nome: "Animação desenhada",
+    descricao:
+      "Cena montada pela IA com camadas (caixas, círculos, textos, emojis, imagens e traços), cada uma com entrada e movimento: um celular com app, um gráfico, um contrato, uma casa…",
+    quandoUsar:
+      "Quando nenhum modelo pronto encena bem a fala: a IA desenha uma cena nova (ou usa um padrão salvo).",
+    campos: "camadas (criar_animacao) ou um padrão salvo (usar_padrao).",
+    exemplo: { texto: "", camadas: PADROES_INICIAIS[0].camadas },
     som: null,
     neon: true,
   },

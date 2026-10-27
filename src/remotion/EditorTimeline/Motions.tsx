@@ -28,6 +28,7 @@ import {
   VERMELHO,
 } from "./motionBase";
 import { MODELOS_NEON } from "./MotionsNeon";
+import { MODELOS_DESENHO } from "./MotionsDesenho";
 import { MODELOS_TELAS } from "./MotionsTelas";
 import { COR_NEON, ehModeloNeon } from "./neonBase";
 
@@ -1415,6 +1416,7 @@ const MODELOS: Record<Motion["modelo"], React.FC<{ c: Ctx }>> = {
   marcador: Marcador,
   ...MODELOS_NEON,
   ...MODELOS_TELAS,
+  ...MODELOS_DESENHO,
 };
 
 // Um motion, com o tempo contado do começo dele.

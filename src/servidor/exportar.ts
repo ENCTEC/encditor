@@ -81,12 +81,21 @@ export const pacote = () => {
 // renderizador precisa do endereço completo do servidor.
 export const comEnderecoCompleto = (t: Timeline, origem: string): Timeline => {
   const abs = (url: string) => (url.startsWith("/") ? origem + url : url);
+  const normal = normalizarTimeline(t);
   return {
     // Projetos salvos antes das faixas Motion e Efeitos.
-    ...normalizarTimeline(t),
+    ...normal,
     clipes: t.clipes.map((c) => ({ ...c, url: abs(c.url) })),
     inserts: t.inserts.map((i) => ({ ...i, url: abs(i.url) })),
     audios: t.audios.map((a) => ({ ...a, url: abs(a.url) })),
+    // A logo do motion "marca" e as imagens das camadas de um "desenho".
+    motions: normal.motions.map((m) => ({
+      ...m,
+      ...(m.imagem ? { imagem: abs(m.imagem) } : {}),
+      ...(m.camadas
+        ? { camadas: m.camadas.map((k) => (k.imagem ? { ...k, imagem: abs(k.imagem) } : k)) }
+        : {}),
+    })),
   };
 };
 

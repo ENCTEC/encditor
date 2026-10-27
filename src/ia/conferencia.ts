@@ -75,6 +75,8 @@ const areaDoMotion = (m: Motion, t: Timeline): Area | null => {
       return lugar("centro", 60);
     case "rec":
       return lugar("centro", 42);
+    case "marca":
+      return lugar("centro", 30);
     case "edicao":
       return lugar("centro", 30);
     case "conversa": {
@@ -268,14 +270,17 @@ export const conferirEdicao = (
     }
   });
 
-  // 9) O mesmo grafismo (modelo + texto) repetido muitas vezes.
+  // 9) O mesmo grafismo repetido muitas vezes (modelo + texto; no desenho,
+  //    as camadas; na marca, a logo — a mesma logo de novo é normal).
   const iguais = new Map<string, number[]>();
   depois.motions.forEach((m, i) => {
-    if (m.modelo === "fala") return;
-    const chave = `${m.modelo} "${m.texto.replace(/[*|]/g, " ").replace(/\s+/g, " ").trim()}"`;
-    iguais.set(chave, [...(iguais.get(chave) ?? []), i]);
+    if (m.modelo === "fala" || m.modelo === "marca") return;
+    const texto = m.texto.replace(/[*|]/g, " ").replace(/\s+/g, " ").trim();
+    const desenho = m.camadas?.length ? ` ${JSON.stringify(m.camadas)}` : "";
+    iguais.set(`${m.modelo} "${texto}"${desenho}`, [...(iguais.get(`${m.modelo} "${texto}"${desenho}`) ?? []), i]);
   });
-  for (const [chave, indices] of iguais) {
+  for (const [bruta, indices] of iguais) {
+    const chave = bruta.split(" [")[0].split(" {")[0];
     if (indices.length >= 3 && indices.some((i) => motionsNovos.has(depois.motions[i]))) {
       problemas.push(`O mesmo grafismo (${chave}) aparece ${indices.length} vezes (aos ${indices.map((i) => `${r1(depois.motions[i].inicio)}s`).join(", ")}): fica repetitivo e genérico. Varie ou tire os que sobram.`);
     }

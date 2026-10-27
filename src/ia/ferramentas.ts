@@ -48,6 +48,9 @@ import { aplicarEfeitos } from "@/servidor/efeitos";
 import { envelopeDoArquivo } from "@/servidor/envelope";
 import { estudarExemplo } from "@/servidor/estudarExemplo";
 import { medirVoz } from "@/servidor/medirVoz";
+import { buscarFoto, buscarLogo } from "@/servidor/buscarNaWeb";
+import { salvarMidiasDoCliente, salvarPadrao } from "@/servidor/banco";
+import { padroesDisponiveis } from "./padroes";
 import { conferirVideo } from "@/servidor/conferirVideo";
 import { semItens } from "./conferencia";
 import { salvarDirecaoDoCliente } from "@/servidor/banco";
@@ -55,6 +58,8 @@ import { lerAnaliseSalva } from "@/servidor/armazenamento";
 import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
 import {
   acaoDaConversaSchema,
+  Camada,
+  camadaSchema,
   direcaoSchema,
   DirecaoDeArte,
   Efeito,
@@ -116,6 +121,10 @@ export type SessaoEdicao = {
   banco?: Midia[];
   // Mídias que a IA alterou (ex.: efeitos de áudio), para o app atualizar.
   midiasAlteradas?: Midia[];
+  // Mídias que a IA criou (ex.: logo baixada da web), para o app guardar.
+  midiasNovas?: Midia[];
+  // Projeto aberto (os arquivos novos ficam marcados nele).
+  projetoId?: string;
   // Inserts colocados sem posição definida: o app abre o popup para o
   // usuário escolher onde ficam e o tamanho.
   insertsParaPosicionar?: number[];
@@ -250,6 +259,41 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
       sessao.timeline.largura / sessao.timeline.altura,
       largura,
     );
+  };
+
+  // Camadas de um desenho: imagem por @apelido vira o endereço do arquivo.
+  const camadasComImagens = (camadas: Camada[]) =>
+    camadas.map((k) => {
+      if (!k.imagem || k.imagem.startsWith("/") || /^https?:/.test(k.imagem)) return k;
+      const m = acharMidia(k.imagem);
+      if (m.formato !== "imagem") throw new Error(`"${k.imagem}" não é uma imagem.`);
+      return { ...k, imagem: m.url };
+    });
+
+  // As camadas de um padrão com textos trocados e campos ajustados.
+  const camadasDoPadrao = (
+    nome: string,
+    trocas: { de: string; para: string }[],
+    ajustes: (Partial<Camada> & { camada: number })[],
+  ) => {
+    const p = padroesDisponiveis(sessao.clienteId).find((x) => x.nome === nome);
+    if (!p) throw new Error(`Não há o padrão "${nome}".`);
+    const trocar = (texto?: string) =>
+      texto === undefined
+        ? undefined
+        : trocas.reduce((t, x) => t.split(x.de).join(x.para), texto);
+    const camadas = p.camadas.map((k) => ({
+      ...k,
+      ...(k.texto !== undefined ? { texto: trocar(k.texto) } : {}),
+      ...(k.conta
+        ? { conta: { ...k.conta, antes: trocar(k.conta.antes), depois: trocar(k.conta.depois) } }
+        : {}),
+    }));
+    for (const { camada, ...campos } of ajustes) {
+      if (!camadas[camada]) throw new Error(`O padrão "${nome}" não tem a camada ${camada}.`);
+      camadas[camada] = { ...camadas[camada], ...campos } as Camada;
+    }
+    return camadasComImagens(camadas);
   };
 
   const acharMidia = (nome: string) => {
@@ -1104,7 +1148,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "adicionar_motion",
       description:
-        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). Kit neon (motion design falado; para um vídeo inteiro prefira encenar_fala): fala (as palavras faladas entram uma a uma junto com a voz; *destaque* enorme em degradê; | quebra linha), etiqueta (pílula da ação no topo), anel (círculo de luz com texto em x/y), digitando (cartão que escreve o que é dito; detalhe = cabeçalho), barra (palavra grande + barra que enche; detalhe = linha de cima), comentario (caixa: texto digitado e publicado; detalhe = pílula acima), curtida (botão de like tocado em x/y; texto = número que sobe 1), toque (dedo tocando em x/y), brilho (✦ em x/y), microfone (microfone com ondas em x/y), confirmado (selo ✓ inclinado), rec (cartão de gravação com REC e relógio; texto no meio), edicao (timeline de edição se montando; detalhe = cabeçalho), conversa (chat estilo WhatsApp no celular — o roteiro só dá para montar com encenar_fala). *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
+        "Coloca um MOTION (texto ou grafismo animado por cima do vídeo, acima das cenas e abaixo das legendas) num trecho do vídeo final. Modelos: frase (frase de impacto enorme), preco (preço novo saltando numa etiqueta; detalhe = preço antigo riscado), contador (número que conta até o valor; detalhe = rótulo), titulo (título com marca-texto; detalhe = chapéu pequeno acima), rodape (nome/produto no canto de baixo; detalhe = descrição), lista (itens com ✓ entrando um a um; texto = título, detalhe = itens separados por |), chamada (botão de CTA pulsando com seta; detalhe = linha acima), selo (selo redondo carimbado; texto curto; x/y = onde), seta (seta desenhada apontando para x/y, com o texto), circulo (círculo à mão em volta de x/y). Kit investigação: carimbo (carimbo torto em x/y; detalhe = linha pequena), fita (fitas zebradas cruzando a tela; texto = o escrito; y = altura), fio (fio vermelho entre alfinetes em x/y e x2/y2; texto = etiqueta do meio), nota (bilhete amarelo preso em x/y; detalhe = linha de cima), ficha (ficha datilografada; detalhe = cabeçalho, texto = linhas 'CAMPO: valor' com |; y = topo), vigilancia (moldura de câmera de segurança com REC e relógio; texto = câmera, detalhe = local; dure a cena toda), marcador (plaquinha numerada de perícia em pé em x/y). Kit neon (motion design falado; para um vídeo inteiro prefira encenar_fala): fala (as palavras faladas entram uma a uma junto com a voz; *destaque* enorme em degradê; | quebra linha), etiqueta (pílula da ação no topo), anel (círculo de luz com texto em x/y), digitando (cartão que escreve o que é dito; detalhe = cabeçalho), barra (palavra grande + barra que enche; detalhe = linha de cima), comentario (caixa: texto digitado e publicado; detalhe = pílula acima), curtida (botão de like tocado em x/y; texto = número que sobe 1), toque (dedo tocando em x/y), brilho (✦ em x/y), microfone (microfone com ondas em x/y), confirmado (selo ✓ inclinado), rec (cartão de gravação com REC e relógio; texto no meio), edicao (timeline de edição se montando; detalhe = cabeçalho), conversa (chat estilo WhatsApp no celular — o roteiro só dá para montar com encenar_fala), marca (a LOGO de uma marca num cartão; imagem = @apelido; texto = legenda curta ou vazio). Para cenas novas desenhadas, use criar_animacao ou usar_padrao. *palavra* entre asteriscos sai na cor de destaque. Com com_som true já coloca o efeito sonoro que combina.",
       inputSchema: z.object({
         modelo: modeloMotionSchema,
         de: z
@@ -1165,8 +1209,19 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           .describe(
             "true = coloca junto o efeito sonoro que combina (padrão).",
           ),
+        imagem: z
+          .string()
+          .nullable()
+          .describe("Só marca: @apelido da logo (da biblioteca ou de buscar_na_web)."),
       }),
       run: (e) => {
+        if (e.modelo === "marca" && !e.imagem) {
+          throw new Error("O motion marca precisa da imagem da logo (@apelido); sem logo, use buscar_na_web.");
+        }
+        if (e.modelo === "desenho") {
+          throw new Error("Para desenhar, use criar_animacao (ou usar_padrao).");
+        }
+        const imagem = e.imagem ? acharMidia(e.imagem).url : undefined;
         if (e.cor && !/^#[0-9a-f]{6}$/i.test(e.cor)) {
           throw new Error("Cor inválida: use #rrggbb (ex.: #FFD60A).");
         }
@@ -1201,6 +1256,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           ...(e.y2 !== null ? { y2: e.y2 } : {}),
           ...(e.cor ? { cor: e.cor } : {}),
           ...(palavras ? { palavras } : {}),
+          ...(imagem ? { imagem } : {}),
         };
         const som = e.com_som ? somDoMotion(motion) : null;
         const nome = MOTIONS.find((m) => m.id === e.modelo)?.nome ?? e.modelo;
@@ -1213,6 +1269,184 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           },
           `motion "${nome}" ("${e.texto}") de ${motion.inicio}s a ${motion.fim}s${som ? ` com o som ${som}` : ""}`,
         );
+      },
+    }),
+
+    ferramenta({
+      name: "buscar_na_web",
+      description:
+        "Busca na internet uma imagem que falta e guarda nos arquivos do cliente. tipo 'logo' = logo oficial de uma marca (banco, loja, empresa, produto), pelo Wikidata/Wikimedia; tipo 'foto' = foto de uso livre do Wikimedia Commons (o_que em INGLÊS, ex.: 'house keys in hand'). A imagem é conferida por visão antes de guardar (não confunde marcas). Use SEM PERGUNTAR sempre que a fala citar uma marca que não tem logo na biblioteca, ou faltar uma foto para encenar. Devolve o @apelido para usar (adicionar_motion modelo marca, camada imagem de criar_animacao ou colocar_insert). Demora de 3 a 30 s.",
+      inputSchema: z.object({
+        tipo: z.enum(["logo", "foto"]),
+        o_que: z
+          .string()
+          .describe("A marca (ex.: 'Banco Inter') ou o que a foto mostra, em inglês."),
+        contexto: z
+          .string()
+          .describe("O que é, para não confundir (ex.: 'banco digital brasileiro')."),
+      }),
+      run: async (e) => {
+        const consulta = `${e.tipo}:${normalizar(e.o_que)}`;
+        const todas = [...sessao.biblioteca, ...(sessao.banco ?? [])];
+        const ja = todas.find((m) => m.fonte?.consulta === consulta);
+        if (ja) {
+          if (!sessao.biblioteca.some((m) => m.id === ja.id)) {
+            sessao.biblioteca = [...sessao.biblioteca, ja];
+          }
+          return `OK: já está nos arquivos como @${ja.apelido}.`;
+        }
+        const achada =
+          e.tipo === "logo"
+            ? await buscarLogo(e.o_que, e.contexto)
+            : await buscarFoto(e.o_que, e.contexto);
+        if (!achada) {
+          return `Não achei ${e.tipo === "logo" ? "a logo" : "uma foto"} de "${e.o_que}" numa fonte confiável. Siga sem ela (não ponha um ícone genérico no lugar de uma logo) e diga ao usuário que ele pode enviar o arquivo.`;
+        }
+        const unico = (base: string, usados: string[]) => {
+          let nome = base;
+          for (let n = 2; usados.includes(normalizar(nome)); n++) nome = `${base}${n}`;
+          return nome;
+        };
+        const apelido = unico(
+          normalizar(`${e.tipo === "logo" ? "logo" : "foto"} ${e.o_que}`).replace(/[^a-z0-9]/g, "").slice(0, 28),
+          todas.map((m) => normalizar(m.apelido ?? "")),
+        );
+        const nome = unico(
+          e.tipo === "logo" ? `Logo ${achada.titulo}` : `Foto ${e.o_que}`.slice(0, 40),
+          todas.map((m) => normalizar(m.nome)),
+        );
+        const midia: Midia = {
+          id: crypto.randomUUID(),
+          nome,
+          apelido,
+          usarIA: false,
+          papel: "insert",
+          formato: "imagem",
+          url: `/api/midia/${achada.arquivo}`,
+          nomeArquivo: achada.titulo,
+          duracao: null,
+          largura: achada.largura,
+          altura: achada.altura,
+          ...(sessao.projetoId ? { projetoId: sessao.projetoId } : {}),
+          fonte: { ...achada.fonte, consulta },
+        };
+        // Já fica no banco do cliente (mesmo se a página fechar).
+        if (sessao.clienteId) salvarMidiasDoCliente(sessao.clienteId, [midia]);
+        sessao.biblioteca = [...sessao.biblioteca, midia];
+        sessao.midiasNovas = [...(sessao.midiasNovas ?? []), midia];
+        return `OK: ${e.tipo === "logo" ? `logo de ${achada.titulo}` : `foto "${achada.titulo}"`} guardada como @${apelido} (${achada.largura}×${achada.altura}; ${achada.fonte.site}, licença ${achada.fonte.licenca}). Use com adicionar_motion modelo marca (imagem @${apelido}), numa camada imagem de criar_animacao ou com colocar_insert.`;
+      },
+    }),
+
+    ferramenta({
+      name: "criar_animacao",
+      description: `Desenha uma animação NOVA (motion "desenho") em camadas, quando nenhum modelo pronto encena bem a fala: um celular com um app, um gráfico, um contrato, uma casa, um produto com preço, um passo a passo… Comece de um padrão parecido (ver_padrao) e adapte. COMO DESENHAR: camada solta: x/y = CENTRO em % da tela; l/a = largura/altura em u (1% do lado menor; um celular grande ≈ l 38 a 76; um cartão ≈ l 80 a 50). Camada com "dentro" = índice (0, 1, 2…) de uma camada ANTERIOR: x/y/l/a em % da caixa da mãe e ela anda junto (tela dentro do celular, texto dentro do botão). tamanho = letra em u (título 5–8, texto 3–4, rótulo de app 2–2,5). tipo: caixa (cor, cantos, borda, sombra, brilho, recorta = esconde o que passa da borda), circulo, texto (*palavra* = destaque em degradê; | quebra linha; fonte forte/interface/condensada/mono/marcador; conta = número contando), emoji (um emoji grande), imagem (@apelido; ajuste conter/cobrir), traco (d = caminho SVG de 0 a 100 dentro da caixa; efeito desenha = se desenha). cor: #rrggbb, paleta1/2/3 ou degrade (cores da direção de arte), texto (escuro no fundo claro, claro no escuro). Tempo (s desde o começo do motion): entra + efeito (surge, sobe, desce, esquerda, direita, zoom, pula, gira, cresce = barra enchendo da esquerda, desenha, digita), sai, move {de, ate, x, y, escala, rotacao} (ex.: dedo indo tocar um botão), repete (pulsa, flutua, gira, pisca, balanca). Entradas em sequência (0,2–0,4 s entre elas) contam a história; tudo dentro da tela; poucas palavras. Ficou boa e serve para outros vídeos? salvar_como_padrao.`,
+      inputSchema: z.object({
+        de: z.number().min(0).describe("Segundo do vídeo final em que aparece."),
+        ate: z.number().min(0).describe("Segundo em que some."),
+        camadas: z.array(camadaSchema).min(1).max(60),
+        salvar_como_padrao: z
+          .object({
+            nome: z.string().describe("Curto, com hífen (ex.: 'celular-pix')."),
+            descricao: z.string().describe("O que mostra e o que trocar para reusar."),
+            para_todos_os_clientes: z.boolean(),
+          })
+          .nullable(),
+      }),
+      run: (e) => {
+        const camadas = camadasComImagens(e.camadas);
+        const motion: Motion = {
+          modelo: "desenho",
+          inicio: s(e.de),
+          fim: s(Math.max(e.ate, e.de + 0.5)),
+          texto: "",
+          camadas,
+        };
+        if (e.salvar_como_padrao) {
+          salvarPadrao(e.salvar_como_padrao.para_todos_os_clientes ? null : (sessao.clienteId ?? null), {
+            nome: e.salvar_como_padrao.nome,
+            descricao: e.salvar_como_padrao.descricao,
+            duracao: motion.fim - motion.inicio,
+            camadas,
+          });
+        }
+        return aplicar(
+          (t) => adicionarItem(t, "motions", motion),
+          `animação desenhada (${camadas.length} camadas) de ${motion.inicio}s a ${motion.fim}s${e.salvar_como_padrao ? `, salva como o padrão "${e.salvar_como_padrao.nome}"` : ""}`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "ver_padrao",
+      description:
+        "Mostra as camadas de um padrão de animação (os da lista PADRÕES DE ANIMAÇÃO), com o índice de cada uma, para usar com usar_padrao (ajustes) ou como ponto de partida de criar_animacao.",
+      inputSchema: z.object({ nome: z.string() }),
+      run: (e) => {
+        const p = padroesDisponiveis(sessao.clienteId).find((x) => x.nome === e.nome);
+        if (!p) throw new Error(`Não há o padrão "${e.nome}".`);
+        return JSON.stringify({
+          nome: p.nome,
+          descricao: p.descricao,
+          duracao: p.duracao,
+          camadas: p.camadas.map((k, i) => ({ indice: i, ...k })),
+        });
+      },
+    }),
+
+    ferramenta({
+      name: "usar_padrao",
+      description:
+        "Coloca um padrão de animação pronto (lista PADRÕES DE ANIMAÇÃO) num trecho, adaptado à fala: trocar_textos troca textos exatos (também os de antes/depois de um número que conta); ajustes muda campos de camadas pelo índice (veja com ver_padrao): conta {de, ate…} para os números, l/x de uma barra, imagem (@apelido) de uma logo, cor… Mais rápido e bonito que desenhar do zero.",
+      inputSchema: z.object({
+        nome: z.string(),
+        de: z.number().min(0),
+        ate: z.number().min(0),
+        trocar_textos: z
+          .array(z.object({ de: z.string(), para: z.string() }))
+          .nullable(),
+        ajustes: z
+          .array(camadaSchema.partial().extend({ camada: z.number().int().min(0) }))
+          .nullable(),
+      }),
+      run: (e) => {
+        const camadas = camadasDoPadrao(e.nome, e.trocar_textos ?? [], e.ajustes ?? []);
+        const motion: Motion = {
+          modelo: "desenho",
+          inicio: s(e.de),
+          fim: s(Math.max(e.ate, e.de + 0.5)),
+          texto: "",
+          camadas,
+        };
+        return aplicar(
+          (t) => adicionarItem(t, "motions", motion),
+          `padrão "${e.nome}" de ${motion.inicio}s a ${motion.fim}s`,
+        );
+      },
+    }),
+
+    ferramenta({
+      name: "salvar_padrao",
+      description:
+        "Guarda uma animação desenhada (motion 'desenho' já na timeline) como padrão para reusar em outros vídeos do cliente (ou de todos). Use quando uma cena ficou boa e se repete no nicho (ex.: simulação no celular, comparativo).",
+      inputSchema: z.object({
+        motion: z.number().int().min(1),
+        nome: z.string(),
+        descricao: z.string(),
+        para_todos_os_clientes: z.boolean(),
+      }),
+      run: (e) => {
+        const m = sessao.timeline.motions[e.motion - 1];
+        if (!m || m.modelo !== "desenho" || !m.camadas?.length) {
+          throw new Error(`O motion ${e.motion} não é uma animação desenhada.`);
+        }
+        salvarPadrao(e.para_todos_os_clientes ? null : (sessao.clienteId ?? null), {
+          nome: e.nome,
+          descricao: e.descricao,
+          duracao: m.fim - m.inicio,
+          camadas: m.camadas,
+        });
+        return `OK: padrão "${e.nome}" salvo${e.para_todos_os_clientes ? " para todos os clientes" : " para este cliente"}.`;
       },
     }),
 
@@ -1513,7 +1747,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     ferramenta({
       name: "encenar_fala",
       description:
-        "Monta de uma vez um vídeo de MOTION DESIGN FALADO: o que a pessoa diz vai ACONTECENDO na tela, sincronizado com a narração transcrita (ela precisa estar na timeline). Divida a fala em TELAS curtas, na ordem em que são ditas (uma ideia cada, ~1 a 3s). Cada tela começa quando o seu primeiro item é dito e acaba quando a próxima começa. Em cada tela: um motion 'fala' com as palavras ditas (menos quando um celular/cartão ocupa a tela) + 1 ou 2 itens que ENCENAM o que é dito (etiqueta, toque, digitando, barra, curtida, comentario, microfone, anel, brilho, confirmado, ou um print/foto/vídeo da biblioteca no celular). Faça o vídeo inteiro numa chamada só: os tempos saem da fala sozinhos e 'fala'/'digitando' acompanham cada palavra.",
+        "Monta de uma vez um vídeo de MOTION DESIGN FALADO: o que a pessoa diz vai ACONTECENDO na tela, sincronizado com a narração transcrita (ela precisa estar na timeline). Divida a fala em TELAS curtas, na ordem em que são ditas (uma ideia cada, ~1 a 3s). Cada tela começa quando o seu primeiro item é dito e acaba quando a próxima começa. Em cada tela: um motion 'fala' com as palavras ditas (menos quando um celular/cartão ocupa a tela) + 1 ou 2 itens que ENCENAM o que é dito (etiqueta, toque, digitando, barra, curtida, comentario, microfone, anel, brilho, confirmado, ou um print/foto/vídeo da biblioteca no celular). Marca citada → item marca com a logo (imagem @apelido; busque antes com buscar_na_web se faltar). A cada ~6 a 10 s uma CENA GRANDE: item desenho com padrao (celular-simulacao, comparativo-bancos, contrato-aprovado, casa-chave ou outro da lista), trocando textos e números pelos da fala. Faça o vídeo inteiro numa chamada só: os tempos saem da fala sozinhos e 'fala'/'digitando' acompanham cada palavra.",
       inputSchema: z.object({
         telas: z
           .array(
@@ -1601,6 +1835,19 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
                       .describe(
                         "Só no modelo conversa (chat estilo WhatsApp no celular; detalhe = nome do contato): o roteiro, na ordem da fala. Ex.: lista → toque conversa → abrir → toque microfone → gravar → zoom baixo → toque enviar → enviar_audio → zoom normal → digitando → zoom mensagens → recebe → toque campo → escreve → envia → joinha. null nos outros modelos.",
                       ),
+                    imagem: z
+                      .string()
+                      .nullable()
+                      .describe("Só no modelo marca: @apelido da logo (da biblioteca ou de buscar_na_web)."),
+                    padrao: z
+                      .object({
+                        nome: z.string(),
+                        trocar_textos: z
+                          .array(z.object({ de: z.string(), para: z.string() }))
+                          .nullable(),
+                      })
+                      .nullable()
+                      .describe("Só no modelo desenho: uma cena pronta da lista PADRÕES DE ANIMAÇÃO, com os textos e números trocados pelos da fala."),
                   }),
                 )
                 .min(1),
@@ -1624,7 +1871,21 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           );
         }
         const telas = e.telas.map((tela) => ({
-          itens: tela.itens.map((item) => {
+          itens: tela.itens.map((bruto) => {
+            // Logo (marca) e cena pronta (desenho com padrão).
+            if (bruto.modelo === "marca" && !bruto.imagem) {
+              throw new Error("O item marca precisa da imagem da logo (@apelido); sem logo, use buscar_na_web antes.");
+            }
+            if (bruto.modelo === "desenho" && !bruto.padrao) {
+              throw new Error("No encenar_fala, o item desenho usa um padrão (padrao.nome); para desenhar do zero, use criar_animacao depois.");
+            }
+            const item = {
+              ...bruto,
+              imagem: bruto.imagem ? acharMidia(bruto.imagem).url : null,
+              camadas: bruto.padrao
+                ? camadasDoPadrao(bruto.padrao.nome, bruto.padrao.trocar_textos ?? [], [])
+                : null,
+            };
             if (!item.midia) return { ...item, midia: null, moldura: null };
             const m = acharMidia(item.midia);
             if (m.formato === "audio") {
@@ -2410,6 +2671,8 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     "duplicar_item",
     "adicionar_som",
     "adicionar_efeito",
+    "criar_animacao",
+    "usar_padrao",
   ]);
   const varias = ferramenta({
     name: "varias_edicoes",

@@ -115,6 +115,19 @@ export const resumoDoProjeto = (t: Timeline, biblioteca: Midia[]) => {
       ...(x.eventos?.length
         ? { roteiro: x.eventos.map((e) => `${e.acao}@${e.de}s`).join(", ") }
         : {}),
+      ...(x.imagem
+        ? { imagem: `@${biblioteca.find((m) => m.url === x.imagem)?.apelido ?? x.imagem}` }
+        : {}),
+      ...(x.camadas?.length
+        ? {
+            camadas: x.camadas.length,
+            textos_do_desenho: x.camadas
+              .map((k) => k.texto ?? (k.conta ? `${k.conta.antes ?? ""}${k.conta.ate}${k.conta.depois ?? ""}` : ""))
+              .filter(Boolean)
+              .slice(0, 8)
+              .join(" · "),
+          }
+        : {}),
     })),
     efeitos: (t.efeitos ?? []).map((x, i) => ({
       numero: i + 1,

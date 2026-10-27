@@ -1189,7 +1189,7 @@ const Confirmado: React.FC<{ c: Ctx }> = ({ c }) => {
 };
 
 export const MODELOS_NEON: Record<
-  Exclude<ModeloNeon, "conversa" | "edicao" | "rec">,
+  Exclude<ModeloNeon, "conversa" | "edicao" | "rec" | "marca" | "desenho">,
   React.FC<{ c: Ctx }>
 > = {
   fala: Fala,

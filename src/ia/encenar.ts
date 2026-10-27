@@ -22,6 +22,7 @@ import {
   ModeloMotion,
   Motion,
   Timeline,
+  Camada,
 } from "@/timeline/schema";
 import { PalavraFinal, tokensDaFala } from "./conteudo";
 
@@ -168,6 +169,10 @@ export type ItemDaTela = {
   // Só no motion "conversa": o roteiro do chat, cada ação no instante em
   // que o seu trecho é dito (na ordem da fala).
   eventos?: { quando: string; acao: AcaoDaConversa; texto: string | null }[] | null;
+  // Só no "marca": o endereço da logo. Só no "desenho": as camadas (de um
+  // padrão, já com os textos trocados).
+  imagem?: string | null;
+  camadas?: Camada[] | null;
 };
 
 // O toque (dedo) vem um pouco antes da ação que ele "provoca".
@@ -260,6 +265,8 @@ const MEIO: ModeloMotion[] = [
   "conversa",
   "edicao",
   "rec",
+  "marca",
+  "desenho",
 ];
 const ocupaOMeio = (item: ItemDaTela) =>
   !!item.midia ||
@@ -448,6 +455,8 @@ export const encenar = (
         ...(item.cor ? { cor: item.cor } : {}),
         ...(palavras ? { palavras } : {}),
         ...(roteiro ? { eventos: roteiro.eventos } : {}),
+        ...(item.imagem ? { imagem: item.imagem } : {}),
+        ...(item.camadas?.length ? { camadas: item.camadas } : {}),
       };
       nova = adicionarItem(nova, "motions", motion);
       novos.add(motion);
