@@ -9,7 +9,7 @@ import {
   useCustos,
 } from "@/componentes/resultados/CustosDaIA";
 import { ModalVinculos } from "@/componentes/resultados/ModalVinculos";
-import { dolares } from "@/projeto/dinheiro";
+import { reais } from "@/projeto/dinheiro";
 import { lerVinculos, temVinculo, Vinculos } from "@/conexoes/vinculos";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import {
@@ -124,7 +124,7 @@ export default function PaginaResultados() {
 
   const { situacao, recarregar: recarregarConexao } = useConexaoMeta(clienteId);
   // Quanto a IA já custou em cada vídeo (atualiza sozinho).
-  const custos = useCustos(clienteId);
+  const { pedidos: custos, cotacao } = useCustos(clienteId);
   const conectado = !!situacao?.conectado && !situacao.ilegivel;
   const leuSozinho = useRef(false);
 
@@ -358,6 +358,7 @@ export default function PaginaResultados() {
         ) : null}
 
         <CustosDaIA
+          cotacao={cotacao}
           pedidos={custos}
           projetoId={meta?.id ?? null}
           doCliente={doCliente}
@@ -387,7 +388,7 @@ export default function PaginaResultados() {
                       {new Date(e.criadoEm).toLocaleDateString("pt-BR")} ·{" "}
                       {br(e.duracao, 1)}s
                       {custos
-                        ? ` · IA até esta versão: ${dolares(custoAte(custos, e.projetoId, e.criadoEm))}`
+                        ? ` · IA até esta versão: ${reais(custoAte(custos, e.projetoId, e.criadoEm), cotacao)}`
                         : ""}
                     </p>
                   </div>

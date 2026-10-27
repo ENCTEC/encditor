@@ -29,7 +29,8 @@ import {
   lerTrabalhoIA,
 } from "@/servidor/trabalhosIA";
 import { comCusto, custoDoPedido } from "@/servidor/custos";
-import { dolares } from "@/projeto/dinheiro";
+import { reais } from "@/projeto/dinheiro";
+import { cotacaoDoDia } from "@/servidor/cotacao";
 import { listaDePadroes } from "@/ia/padroes";
 import {
   ehEdicaoGrande,
@@ -447,8 +448,9 @@ ${listaDePadroes(clienteId)}`,
     // Quanto este pedido custou (todas as chamadas à IA dele) e o vídeo
     // inteiro até agora.
     const gasto = custoDoPedido();
+    const cotacao = gasto ? await cotacaoDoDia() : null;
     const custo = gasto
-      ? `💲 Este pedido: ${dolares(gasto)}${projetoId ? ` · o vídeo até agora: ${dolares(totalDoProjeto(projetoId))}` : ""}.`
+      ? `💲 Este pedido: ${reais(gasto, cotacao)}${projetoId ? ` · o vídeo até agora: ${reais(totalDoProjeto(projetoId), cotacao)}` : ""}${cotacao ? " (dólar de hoje + IOF)" : ""}.`
       : "";
     return {
       resposta: [

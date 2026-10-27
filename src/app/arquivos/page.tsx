@@ -14,8 +14,10 @@ import {
   podeAnalisar,
   proximoNome,
 } from "@/projeto/midia-cliente";
+import { reais } from "@/projeto/dinheiro";
 import { novoId, useProjeto } from "@/projeto/ProjetoProvider";
 import { Midia } from "@/projeto/tipos";
+import { useCotacao } from "@/projeto/useCotacao";
 import { useEnvio } from "@/projeto/useEnvio";
 
 const PAPEL: Record<Midia["papel"], string> = {
@@ -234,9 +236,11 @@ const AcoesDoArquivo: React.FC<{ midia: Midia }> = ({ midia }) => {
 
 // Arquivos "frios" (sem descrição da IA) que já estão no banco: analisar
 // todos de uma vez, para o planejador e o chat poderem reaproveitá-los.
-// Custo medido: ~US$ 0,01 por vídeo curto, ~US$ 0,005 por imagem.
+// Custo medido: ~US$ 0,01 por vídeo curto, ~US$ 0,005 por imagem (na
+// tela, em real: dólar do dia + IOF).
 const AnalisarFrios: React.FC = () => {
   const { projeto, editarMidia, atualizarAnalise } = useProjeto();
+  const cotacao = useCotacao();
   const frios = projeto.biblioteca.filter(
     (m) =>
       m.formato !== "audio" &&
@@ -261,7 +265,7 @@ const AnalisarFrios: React.FC = () => {
         }}
         className="botao-spray !px-3 !py-1 !text-sm"
       >
-        Analisar todos (≈ US$ {custo.toFixed(2).replace(".", ",")})
+        Analisar todos (≈ {reais(custo, cotacao)})
       </button>
     </div>
   );

@@ -25,7 +25,7 @@ const global = globalThis as unknown as {
 
 // Suba este número ao criar tabelas/colunas: a conexão guardada (em
 // desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
-const VERSAO_ESQUEMA = 6;
+const VERSAO_ESQUEMA = 7;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -162,6 +162,12 @@ const banco = () => {
       cliente_id TEXT PRIMARY KEY,
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS cotacoes (
+      dia TEXT PRIMARY KEY,
+      dolar REAL NOT NULL,
+      fonte TEXT NOT NULL,
+      buscado_em INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS custos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -944,6 +950,24 @@ export const totalDoProjeto = (projetoId: string) =>
       .prepare("SELECT COALESCE(SUM(valor), 0) AS total FROM custos WHERE projeto_id = ?")
       .get(projetoId) as { total: number }
   ).total;
+
+// ---------- Cotação do dólar (para mostrar os custos em real) ----------
+
+export type CotacaoSalva = { dia: string; dolar: number; fonte: string; buscadoEm: number };
+
+export const lerUltimaCotacao = (): CotacaoSalva | null =>
+  (banco()
+    .prepare("SELECT dia, dolar, fonte, buscado_em AS buscadoEm FROM cotacoes ORDER BY buscado_em DESC LIMIT 1")
+    .get() as CotacaoSalva | undefined) ?? null;
+
+export const salvarCotacao = (c: CotacaoSalva) => {
+  banco()
+    .prepare(
+      `INSERT INTO cotacoes (dia, dolar, fonte, buscado_em) VALUES (?, ?, ?, ?)
+       ON CONFLICT(dia) DO UPDATE SET dolar = excluded.dolar, fonte = excluded.fonte, buscado_em = excluded.buscado_em`,
+    )
+    .run(c.dia, c.dolar, c.fonte, c.buscadoEm);
+};
 
 // ---------- Padrões de animação (motions "desenho" salvos) ----------
 // A IA guarda as cenas desenhadas que ficaram boas para reusar: do cliente

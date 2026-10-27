@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { custosDoCliente } from "@/servidor/banco";
+import { cotacaoDoDia } from "@/servidor/cotacao";
 
 // O que a IA já custou em cada vídeo (projeto) de um cliente: os pedidos,
 // do mais antigo ao mais novo, com o valor de cada um (aba Resultados).
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ erro: "Cliente inválido." }, { status: 400 });
   }
   return NextResponse.json(
-    { pedidos: custosDoCliente(cliente) },
+    { pedidos: custosDoCliente(cliente), cotacao: await cotacaoDoDia() },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

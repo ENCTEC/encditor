@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { dolares } from "@/projeto/dinheiro";
+import { CotacaoNaTela, dolares, explicarCotacao, reais } from "@/projeto/dinheiro";
 
 // Quanto a IA já custou em cada vídeo (aba Resultados). Os valores vêm da
 // tabela "custos" (cada chamada paga anotada no projeto de onde veio) e se
@@ -18,12 +18,17 @@ export type PedidoComCusto = {
 
 export const useCustos = (clienteId: string | null) => {
   const [pedidos, setPedidos] = useState<PedidoComCusto[] | null>(null);
+  const [cotacao, setCotacao] = useState<CotacaoNaTela | null>(null);
   const recarregar = useCallback(async () => {
     if (!clienteId) return;
     const r = await fetch(`/api/custos?cliente=${clienteId}`, { cache: "no-store" }).catch(
       () => null,
     );
-    if (r?.ok) setPedidos(((await r.json()) as { pedidos: PedidoComCusto[] }).pedidos);
+    if (r?.ok) {
+      const d = (await r.json()) as { pedidos: PedidoComCusto[]; cotacao: CotacaoNaTela | null };
+      setPedidos(d.pedidos);
+      setCotacao(d.cotacao);
+    }
   }, [clienteId]);
   useEffect(() => {
     void recarregar();
@@ -41,7 +46,7 @@ export const useCustos = (clienteId: string | null) => {
       window.removeEventListener("focus", aoVoltar);
     };
   }, [recarregar]);
-  return pedidos;
+  return { pedidos, cotacao };
 };
 
 // Quanto o vídeo tinha custado até um momento (ex.: a exportação).
@@ -64,12 +69,27 @@ const quandoFoi = (ms: number) =>
     minute: "2-digit",
   });
 
+// A conta do real, embaixo do quadro.
+const Rodape: React.FC<{ cotacao: CotacaoNaTela | null; cliente: boolean }> = ({ cotacao, cliente }) => (
+  <p className="text-xs text-zinc-500">
+    {cliente
+      ? "Conta tudo o que a IA fez em cada vídeo: pedidos no chat (com a conferência), planejamento, análise dos arquivos e voz de exemplo."
+      : "Pedidos no chat (com a conferência), planejamento, análise dos arquivos e voz de exemplo."}{" "}
+    {cotacao
+      ? `Em real: ${explicarCotacao(cotacao)}. O banco do cartão pode cobrar um pouco mais (spread).`
+      : "Sem a cotação do dólar agora: valores em dólar."}{" "}
+    Preços da OpenAI de 27/10/2026; gastos antes de 26/10 podem estar incompletos.
+  </p>
+);
+
 export const CustosDaIA: React.FC<{
+  cotacao: CotacaoNaTela | null;
   pedidos: PedidoComCusto[] | null;
   projetoId: string | null;
   doCliente: boolean;
   nomes: Record<string, string>;
-}> = ({ pedidos, projetoId, doCliente, nomes }) => {
+}> = ({ cotacao, pedidos, projetoId, doCliente, nomes }) => {
+  const r = (usd: number) => reais(usd, cotacao);
   const [todos, setTodos] = useState(false);
   if (!pedidos) return null;
 
@@ -87,8 +107,10 @@ export const CustosDaIA: React.FC<{
       <section className="cartao-zine space-y-3 p-4">
         <div className="flex flex-wrap items-baseline gap-3">
           <h2 className="font-display text-2xl leading-none uppercase">Custo da IA</h2>
-          <span className="font-display text-3xl leading-none">{dolares(soma(pedidos))}</span>
-          <span className="text-xs text-zinc-500">no cliente todo · atualiza sozinho</span>
+          <span className="font-display text-3xl leading-none">{r(soma(pedidos))}</span>
+          <span className="text-xs text-zinc-500">
+            no cliente todo{cotacao ? ` (${dolares(soma(pedidos))})` : ""} · atualiza sozinho
+          </span>
         </div>
         {linhas.length ? (
           <table className="w-full text-sm">
@@ -101,7 +123,7 @@ export const CustosDaIA: React.FC<{
                   <td className="py-1.5 pr-3 text-right text-zinc-500 tabular-nums">
                     {l.lista.length} pedido(s)
                   </td>
-                  <td className="py-1.5 text-right font-mono tabular-nums">{dolares(l.total)}</td>
+                  <td className="py-1.5 text-right font-mono tabular-nums">{r(l.total)}</td>
                 </tr>
               ))}
             </tbody>
@@ -109,11 +131,7 @@ export const CustosDaIA: React.FC<{
         ) : (
           <p className="text-sm text-zinc-500">Nenhum gasto com a IA ainda.</p>
         )}
-        <p className="text-xs text-zinc-500">
-          Conta tudo o que a IA fez em cada vídeo: pedidos no chat (com a conferência), planejamento,
-          análise dos arquivos e voz de exemplo. Preços da OpenAI de 27/10/2026. Gastos antes de
-          26/10 podem estar incompletos.
-        </p>
+        <Rodape cotacao={cotacao} cliente />
       </section>
     );
   }
@@ -127,9 +145,10 @@ export const CustosDaIA: React.FC<{
     <section className="cartao-zine space-y-3 p-4">
       <div className="flex flex-wrap items-baseline gap-3">
         <h2 className="font-display text-2xl leading-none uppercase">Custo da IA</h2>
-        <span className="font-display text-3xl leading-none">{dolares(soma(doVideo))}</span>
+        <span className="font-display text-3xl leading-none">{r(soma(doVideo))}</span>
         <span className="text-xs text-zinc-500">
-          neste vídeo · {doVideo.length} pedido(s) · atualiza sozinho
+          neste vídeo{cotacao ? ` (${dolares(soma(doVideo))})` : ""} · {doVideo.length} pedido(s) ·
+          atualiza sozinho
         </span>
       </div>
       {doVideo.length ? (
@@ -139,7 +158,7 @@ export const CustosDaIA: React.FC<{
               .sort((a, b) => b[1] - a[1])
               .map(([tipo, valor]) => (
                 <span key={tipo} className="border-2 border-tinta px-2 py-1">
-                  {tipo}: {dolares(valor)}
+                  {tipo}: {r(valor)}
                 </span>
               ))}
           </div>
@@ -155,7 +174,7 @@ export const CustosDaIA: React.FC<{
                     {p.descricao}
                   </td>
                   <td className="py-1.5 text-right font-mono whitespace-nowrap tabular-nums">
-                    {dolares(p.valor)}
+                    {r(p.valor)}
                   </td>
                 </tr>
               ))}
@@ -170,10 +189,7 @@ export const CustosDaIA: React.FC<{
       ) : (
         <p className="text-sm text-zinc-500">A IA ainda não gastou nada neste vídeo.</p>
       )}
-      <p className="text-xs text-zinc-500">
-        Pedidos no chat (com a conferência), planejamento, análise dos arquivos e voz de exemplo.
-        Preços da OpenAI de 27/10/2026. Gastos antes de 26/10 podem estar incompletos.
-      </p>
+      <Rodape cotacao={cotacao} cliente={false} />
     </section>
   );
 };
