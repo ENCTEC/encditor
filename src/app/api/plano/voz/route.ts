@@ -4,6 +4,7 @@ import { lerProjeto } from "@/servidor/banco";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
 import { VOZES } from "@/plano/vozes";
 import { gerarVozTeste } from "@/servidor/voz";
+import { comCusto } from "@/servidor/custos";
 
 // Narração de exemplo do roteiro (voz sintética), para o usuário copiar a
 // entonação. POST ?projeto=<id> { voz } → { plano }
@@ -30,7 +31,15 @@ export async function POST(req: NextRequest) {
   }
   try {
     return NextResponse.json({
-      plano: await gerarVozTeste(id, corpo.data.voz),
+      plano: await comCusto(
+        {
+          projetoId: id,
+          clienteId: lerProjeto(id)?.cliente.id ?? null,
+          tipo: "voz de exemplo",
+          descricao: "narração de exemplo do roteiro",
+        },
+        () => gerarVozTeste(id, corpo.data.voz),
+      ),
     });
   } catch (e) {
     const conhecido = mensagemDeErroOpenAI(e);

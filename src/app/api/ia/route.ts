@@ -15,6 +15,7 @@ import {
   lerMidiasDoCliente,
   lerPlano,
   lerProjeto,
+  totalDoProjeto,
 } from "@/servidor/banco";
 import { enderecoInterno } from "@/servidor/endereco";
 import {
@@ -27,6 +28,8 @@ import {
   iniciarTrabalhoIA,
   lerTrabalhoIA,
 } from "@/servidor/trabalhosIA";
+import { comCusto, custoDoPedido } from "@/servidor/custos";
+import { dolares } from "@/projeto/dinheiro";
 import { listaDePadroes } from "@/ia/padroes";
 import {
   ehEdicaoGrande,
@@ -441,10 +444,22 @@ ${listaDePadroes(clienteId)}`,
       (sessao.acoes.length
         ? "Pronto."
         : "Não entendi o que mudar. Pode detalhar?");
+    // Quanto este pedido custou (todas as chamadas à IA dele) e o vídeo
+    // inteiro até agora.
+    const gasto = custoDoPedido();
+    const custo = gasto
+      ? `💲 Este pedido: ${dolares(gasto)}${projetoId ? ` · o vídeo até agora: ${dolares(totalDoProjeto(projetoId))}` : ""}.`
+      : "";
     return {
-      resposta: notas.length
-        ? `${texto}\n\n${conferenciaOk ? "✓" : "⚠"} Conferência: ${notas.join("; ")}.`
-        : texto,
+      resposta: [
+        texto,
+        notas.length
+          ? `${conferenciaOk ? "✓" : "⚠"} Conferência: ${notas.join("; ")}.`
+          : "",
+        custo,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       timeline: sessao.acoes.length ? sessao.timeline : null,
       acoes: sessao.acoes,
       midiasAlteradas: sessao.midiasAlteradas,
@@ -456,10 +471,20 @@ ${listaDePadroes(clienteId)}`,
   const mensagemDeErro = (e: unknown) =>
     usarOpenAI ? mensagemDeErroOpenAI(e) : mensagemDeErroClaude(e);
 
+  // O custo de cada chamada à IA deste pedido fica no projeto.
+  const contextoDeCusto = {
+    projetoId: projetoId ?? null,
+    clienteId: clienteId ?? null,
+    tipo: "chat",
+    descricao: pedido.slice(0, 120),
+  };
+
   // Sem streaming (scripts de teste): espera tudo e devolve JSON.
   if (!req.headers.get("accept")?.includes("application/x-ndjson")) {
     try {
-      return NextResponse.json<RespostaIA>(await executar(semProgresso));
+      return NextResponse.json<RespostaIA>(
+        await comCusto(contextoDeCusto, () => executar(semProgresso)),
+      );
     } catch (e) {
       const conhecido = mensagemDeErro(e);
       if (conhecido) return erro(conhecido.erro, conhecido.status);
@@ -494,12 +519,12 @@ ${listaDePadroes(clienteId)}`,
       };
       if (trabalho) enviar({ tipo: "trabalho", id: trabalho.id });
       try {
-        const resultado = await executar(
+        const resultado = await comCusto(contextoDeCusto, () => executar(
           criarProgresso((pct, texto) => {
             if (trabalho) atualizarTrabalhoIA(trabalho, { pct, texto });
             enviar({ tipo: "progresso", pct, texto });
           }),
-        );
+        ));
         if (trabalho) {
           atualizarTrabalhoIA(trabalho, { estado: "pronto", pct: 100, resultado });
         }

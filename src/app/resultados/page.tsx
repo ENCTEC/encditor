@@ -3,7 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModalResultado } from "@/componentes/clientes/ModalResultado";
 import { haQuanto, useConexaoMeta } from "@/componentes/conexoes/ConexaoMeta";
+import {
+  custoAte,
+  CustosDaIA,
+  useCustos,
+} from "@/componentes/resultados/CustosDaIA";
 import { ModalVinculos } from "@/componentes/resultados/ModalVinculos";
+import { dolares } from "@/projeto/dinheiro";
 import { lerVinculos, temVinculo, Vinculos } from "@/conexoes/vinculos";
 import { useProjeto } from "@/projeto/ProjetoProvider";
 import {
@@ -117,6 +123,8 @@ export default function PaginaResultados() {
   }, [outroCliente]);
 
   const { situacao, recarregar: recarregarConexao } = useConexaoMeta(clienteId);
+  // Quanto a IA já custou em cada vídeo (atualiza sozinho).
+  const custos = useCustos(clienteId);
   const conectado = !!situacao?.conectado && !situacao.ilegivel;
   const leuSozinho = useRef(false);
 
@@ -349,6 +357,13 @@ export default function PaginaResultados() {
           </div>
         ) : null}
 
+        <CustosDaIA
+          pedidos={custos}
+          projetoId={meta?.id ?? null}
+          doCliente={doCliente}
+          nomes={nomes}
+        />
+
         {exportacoes === null ? (
           <p className="text-sm text-zinc-500">Carregando…</p>
         ) : !lista.length ? (
@@ -371,6 +386,9 @@ export default function PaginaResultados() {
                       {doCliente ? `${nomes[e.projetoId] ?? "?"} · ` : ""}
                       {new Date(e.criadoEm).toLocaleDateString("pt-BR")} ·{" "}
                       {br(e.duracao, 1)}s
+                      {custos
+                        ? ` · IA até esta versão: ${dolares(custoAte(custos, e.projetoId, e.criadoEm))}`
+                        : ""}
                     </p>
                   </div>
                   {r ? (

@@ -140,6 +140,8 @@ export const analisarMidia = (midia: Midia): Promise<Analise> => {
           url: midia.url,
           formato: midia.formato,
           duracao: midia.duracao,
+          // O custo da análise fica no projeto do arquivo.
+          projetoId: midia.projetoId,
         }),
       }),
     )

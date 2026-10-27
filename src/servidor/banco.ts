@@ -25,7 +25,7 @@ const global = globalThis as unknown as {
 
 // Suba este número ao criar tabelas/colunas: a conexão guardada (em
 // desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
-const VERSAO_ESQUEMA = 5;
+const VERSAO_ESQUEMA = 6;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -163,6 +163,23 @@ const banco = () => {
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS custos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      quando INTEGER NOT NULL,
+      projeto_id TEXT,
+      cliente_id TEXT,
+      pedido TEXT,
+      tipo TEXT NOT NULL,
+      descricao TEXT NOT NULL,
+      modelo TEXT NOT NULL,
+      entrada INTEGER NOT NULL,
+      cache INTEGER NOT NULL,
+      saida INTEGER NOT NULL,
+      segundos REAL,
+      valor REAL NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_custos_cliente ON custos (cliente_id);
+    CREATE INDEX IF NOT EXISTS idx_custos_projeto ON custos (projeto_id);
     CREATE TABLE IF NOT EXISTS padroes (
       nome TEXT NOT NULL,
       cliente_id TEXT NOT NULL,
@@ -492,6 +509,7 @@ export const apagarProjeto = (id: string) =>
       ...arquivosDoPlano(id),
     ];
     banco().prepare("DELETE FROM exportacoes WHERE projeto_id = ?").run(id);
+    banco().prepare("DELETE FROM custos WHERE projeto_id = ?").run(id);
     banco().prepare("DELETE FROM planos WHERE projeto_id = ?").run(id);
     banco().prepare("DELETE FROM projetos WHERE id = ?").run(id);
     return arquivos;
@@ -562,6 +580,7 @@ export const apagarCliente = (id: string) =>
       apagarProxy.run(nome, nome);
     }
     db.prepare("DELETE FROM exportacoes WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM custos WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM projetos WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM midias_cliente WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM clientes WHERE id = ?").run(id);
@@ -854,6 +873,77 @@ export const salvarDirecaoDoCliente = (clienteId: string, dados: unknown) => {
     )
     .run(clienteId, JSON.stringify(dados), Date.now());
 };
+
+// ---------- Custos da IA (cada chamada paga, por projeto) ----------
+// Gravados por src/servidor/custos.ts. "pedido" junta as chamadas de um
+// mesmo pedido (ex.: um pedido ao chat = editor + revisor + visão).
+
+export type LinhaDeCusto = {
+  quando: number;
+  projetoId: string | null;
+  clienteId: string | null;
+  pedido: string | null;
+  tipo: string;
+  descricao: string;
+  modelo: string;
+  entrada: number;
+  cache: number;
+  saida: number;
+  segundos: number | null;
+  valor: number;
+};
+
+export const registrarCusto = (c: LinhaDeCusto) => {
+  banco()
+    .prepare(
+      `INSERT INTO custos (quando, projeto_id, cliente_id, pedido, tipo, descricao, modelo, entrada, cache, saida, segundos, valor)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      c.quando,
+      c.projetoId,
+      c.clienteId,
+      c.pedido,
+      c.tipo,
+      c.descricao,
+      c.modelo,
+      c.entrada,
+      c.cache,
+      c.saida,
+      c.segundos,
+      c.valor,
+    );
+};
+
+// Pedidos (chamadas juntadas) de um cliente, do mais antigo ao mais novo.
+export type PedidoComCusto = {
+  projetoId: string | null;
+  quando: number;
+  tipo: string;
+  descricao: string;
+  valor: number;
+  chamadas: number;
+};
+export const custosDoCliente = (clienteId: string): PedidoComCusto[] =>
+  (
+    banco()
+      .prepare(
+        `SELECT projeto_id AS projetoId, MIN(quando) AS quando, MIN(tipo) AS tipo,
+                MIN(descricao) AS descricao, SUM(valor) AS valor, COUNT(*) AS chamadas
+         FROM custos WHERE cliente_id = ?
+         GROUP BY projeto_id, COALESCE(pedido, 'linha-' || id)
+         ORDER BY MIN(quando)`,
+      )
+      .all(clienteId) as PedidoComCusto[]
+  );
+
+// Total já gasto num projeto (para a nota do chat).
+export const totalDoProjeto = (projetoId: string) =>
+  (
+    banco()
+      .prepare("SELECT COALESCE(SUM(valor), 0) AS total FROM custos WHERE projeto_id = ?")
+      .get(projetoId) as { total: number }
+  ).total;
 
 // ---------- Padrões de animação (motions "desenho" salvos) ----------
 // A IA guarda as cenas desenhadas que ficaram boas para reusar: do cliente

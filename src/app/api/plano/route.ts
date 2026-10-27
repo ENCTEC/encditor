@@ -11,6 +11,7 @@ import { apagarArquivos } from "@/servidor/armazenamento";
 import { lerPlano, lerProjeto, salvarPlano } from "@/servidor/banco";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
 import { conversarComPlanejador } from "@/servidor/planejador";
+import { comCusto } from "@/servidor/custos";
 
 // Plano de um projeto (aba Planejar).
 // GET  ?projeto=<id>                  → { plano }
@@ -102,7 +103,15 @@ export async function POST(req: NextRequest) {
     .safeParse(await req.json().catch(() => null));
   if (!corpo.success) return erro("Escreva uma mensagem.", 400);
   try {
-    const plano = await conversarComPlanejador(id, corpo.data.mensagem);
+    const plano = await comCusto(
+      {
+        projetoId: id,
+        clienteId: lerProjeto(id)?.cliente.id ?? null,
+        tipo: "planejar",
+        descricao: corpo.data.mensagem.slice(0, 120),
+      },
+      () => conversarComPlanejador(id, corpo.data.mensagem),
+    );
     return NextResponse.json({ plano });
   } catch (e) {
     const conhecido = mensagemDeErroOpenAI(e);

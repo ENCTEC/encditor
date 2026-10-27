@@ -3,7 +3,9 @@ import { z } from "zod";
 import { Analise } from "@/projeto/analise";
 import { analisarArquivo } from "@/servidor/analise";
 import { nomeDaUrl } from "@/servidor/armazenamento";
+import { lerProjeto } from "@/servidor/banco";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
+import { comCusto } from "@/servidor/custos";
 
 // Analisa um arquivo já enviado (fala + conteúdo visual).
 // Pode levar de segundos a alguns minutos, conforme o tamanho do vídeo.
@@ -12,6 +14,8 @@ const corpoSchema = z.object({
   url: z.string(),
   formato: z.enum(["video", "imagem", "audio"]),
   duracao: z.number().nullable(),
+  // Projeto onde o arquivo foi enviado (o custo da análise fica nele).
+  projetoId: z.string().optional(),
 });
 
 const falha = (erro: string, status: number) =>
@@ -41,10 +45,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const analise = await analisarArquivo(
-      nome,
-      corpo.data.formato,
-      corpo.data.duracao,
+    const projetoId = corpo.data.projetoId ?? null;
+    const analise = await comCusto(
+      {
+        projetoId,
+        clienteId: projetoId ? (lerProjeto(projetoId)?.cliente.id ?? null) : null,
+        tipo: "análise de arquivo",
+        descricao: nome,
+      },
+      () => analisarArquivo(nome, corpo.data.formato, corpo.data.duracao),
     );
     return NextResponse.json(analise);
   } catch (e) {

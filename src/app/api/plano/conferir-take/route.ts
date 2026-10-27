@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { lerProjeto } from "@/servidor/banco";
 import { conferirTake } from "@/servidor/conferirTake";
+import { comCusto } from "@/servidor/custos";
 import { mensagemDeErroOpenAI, openaiConfigurada } from "@/servidor/openai";
 
 // Olhada da IA num take enviado (só informa; não trava nada).
@@ -29,7 +30,15 @@ export async function POST(req: NextRequest) {
   }
   try {
     return NextResponse.json({
-      plano: await conferirTake(id, corpo.data.chave),
+      plano: await comCusto(
+        {
+          projetoId: id,
+          clienteId: lerProjeto(id)?.cliente.id ?? null,
+          tipo: "olhada no take",
+          descricao: corpo.data.chave,
+        },
+        () => conferirTake(id, corpo.data.chave),
+      ),
     });
   } catch (e) {
     const conhecido = mensagemDeErroOpenAI(e);

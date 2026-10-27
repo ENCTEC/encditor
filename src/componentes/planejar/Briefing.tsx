@@ -71,7 +71,12 @@ export const Briefing: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
         void fetch("/api/analisar", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, formato, duracao: meta.duracao }),
+          body: JSON.stringify({
+            url,
+            formato,
+            duracao: meta.duracao,
+            projetoId: uso.projetoId ?? undefined,
+          }),
         });
       } catch (e) {
         setErroEnvio(e instanceof Error ? e.message : String(e));
