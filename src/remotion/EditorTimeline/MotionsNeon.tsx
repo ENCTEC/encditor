@@ -161,7 +161,17 @@ export const estiloDaSaida = (c: Ctx): React.CSSProperties =>
 
 const Fala: React.FC<{ c: Ctx }> = ({ c }) => {
   const { u, motion, largura } = c;
-  const linhas = linhasDoTexto(motion.texto);
+  // Linha com mais de 6 palavras vira 2 ou 3 linhas equilibradas: letra
+  // grande, em vez de uma linha comprida e miúda.
+  const linhas = linhasDoTexto(motion.texto).flatMap((l) => {
+    if (l.barra || l.pedacos.length <= 6) return [l];
+    const partes = Math.ceil(l.pedacos.length / 5);
+    const porLinha = Math.ceil(l.pedacos.length / partes);
+    return Array.from({ length: partes }, (_, i) => ({
+      barra: false,
+      pedacos: l.pedacos.slice(i * porLinha, (i + 1) * porLinha),
+    }));
+  });
   const todas = linhas.flatMap((l) => l.pedacos);
   const quadros = quadrosDasPalavras(c, todas.length);
   const temDestaque = todas.some((p) => p.destaque);
@@ -176,7 +186,7 @@ const Fala: React.FC<{ c: Ctx }> = ({ c }) => {
         flexDirection: "column",
         gap: u * 0.4,
         ...estiloDaSaida(c),
-        ...(motion.posicao === "topo" ? { paddingTop: "9%" } : {}),
+        ...(motion.posicao === "topo" ? { paddingTop: u * 9 } : {}),
       }}
     >
       {linhas.map((linha, l) => {
@@ -302,7 +312,7 @@ const Etiqueta: React.FC<{ c: Ctx }> = ({ c }) => {
     <Lugar
       posicao={p}
       padrao="topo"
-      estilo={p === "topo" ? { paddingTop: "7%" } : undefined}
+      estilo={p === "topo" ? { paddingTop: u * 7 } : undefined}
     >
       {pilula}
     </Lugar>
@@ -347,7 +357,10 @@ const Anel: React.FC<{ c: Ctx }> = ({ c }) => {
               filter: `drop-shadow(0 0 ${u * 1.6}px ${comAlfa(corDe(c, 0), 0.8)})`,
             }}
           >
-            <circle r={raio} fill="rgba(10, 14, 30, 0.55)" />
+            <circle
+              r={raio}
+              fill={c.claro ? "rgba(255, 255, 255, 0.85)" : "rgba(10, 14, 30, 0.55)"}
+            />
             <circle
               r={raio}
               fill="none"
@@ -379,7 +392,7 @@ const Anel: React.FC<{ c: Ctx }> = ({ c }) => {
               fontWeight: 900,
               fontSize: tamanho,
               lineHeight: 1.02,
-              color: BRANCO,
+              color: c.claro ? corDoTexto(c) : BRANCO,
               textTransform: "uppercase",
               textAlign: "center",
               opacity: interpolate(frame, [3, 9], [0, 1], LIMITE),
@@ -416,7 +429,7 @@ const Digitando: React.FC<{ c: Ctx }> = ({ c }) => {
       padrao="topo"
       estilo={{
         opacity: c.saida,
-        ...(p === "topo" ? { paddingTop: "6%" } : {}),
+        ...(p === "topo" ? { paddingTop: u * 6 } : {}),
       }}
     >
       <div
@@ -1139,6 +1152,9 @@ const Confirmado: React.FC<{ c: Ctx }> = ({ c }) => {
         <TextoDegrade
           c={c}
           estilo={{
+            backgroundImage: c.corEscolhida
+              ? `linear-gradient(90deg, ${misturar(c.cor, "#ffffff", 0.35)}, ${misturar(c.cor, "#ffffff", 0.35)})`
+              : `linear-gradient(90deg, ${misturar(corDe(c, 0), "#ffffff", 0.45)}, ${misturar(corDe(c, 1), "#ffffff", 0.45)} 48%, ${misturar(corDe(c, 2), "#ffffff", 0.45)})`,
             fontFamily: FONTES.forte,
             fontWeight: 900,
             fontSize: u * (texto.length <= 10 ? 7.6 : 5.6),
@@ -1165,7 +1181,7 @@ const Confirmado: React.FC<{ c: Ctx }> = ({ c }) => {
     <Lugar
       posicao={p}
       padrao="topo"
-      estilo={{ opacity: c.saida, ...(p === "topo" ? { paddingTop: "8%" } : {}) }}
+      estilo={{ opacity: c.saida, ...(p === "topo" ? { paddingTop: u * 8 } : {}) }}
     >
       {selo}
     </Lugar>

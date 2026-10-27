@@ -24,6 +24,7 @@ import { FundoAnimado, FUNDOS_CLAROS } from "./Fundos";
 import { TemaContexto } from "./motionBase";
 import { Inserts } from "./Inserts";
 import { Legendas } from "./Legendas";
+import { Medidor } from "./Medidor";
 import { Motions } from "./Motions";
 import { PREMONTAR_S } from "./premontar";
 import { ClipeComTransicoes } from "./transicoes";
@@ -72,7 +73,7 @@ export const EditorTimeline: React.FC<Timeline> = (recebida) => {
   };
 
   return (
-    <AbsoluteFill style={{ backgroundColor: "black" }}>
+    <AbsoluteFill style={{ backgroundColor: "black" }} data-raiz-video>
       <Efeitos efeitos={timeline.efeitos}>
         <Zoom zooms={timeline.zooms}>
           {clipes.map((clipe, i) => (
@@ -136,6 +137,7 @@ export const EditorTimeline: React.FC<Timeline> = (recebida) => {
         aparencia={timeline.aparenciaLegendas}
       />
       <Audios audios={timeline.audios} />
+      <Medidor />
     </AbsoluteFill>
   );
 };

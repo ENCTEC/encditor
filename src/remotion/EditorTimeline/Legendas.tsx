@@ -385,12 +385,14 @@ export const Legendas: React.FC<{
             name={`Legenda: ${legenda.texto}`}
             layout="none"
           >
-            <LegendaAnimada
-              legenda={legenda}
-              estilo={legenda.estilo ?? estiloPadrao ?? "classico"}
-              duracaoFrames={duracao}
-              aparencia={aparencia}
-            />
+            <div data-item={`legenda:${i}`} style={{ position: "absolute", inset: 0 }}>
+              <LegendaAnimada
+                legenda={legenda}
+                estilo={legenda.estilo ?? estiloPadrao ?? "classico"}
+                duracaoFrames={duracao}
+                aparencia={aparencia}
+              />
+            </div>
           </Sequence>
         );
       })}

@@ -89,6 +89,22 @@ export const corNaPosicao = (c: Ctx, t: number) =>
 export const corDoTexto = (c: Ctx, alfa = 1) =>
   c.claro ? `rgba(21, 19, 26, ${alfa})` : `rgba(255, 255, 255, ${alfa})`;
 
+// Emojis (com tom de pele e combinações 👨‍👩‍👧) separados do resto do texto.
+const EMOJI =
+  /(\p{Extended_Pictographic}[\uFE0F\p{Emoji_Modifier}]*(?:\u200D\p{Extended_Pictographic}[\uFE0F\p{Emoji_Modifier}]*)*)/u;
+const comEmojisColoridos = (children: React.ReactNode) =>
+  typeof children === "string" && EMOJI.test(children)
+    ? children.split(EMOJI).map((parte, i) =>
+        i % 2 === 1 ? (
+          <span key={i} style={{ WebkitTextFillColor: "initial", color: "initial" }}>
+            {parte}
+          </span>
+        ) : (
+          parte
+        ),
+      )
+    : children;
+
 // Texto em degradê com brilho. Sombra de texto não serve aqui (cobriria o
 // degradê): o brilho e o "fantasma" colorido da entrada usam drop-shadow.
 export const TextoDegrade: React.FC<{
@@ -109,7 +125,7 @@ export const TextoDegrade: React.FC<{
       filter: `${filtroExtra ?? ""} drop-shadow(0 ${c.u * 0.25}px ${c.u * 0.5}px rgba(0,0,0,${c.claro ? 0.22 : 0.45})) drop-shadow(0 0 ${c.u * 1.1}px ${comAlfa(corDoBrilho(c), 0.55)})`,
     }}
   >
-    {children}
+    {comEmojisColoridos(children)}
   </span>
 );
 
@@ -168,7 +184,8 @@ export const quadrosDasPalavras = (
   ditas = c.motion.palavras,
 ) => {
   if (ditas && ditas.length === n) {
-    return ditas.map((p) => Math.max(0, Math.round(p.de * c.fps)));
+    const ultimo = Math.max(0, c.duracao - Math.round(0.55 * c.fps));
+    return ditas.map((p) => Math.min(ultimo, Math.max(0, Math.round(p.de * c.fps))));
   }
   const ritmo = Math.max(
     2,

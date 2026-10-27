@@ -1,5 +1,5 @@
 import React, { createContext } from "react";
-import { AbsoluteFill, spring } from "remotion";
+import { AbsoluteFill, spring, useVideoConfig } from "remotion";
 import { Motion } from "../../timeline/schema";
 
 // Peças comuns a todos os motions (Motions.tsx e MotionsNeon.tsx). Tudo é
@@ -88,6 +88,8 @@ export const entrada = (c: Ctx, atraso = 0, rigidez = 170, amortecimento = 13) =
   });
 
 // Onde o bloco fica: topo / centro / base (a base fica acima das legendas).
+// As margens são em u (1% do lado menor): porcentagem no padding do CSS é
+// sempre da LARGURA, e no vídeo deitado a "base" ia parar no meio da tela.
 export const Lugar: React.FC<{
   posicao: Motion["posicao"];
   padrao: NonNullable<Motion["posicao"]>;
@@ -95,14 +97,16 @@ export const Lugar: React.FC<{
   estilo?: React.CSSProperties;
 }> = ({ posicao, padrao, children, estilo }) => {
   const p = posicao ?? padrao;
+  const { width, height } = useVideoConfig();
+  const u = Math.min(width, height) / 100;
   return (
     <AbsoluteFill
       style={{
         justifyContent:
           p === "topo" ? "flex-start" : p === "base" ? "flex-end" : "center",
         alignItems: "center",
-        paddingTop: p === "topo" ? "13%" : 0,
-        paddingBottom: p === "base" ? "24%" : 0,
+        paddingTop: p === "topo" ? u * 13 : 0,
+        paddingBottom: p === "base" ? u * 24 : 0,
         paddingLeft: "6%",
         paddingRight: "6%",
         ...estilo,

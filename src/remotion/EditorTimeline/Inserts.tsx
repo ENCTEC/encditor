@@ -312,16 +312,18 @@ export const Inserts: React.FC<{ inserts: Insert[] }> = ({ inserts }) => {
             name={`Insert ${i + 1}`}
             premountFor={PREMONTAR_S * fps}
           >
-            <ConteudoInsert
-              insert={insert}
-              duracao={duracao}
-              continuaAntes={inserts.some(
-                (outro, j) => j !== i && colados(outro, insert),
-              )}
-              continuaDepois={inserts.some(
-                (outro, j) => j !== i && colados(insert, outro),
-              )}
-            />
+            <div data-item={`insert:${i}`} style={{ position: "absolute", inset: 0 }}>
+              <ConteudoInsert
+                insert={insert}
+                duracao={duracao}
+                continuaAntes={inserts.some(
+                  (outro, j) => j !== i && colados(outro, insert),
+                )}
+                continuaDepois={inserts.some(
+                  (outro, j) => j !== i && colados(insert, outro),
+                )}
+              />
+            </div>
           </Sequence>
         );
       })}

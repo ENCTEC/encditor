@@ -17,12 +17,15 @@ import {
   lerProjeto,
 } from "@/servidor/banco";
 import { enderecoInterno } from "@/servidor/endereco";
-import { renderizarQuadros } from "@/servidor/quadros";
 import {
-  conferirEdicao,
-  descreverMomento,
+  Achado,
+  conferirVideo,
+  quadrosDosAchados,
+} from "@/servidor/conferirVideo";
+import {
   ehEdicaoGrande,
-  momentosParaRevisar,
+  focoDaEdicao,
+  momentosParaMedir,
 } from "@/ia/conferencia";
 import {
   criarProgresso,
@@ -119,19 +122,51 @@ const erro = (mensagem: string, status: number) =>
 const ehOk = (texto: string) => /^\s*ok[.!]?\s*$/i.test(texto);
 
 const mensagemDaConferencia = (problemas: string[], estado: string) =>
-  `CONFERÊNCIA AUTOMÁTICA da sua edição, antes de entregar ao usuário. Pontos encontrados:
+  `CONFERÊNCIA da sua edição, antes de entregar ao usuário. Ela MEDIU a posição de cada texto e desenho nos quadros de verdade (não é estimativa), aplicou as regras e um revisor independente olhou as imagens. Os quadros dos momentos com problema vão junto. Pontos encontrados:
 ${problemas.map((p) => `- ${p}`).join("\n")}
 
-Corrija com as ferramentas o que for erro de verdade (o estado atual está abaixo; use os números dos itens). Se algum ponto foi pedido pelo usuário ou é de propósito, deixe como está. Depois responda com o resumo FINAL e completo do que foi feito no pedido (incluindo as correções). Se não mudar nada, responda exatamente: OK.
+Corrija com as ferramentas TODOS os pontos (o estado atual está abaixo; use os números dos itens). Sobreposição medida é erro de verdade: mude posição (topo/centro/base ou x/y), tamanho ou tempos até não encostar. Corrigir não é apagar: prefira mover, encolher ou encurtar; se tirar um grafismo, ponha outro no lugar. Faça as correções numa chamada só com varias_edicoes. Só deixe como está o que o usuário pediu explicitamente. Depois a conferência roda de novo e o usuário vê o que sobrou. Responda com o resumo FINAL e completo do que foi feito no pedido (incluindo as correções). Se não mudar nada, responda exatamente: OK.
 
 Estado atual do projeto:
 ${estado}`;
 
-const mensagemDaRevisao = (estado: string) =>
-  `REVISÃO ANTES DE ENTREGAR. Abaixo estão quadros do vídeo depois da sua edição; cada um vem com o segundo, o que está sendo falado naquele momento e o que deveria estar na tela. Olhe como um editor exigente: texto cortado ou saindo da tela; texto pequeno demais para ler no celular; uma coisa por cima da outra; algo cobrindo rosto ou produto; elemento que falta ou que não combina com a fala daquele momento; tela vazia. Se achar problema REAL, corrija com as ferramentas e depois responda com o resumo FINAL e completo do que foi feito no pedido (incluindo as correções). Se estiver tudo certo, responda exatamente: OK.
-
-Estado atual do projeto:
-${estado}`;
+// A nota do fim da resposta: o que foi conferido e, sem esconder, o que
+// ainda ficou errado depois das correções.
+const notaDaConferencia = ({
+  medidos,
+  olhados,
+  achadosNoInicio,
+  corrigiu,
+  sobraram,
+}: {
+  medidos: number;
+  olhados: number;
+  achadosNoInicio: number;
+  corrigiu: boolean;
+  sobraram: Achado[];
+}) => {
+  const como = [
+    medidos
+      ? `medi a posição de cada texto em ${medidos} quadro(s)`
+      : "conferi as regras",
+    olhados ? `um revisor olhou ${olhados} quadro(s)` : "",
+  ]
+    .filter(Boolean)
+    .join(" e ");
+  if (!achadosNoInicio) return { ok: true, texto: `${como}: nenhum problema` };
+  if (!sobraram.length) {
+    return {
+      ok: true,
+      texto: `${como}: achei ${achadosNoInicio} ponto(s), corrigi e conferi de novo — resolvido`,
+    };
+  }
+  const lista = sobraram.slice(0, 4).map((a) => a.curto).join("; ");
+  const mais = sobraram.length > 4 ? ` (e mais ${sobraram.length - 4})` : "";
+  return {
+    ok: false,
+    texto: `${como}: achei ${achadosNoInicio} ponto(s)${corrigiu ? " e corrigi parte" : ""}, mas AINDA FICOU: ${lista}${mais}`,
+  };
+};
 
 export async function POST(req: NextRequest) {
   const usarOpenAI = openaiConfigurada();
@@ -260,6 +295,27 @@ ${pedidosDoPlano.join("\n")}`
       });
     const estado = () =>
       JSON.stringify(resumoDoProjeto(sessao.timeline, sessao.biblioteca));
+    // O que o revisor independente precisa saber (sem o histórico da
+    // edição): o formato, o que o usuário pediu e a direção do vídeo.
+    const contextoDoRevisor = () =>
+      [
+        `Formato do vídeo: ${sessao.timeline.largura}×${sessao.timeline.altura} (${sessao.timeline.largura > sessao.timeline.altura ? "deitado" : "em pé"}).`,
+        ...historicoIA
+          .filter((m) => m.papel === "user")
+          .slice(-3)
+          .map((m) => `Pedido anterior do usuário: ${m.texto.slice(0, 500)}`),
+        `Pedido atual do usuário: ${pedido}`,
+        sessao.timeline.direcaoDeArte
+          ? `Direção de arte: ${JSON.stringify(sessao.timeline.direcaoDeArte)}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+    sessao.conferencia = {
+      origem: enderecoInterno(req),
+      contexto: contextoDoRevisor,
+      aviso: (texto) => progresso.detalhe(texto),
+    };
 
     progresso.fase(4, 60, "Entendendo o pedido…");
     const primeira = await rodar(pedidoCompleto, historicoIA, [
@@ -268,6 +324,7 @@ ${pedidosDoPlano.join("\n")}`
     ]);
     let resposta = primeira;
     const notas: string[] = [];
+    let conferenciaOk = true;
 
     if (sessao.acoes.length) {
       const conversa = [
@@ -276,94 +333,85 @@ ${pedidosDoPlano.join("\n")}`
         { papel: "assistant" as const, texto: primeira },
       ];
 
-      // 1) Conferência automática (regras, sem custo). Se achar algo, a
-      //    IA corrige; confere de novo uma vez.
-      let corrigidos = 0;
-      for (let rodada = 0; rodada < 2; rodada++) {
+      // Conferência antes de entregar: regras + a posição MEDIDA de cada
+      // texto nos quadros de verdade + (pedidos grandes) um revisor
+      // independente olhando as imagens. O que ela achar, a IA corrige e a
+      // conferência roda de novo (até 2 rodadas). A nota final diz a
+      // verdade: o que foi conferido e o que ainda ficou.
+      const grande = ehEdicaoGrande(timeline, sessao.timeline);
+      const conferir = (olharSo?: number[]) =>
+        conferirVideo({
+          antes: timeline,
+          depois: sessao.timeline,
+          biblioteca: sessao.biblioteca,
+          origem: enderecoInterno(req),
+          olhar: grande,
+          olharSo,
+          contexto: contextoDoRevisor(),
+          aviso: (texto) => progresso.detalhe(texto),
+        });
+      progresso.fase(60, 74, "Conferindo a edição quadro a quadro…");
+      // Se a IA já rodou conferir_video (com o revisor) neste pedido, o
+      // revisor da conferência final só olha o que mudou depois disso.
+      const ultima = sessao.conferencia?.ultima;
+      let conferencia = await conferir(
+        ultima
+          ? momentosParaMedir(sessao.timeline, focoDaEdicao(ultima, sessao.timeline))
+          : undefined,
+      );
+      const achadosNoInicio = conferencia.achados.length;
+      const { medidos, olhados } = conferencia;
+      let corrigiu = false;
+      for (let rodada = 0; rodada < 2 && conferencia.achados.length; rodada++) {
+        const n = conferencia.achados.length;
         progresso.fase(
-          60 + rodada * 7,
-          66 + rodada * 7,
-          rodada
-            ? "Conferindo de novo…"
-            : "Conferindo a edição (sobreposições, tempos, textos)…",
-        );
-        const problemas = conferirEdicao(
-          timeline,
-          sessao.timeline,
-          sessao.biblioteca,
-        );
-        if (!problemas.length) break;
-        progresso.passo(
-          `A conferência achou ${problemas.length} ponto(s) — corrigindo…`,
+          74 + rodada * 12,
+          80 + rodada * 12,
+          `A conferência achou ${n} ponto(s) — corrigindo…`,
         );
         const acoesAntes = sessao.acoes.length;
         const r = await rodar(
-          mensagemDaConferencia(problemas, estado()),
+          mensagemDaConferencia(
+            conferencia.achados.map((a) => a.texto),
+            estado(),
+          ),
           conversa,
           [
-            `Corrigindo o que a conferência achou (${problemas.length} ponto(s))…`,
+            `Corrigindo o que a conferência achou (${n} ponto(s))…`,
             "Corrigindo…",
           ],
+          quadrosDosAchados(conferencia, sessao.timeline, sessao.biblioteca),
         );
         conversa.push(
-          { papel: "user", texto: "(conferência automática da edição)" },
+          { papel: "user", texto: "(conferência da edição)" },
           { papel: "assistant", texto: r },
         );
+        // A IA não mudou nada (achou que é de propósito): fica como está.
         if (sessao.acoes.length === acoesAntes) break;
-        corrigidos += problemas.length;
+        corrigiu = true;
         if (!ehOk(r)) resposta = r;
+        progresso.fase(
+          80 + rodada * 12,
+          86 + rodada * 12,
+          "Conferindo de novo o que foi corrigido…",
+        );
+        // De novo: as posições de tudo o que mudou e, onde o revisor tinha
+        // visto problema, ele olha outra vez.
+        conferencia = await conferir(
+          conferencia.achados
+            .filter((a) => a.origem === "revisor" && a.segundo !== null)
+            .map((a) => a.segundo as number),
+        );
       }
-      notas.push(
-        corrigidos
-          ? `a conferência automática achou e corrigiu ${corrigidos} ponto(s)`
-          : "a conferência automática não achou problemas",
-      );
-
-      // 2) Revisão olhando quadros (só em pedidos grandes).
-      const momentos = ehEdicaoGrande(timeline, sessao.timeline)
-        ? momentosParaRevisar(timeline, sessao.timeline)
-        : [];
-      if (momentos.length) {
-        progresso.fase(74, 86, "Gerando quadros do vídeo para revisar…");
-        try {
-          const quadros = await renderizarQuadros(
-            sessao.timeline,
-            enderecoInterno(req),
-            momentos,
-            (feitos, total) =>
-              progresso.em(
-                74 + (12 * feitos) / total,
-                `Gerando quadros para revisar (${feitos} de ${total})…`,
-              ),
-          );
-          progresso.fase(87, 97, "Olhando os quadros do vídeo…");
-          const acoesAntes = sessao.acoes.length;
-          const r = await rodar(
-            mensagemDaRevisao(estado()),
-            conversa,
-            [
-              `Olhando os ${quadros.length} quadros do vídeo…`,
-              "Corrigindo o que vi nos quadros…",
-            ],
-            quadros.map((q) => ({
-              base64: q.base64,
-              legenda: descreverMomento(
-                sessao.timeline,
-                sessao.biblioteca,
-                q.segundo,
-              ),
-            })),
-          );
-          const corrigiu = sessao.acoes.length > acoesAntes;
-          if (corrigiu && !ehOk(r)) resposta = r;
-          notas.push(
-            `olhei ${quadros.length} quadros do vídeo${corrigiu ? " e corrigi o que vi" : " e está tudo certo"}`,
-          );
-        } catch (e) {
-          console.error("[ia] revisão por quadros falhou:", e);
-          notas.push("não deu para gerar os quadros da revisão desta vez");
-        }
-      }
+      const nota = notaDaConferencia({
+        medidos,
+        olhados,
+        achadosNoInicio,
+        corrigiu,
+        sobraram: conferencia.achados,
+      });
+      notas.push(nota.texto);
+      conferenciaOk = nota.ok;
     }
 
     progresso.em(98, "Finalizando…");
@@ -374,7 +422,7 @@ ${pedidosDoPlano.join("\n")}`
         : "Não entendi o que mudar. Pode detalhar?");
     return {
       resposta: notas.length
-        ? `${texto}\n\n✓ Conferência: ${notas.join("; ")}.`
+        ? `${texto}\n\n${conferenciaOk ? "✓" : "⚠"} Conferência: ${notas.join("; ")}.`
         : texto,
       timeline: sessao.acoes.length ? sessao.timeline : null,
       acoes: sessao.acoes,

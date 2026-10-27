@@ -48,6 +48,8 @@ import { aplicarEfeitos } from "@/servidor/efeitos";
 import { envelopeDoArquivo } from "@/servidor/envelope";
 import { estudarExemplo } from "@/servidor/estudarExemplo";
 import { medirVoz } from "@/servidor/medirVoz";
+import { conferirVideo } from "@/servidor/conferirVideo";
+import { semItens } from "./conferencia";
 import { salvarDirecaoDoCliente } from "@/servidor/banco";
 import { lerAnaliseSalva } from "@/servidor/armazenamento";
 import { formatoPorId, IDS_FORMATO } from "@/timeline/formatos";
@@ -129,6 +131,17 @@ export type SessaoEdicao = {
     finalidade: string;
     detalhe: string;
   }[];
+  // Para conferir_video gerar e olhar os quadros (vem da rota do chat):
+  // o endereço do app, o que o usuário pediu e o aviso da barra.
+  conferencia?: {
+    origem: string;
+    contexto: () => string;
+    aviso?: (texto: string) => void;
+    // Quantas vezes conferir_video rodou neste pedido e a timeline que ela
+    // conferiu por último (a conferência final só olha o que mudou depois).
+    vezes?: number;
+    ultima?: Timeline;
+  };
 };
 
 // Energia da direção de arte → quanto o fundo animado se mexe.
@@ -381,7 +394,7 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
     return `OK: ${descricao}. Duração total agora: ${duracaoTotal()}s.`;
   };
 
-  return [
+  const lista = [
     ferramenta({
       name: "ver_projeto",
       description:
@@ -1200,6 +1213,34 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
           },
           `motion "${nome}" ("${e.texto}") de ${motion.inicio}s a ${motion.fim}s${som ? ` com o som ${som}` : ""}`,
         );
+      },
+    }),
+
+    ferramenta({
+      name: "conferir_video",
+      description:
+        "Confere o vídeo INTEIRO como um editor exigente: gera um quadro perto do fim de cada tela, MEDE onde ficou cada texto e desenho (um em cima do outro, saindo da tela), aplica as regras (texto longo, grafismo repetido, só emoji, a mesma informação duas vezes, tela vazia…) e um revisor independente olha as imagens (contraste, emoji sem cor, elemento solto, algo contra o pedido do usuário). Use SEMPRE que o usuário pedir para conferir, revisar ou achar erros no vídeo ('confere', 'tem algo errado?', 'revisa tudo') e corrija com as ferramentas TUDO o que ela apontar. Nunca diga que o vídeo está certo sem rodar esta ferramenta. Demora de 30 a 90 s.",
+      inputSchema: z.object({}),
+      run: async () => {
+        const c = sessao.conferencia;
+        if (!c) throw new Error("A conferência não está disponível aqui.");
+        if ((c.vezes ?? 0) >= 1) {
+          return "Já conferi o vídeo inteiro neste pedido. Termine as correções; a conferência final roda sozinha quando você terminar e mostra ao usuário o que sobrou.";
+        }
+        c.vezes = (c.vezes ?? 0) + 1;
+        c.ultima = sessao.timeline;
+        const r = await conferirVideo({
+          antes: semItens(sessao.timeline),
+          depois: sessao.timeline,
+          biblioteca: sessao.biblioteca,
+          origem: c.origem,
+          olhar: true,
+          contexto: c.contexto(),
+          aviso: c.aviso,
+        });
+        const como = `Conferi ${r.medidos} quadro(s) medindo a posição de cada texto e um revisor olhou ${r.olhados}.`;
+        if (!r.achados.length) return `OK: ${como} Nenhum problema.`;
+        return `${como} Problemas (corrija TODOS com as ferramentas; os números são os itens da timeline):\n${r.achados.map((a) => `- ${a.texto}`).join("\n")}`;
       },
     }),
 
@@ -2356,4 +2397,54 @@ export const criarFerramentas = (sessao: SessaoEdicao) => {
         ),
     }),
   ];
+
+  // Várias chamadas numa só: corrigir 40 itens um por vez leva 20 etapas
+  // da IA (cada uma reenviando o projeto inteiro); em lote, uma ou duas.
+  const NO_LOTE = new Set([
+    "editar_item",
+    "remover_item",
+    "adicionar_motion",
+    "posicionar_insert",
+    "acabamento_do_insert",
+    "aparar_item",
+    "duplicar_item",
+    "adicionar_som",
+    "adicionar_efeito",
+  ]);
+  const varias = ferramenta({
+    name: "varias_edicoes",
+    description: `Faz VÁRIAS edições numa chamada só, na ordem dada — bem mais rápido que uma chamada por item. Use sempre que for mexer em 3 ou mais itens (ex.: corrigir o que conferir_video apontou). Cada passo = o nome de uma destas ferramentas (${[...NO_LOTE].join(", ")}) e os argumentos exatamente como ela pede. Remover muda os números dos itens seguintes: deixe as remoções por ÚLTIMO, do maior número para o menor.`,
+    inputSchema: z.object({
+      passos: z
+        .array(
+          z.object({
+            ferramenta: z.string(),
+            argumentos: z.record(z.string(), z.unknown()),
+          }),
+        )
+        .min(1),
+    }),
+    run: async ({ passos }) => {
+      const resultados: string[] = [];
+      for (const [i, passo] of passos.entries()) {
+        const f = lista.find((x) => x.name === passo.ferramenta);
+        if (!f || !NO_LOTE.has(f.name)) {
+          resultados.push(`${i + 1}. Erro: "${passo.ferramenta}" não pode ser usada aqui.`);
+          continue;
+        }
+        const entrada = f.inputSchema.safeParse(passo.argumentos);
+        if (!entrada.success) {
+          resultados.push(`${i + 1}. ${f.name}: Erro: argumentos inválidos: ${z.prettifyError(entrada.error)}`);
+          continue;
+        }
+        try {
+          resultados.push(`${i + 1}. ${f.name}: ${await f.run(entrada.data)}`);
+        } catch (e) {
+          resultados.push(`${i + 1}. ${f.name}: Erro: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      return resultados.join("\n");
+    },
+  });
+  return [...lista, varias];
 };

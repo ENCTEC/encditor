@@ -331,7 +331,7 @@ const Rodape: React.FC<{ c: Ctx }> = ({ c }) => {
         justifyContent: "flex-end",
         alignItems: "flex-start",
         paddingLeft: "6%",
-        paddingBottom: "24%",
+        paddingBottom: c.u * 24,
       }}
     >
       <div
@@ -1469,7 +1469,10 @@ export const Motions: React.FC<{ motions: Motion[] }> = ({ motions }) => {
             durationInFrames={duracao}
             name={`Motion ${i + 1}`}
           >
-            <MotionAnimado motion={m} duracaoFrames={duracao} />
+            {/* data-item: o medidor da conferência acha cada motion. */}
+            <div data-item={`motion:${i}`} style={{ position: "absolute", inset: 0 }}>
+              <MotionAnimado motion={m} duracaoFrames={duracao} />
+            </div>
           </Sequence>
         );
       })}

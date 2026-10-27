@@ -6,6 +6,8 @@
 
 const ROTULOS: Record<string, string> = {
   ver_projeto: "Lendo o projeto",
+  conferir_video: "Conferindo o vídeo inteiro, quadro a quadro",
+  varias_edicoes: "Aplicando várias edições de uma vez",
   colocar_insert: "Colocando o insert",
   posicionar_insert: "Ajustando a posição do insert",
   acabamento_do_insert: "Ajustando a moldura do insert",
