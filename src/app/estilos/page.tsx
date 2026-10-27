@@ -1,6 +1,6 @@
 "use client";
 
-import { Player } from "@remotion/player";
+import { Player, Thumbnail } from "@remotion/player";
 import { useEffect, useRef, useState } from "react";
 import {
   arquivoDoSom,
@@ -91,8 +91,10 @@ const Cartao: React.FC<{
   </article>
 );
 
-// Cada exemplo só toca enquanto aparece na tela: com ~90 tocando juntos o
-// navegador travava e não dava nem para sair da aba.
+// Cada exemplo fica PARADO (um quadro do meio da animação) e só toca com o
+// mouse em cima (no celular, um toque liga e desliga): com ~90 tocando
+// juntos o navegador travava e não dava nem para sair da aba. O quadro
+// parado só é desenhado quando o exemplo aparece na tela.
 const Exemplo: React.FC<{
   componente: React.FC<Record<string, unknown>>;
   props: Record<string, unknown>;
@@ -100,6 +102,7 @@ const Exemplo: React.FC<{
 }> = ({ componente, props, duracao }) => {
   const caixa = useRef<HTMLDivElement>(null);
   const [visivel, setVisivel] = useState(false);
+  const [tocando, setTocando] = useState(false);
   useEffect(() => {
     const el = caixa.current;
     if (!el) return;
@@ -110,22 +113,32 @@ const Exemplo: React.FC<{
     observador.observe(el);
     return () => observador.disconnect();
   }, []);
+  const comum = {
+    component: componente,
+    inputProps: props,
+    durationInFrames: duracao,
+    fps: DEMO.fps,
+    compositionWidth: DEMO.largura,
+    compositionHeight: DEMO.altura,
+    style: { width: "100%", height: "100%" },
+  };
   return (
-    <div ref={caixa} style={{ width: "100%", height: "100%" }}>
-      {visivel ? (
-        <Player
-          component={componente}
-          inputProps={props}
-          durationInFrames={duracao}
-          fps={DEMO.fps}
-          compositionWidth={DEMO.largura}
-          compositionHeight={DEMO.altura}
-          style={{ width: "100%", height: "100%" }}
-          autoPlay
-          loop
-          initiallyMuted
-          acknowledgeRemotionLicense
-        />
+    <div
+      ref={caixa}
+      style={{ width: "100%", height: "100%", position: "relative", cursor: "pointer" }}
+      onPointerEnter={(e) => e.pointerType === "mouse" && setTocando(true)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setTocando(false)}
+      onClick={() => setTocando((x) => !x)}
+    >
+      {tocando ? (
+        <Player {...comum} autoPlay loop initiallyMuted acknowledgeRemotionLicense />
+      ) : visivel ? (
+        <>
+          <Thumbnail {...comum} frameToDisplay={Math.floor(duracao * 0.6)} />
+          <span className="pointer-events-none absolute right-1.5 bottom-1.5 bg-tinta/80 px-1.5 py-0.5 font-mono text-[10px] text-papel">
+            ▶ passe o mouse
+          </span>
+        </>
       ) : (
         <div className="h-full w-full bg-zinc-900" />
       )}
