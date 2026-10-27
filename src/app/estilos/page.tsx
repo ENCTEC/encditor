@@ -1,6 +1,7 @@
 "use client";
 
 import { Player } from "@remotion/player";
+import { useEffect, useRef, useState } from "react";
 import {
   arquivoDoSom,
   EFEITOS_VISUAIS,
@@ -90,25 +91,47 @@ const Cartao: React.FC<{
   </article>
 );
 
+// Cada exemplo só toca enquanto aparece na tela: com ~90 tocando juntos o
+// navegador travava e não dava nem para sair da aba.
 const Exemplo: React.FC<{
   componente: React.FC<Record<string, unknown>>;
   props: Record<string, unknown>;
   duracao: number;
-}> = ({ componente, props, duracao }) => (
-  <Player
-    component={componente}
-    inputProps={props}
-    durationInFrames={duracao}
-    fps={DEMO.fps}
-    compositionWidth={DEMO.largura}
-    compositionHeight={DEMO.altura}
-    style={{ width: "100%", height: "100%" }}
-    autoPlay
-    loop
-    initiallyMuted
-    acknowledgeRemotionLicense
-  />
-);
+}> = ({ componente, props, duracao }) => {
+  const caixa = useRef<HTMLDivElement>(null);
+  const [visivel, setVisivel] = useState(false);
+  useEffect(() => {
+    const el = caixa.current;
+    if (!el) return;
+    const observador = new IntersectionObserver(
+      ([e]) => setVisivel(e.isIntersecting),
+      { rootMargin: "80px" },
+    );
+    observador.observe(el);
+    return () => observador.disconnect();
+  }, []);
+  return (
+    <div ref={caixa} style={{ width: "100%", height: "100%" }}>
+      {visivel ? (
+        <Player
+          component={componente}
+          inputProps={props}
+          durationInFrames={duracao}
+          fps={DEMO.fps}
+          compositionWidth={DEMO.largura}
+          compositionHeight={DEMO.altura}
+          style={{ width: "100%", height: "100%" }}
+          autoPlay
+          loop
+          initiallyMuted
+          acknowledgeRemotionLicense
+        />
+      ) : (
+        <div className="h-full w-full bg-zinc-900" />
+      )}
+    </div>
+  );
+};
 
 export default function PaginaEstilos() {
   const { projeto, carregado, aplicar } = useProjeto();

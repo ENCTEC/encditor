@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { enviarArquivo } from "@/projeto/midia-cliente";
 import { Elemento } from "@/plano/elementos";
 import { useElementos } from "@/plano/useElementos";
+import { useProjeto } from "@/projeto/ProjetoProvider";
 import { UsoPlano } from "@/plano/usePlano";
 import { campoZine } from "./Briefing";
 
@@ -122,6 +123,7 @@ const FormElemento: React.FC<{
 export const Elementos: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
   const { plano, clienteId, mudarBriefing } = uso;
   const { elementos, erro, criar, editar, apagar } = useElementos(clienteId);
+  const { meta } = useProjeto();
   const [criando, setCriando] = useState(false);
   const [editando, setEditando] = useState<string | null>(null);
   if (!plano) return null;
@@ -140,7 +142,10 @@ export const Elementos: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
       <h3 className="rotulo-zine">Elementos do Higgsfield</h3>
       <p className="text-xs text-zinc-500">
         Os mesmos que você cita com @ no Higgsfield (modelo, produto, loja).
-        Ficam salvos neste cliente; marque os que este vídeo deve usar.
+        Ficam salvos no cliente{" "}
+        <b>{meta?.cliente.nome ?? "deste projeto"}</b> e aparecem em todos os
+        vídeos dele; marque os que este vídeo deve usar. Elemento de outra
+        marca? Crie o vídeo dentro do cliente certo (Clientes).
       </p>
       <ul className="grid grid-cols-1 gap-2">
         {elementos.map((e) =>
