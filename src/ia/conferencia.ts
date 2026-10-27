@@ -193,9 +193,19 @@ export const conferirEdicao = (
   // 3) Texto falado que não bate com o que é dito naquele momento, e
   //    legenda repetindo o texto falado.
   const ditas = palavrasNoVideoFinal(depois, biblioteca);
+  // Sem o tempo de cada palavra, compara o texto com o que é dito ali: um
+  // nome corrigido (a transcrição ouviu "REC", o certo é "Rekk") não é erro.
+  const simples = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9%]/g, "");
   depois.motions.forEach((m, i) => {
     if (!motionsNovos.has(m) || m.modelo !== "fala" || m.palavras) return;
-    if (ditas.some((p) => p.de < m.fim && p.ate > m.inicio)) {
+    const ali = new Set(
+      ditas.filter((p) => p.de < m.fim + 0.6 && p.ate > m.inicio - 0.6).map((p) => simples(p.palavra)),
+    );
+    if (!ali.size) return;
+    const doTexto = palavrasDoTexto(m.texto).map(simples).filter(Boolean);
+    const batem = doTexto.filter((p) => ali.has(p)).length;
+    if (batem < doTexto.length * 0.6) {
       problemas.push(`${nomeDoMotion(m, i)} não bate com o que é falado de ${r1(m.inicio)}s a ${r1(m.fim)}s (use as palavras exatas da fala).`);
     }
   });

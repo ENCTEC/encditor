@@ -31,7 +31,7 @@ Aponte SÓ problemas reais, que o cliente notaria:
 11) tela desequilibrada ou pobre: texto só no topo com o resto vazio, ou várias telas seguidas só com texto num vídeo de animação;
 12) logo ou produto pequeno demais, cortado ou escondido num canto (principalmente na chamada final, onde a marca deve aparecer bem).
 
-Não aponte gosto pessoal nem coisa que está certa. Para cada problema: o segundo, o que está errado (curto, em português simples) e como corrigir com o editor (posição topo/centro/base ou x/y, tamanho, encurtar ou trocar o texto, trocar o modelo, mudar a cor, tirar o item, mudar os tempos), citando os números dos itens. Se estiver tudo certo, devolva a lista vazia.`;
+Não aponte gosto pessoal nem coisa que está certa. Não é erro: o cartão "digitando" e o texto falado ainda se escrevendo (aparecem palavra por palavra), nem um nome próprio escrito diferente da transcrição (a marca pode estar certa e a transcrição errada). Para cada problema: o segundo, o que está errado (curto, em português simples) e como corrigir com o editor (posição topo/centro/base ou x/y, tamanho, encurtar ou trocar o texto, trocar o modelo, mudar a cor, tirar o item, mudar os tempos), citando os números dos itens. Se estiver tudo certo, devolva a lista vazia.`;
 
 const revisaoSchema = z.object({
   problemas: z.array(
