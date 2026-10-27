@@ -22,6 +22,11 @@ import {
   conferirVideo,
   quadrosDosAchados,
 } from "@/servidor/conferirVideo";
+import {
+  atualizarTrabalhoIA,
+  iniciarTrabalhoIA,
+  lerTrabalhoIA,
+} from "@/servidor/trabalhosIA";
 import { listaDePadroes } from "@/ia/padroes";
 import {
   ehEdicaoGrande,
@@ -462,30 +467,58 @@ ${listaDePadroes(clienteId)}`,
     }
   }
 
-  // Com streaming (o chat): uma linha JSON por evento — o progresso
-  // enquanto trabalha e, no fim, a resposta (ou o erro).
+  // Com streaming (o chat): uma linha JSON por evento — o trabalho, o
+  // progresso enquanto a IA trabalha e, no fim, a resposta (ou o erro).
+  // O pedido também fica guardado no servidor (trabalhosIA): se a pessoa
+  // trocar de tela/projeto ou recarregar, o chat retoma e aplica depois.
+  const emAndamento = projetoId ? lerTrabalhoIA(projetoId) : null;
+  if (emAndamento?.estado === "rodando") {
+    return erro(
+      "A IA ainda está trabalhando no pedido anterior deste projeto. Espere terminar.",
+      409,
+    );
+  }
+  const trabalho = projetoId ? iniciarTrabalhoIA(projetoId) : null;
   const codificador = new TextEncoder();
   const fluxo = new ReadableStream({
     async start(controle) {
-      const enviar = (evento: object) =>
-        controle.enqueue(codificador.encode(`${JSON.stringify(evento)}\n`));
+      let aberto = true;
+      // Se a página fechou, o trabalho continua (só para de mandar).
+      const enviar = (evento: object) => {
+        if (!aberto) return;
+        try {
+          controle.enqueue(codificador.encode(`${JSON.stringify(evento)}\n`));
+        } catch {
+          aberto = false;
+        }
+      };
+      if (trabalho) enviar({ tipo: "trabalho", id: trabalho.id });
       try {
         const resultado = await executar(
-          criarProgresso((pct, texto) =>
-            enviar({ tipo: "progresso", pct, texto }),
-          ),
+          criarProgresso((pct, texto) => {
+            if (trabalho) atualizarTrabalhoIA(trabalho, { pct, texto });
+            enviar({ tipo: "progresso", pct, texto });
+          }),
         );
+        if (trabalho) {
+          atualizarTrabalhoIA(trabalho, { estado: "pronto", pct: 100, resultado });
+        }
         enviar({ tipo: "fim", ...resultado });
       } catch (e) {
         console.error("[ia] pedido falhou:", e);
-        enviar({
-          tipo: "erro",
-          erro:
-            mensagemDeErro(e)?.erro ??
-            (e instanceof Error ? e.message : String(e)),
-        });
+        const mensagem =
+          mensagemDeErro(e)?.erro ??
+          (e instanceof Error ? e.message : String(e));
+        if (trabalho) atualizarTrabalhoIA(trabalho, { estado: "erro", erro: mensagem });
+        enviar({ tipo: "erro", erro: mensagem });
       } finally {
-        controle.close();
+        if (aberto) {
+          try {
+            controle.close();
+          } catch {
+            // já fechado pelo navegador
+          }
+        }
       }
     },
   });

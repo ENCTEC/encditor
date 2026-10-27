@@ -61,6 +61,7 @@ export const ProgressoIA: React.FC<{ estado: EstadoProgresso }> = ({ estado }) =
 export const lerRespostaComProgresso = async <T,>(
   corpo: ReadableStream<Uint8Array>,
   aoProgresso: (pct: number, texto: string) => void,
+  aoTrabalho?: (id: string) => void,
 ): Promise<T> => {
   const leitor = corpo.getReader();
   const decodificador = new TextDecoder();
@@ -73,10 +74,12 @@ export const lerRespostaComProgresso = async <T,>(
     for (const linha of linhas) {
       if (!linha.trim()) continue;
       const evento = JSON.parse(linha) as
+        | { tipo: "trabalho"; id: string }
         | { tipo: "progresso"; pct: number; texto: string }
         | ({ tipo: "fim" } & T)
         | { tipo: "erro"; erro: string };
-      if (evento.tipo === "progresso") aoProgresso(evento.pct, evento.texto);
+      if (evento.tipo === "trabalho") aoTrabalho?.(evento.id);
+      else if (evento.tipo === "progresso") aoProgresso(evento.pct, evento.texto);
       else if (evento.tipo === "erro") throw new Error(evento.erro);
       else if (evento.tipo === "fim") return evento;
     }

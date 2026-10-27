@@ -34,6 +34,10 @@ const EXEMPLOS = [
   "Coloque o @meuinsert quando eu falo “promoção”",
 ];
 
+// Pedidos da IA já aplicados nesta aba do navegador (o mesmo resultado
+// nunca entra duas vezes, mesmo com o chat aberto em dois lugares).
+const JA_APLICADOS = new Set<string>();
+
 // "compacto" = coluna lateral nas abas Timeline e Arquivos.
 export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
   compacto = false,
@@ -50,6 +54,7 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     adicionarMidia,
     obterBiblioteca,
     meta,
+    carregado,
   } = useProjeto();
   const envio = useEnvio();
   const [texto, setTexto] = useState("");
@@ -66,6 +71,20 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     termo: string;
     ativa: number;
   } | null>(null);
+  // Pedido da IA: o projeto aberto agora, se este chat ainda está na tela,
+  // se é ele que está recebendo o pedido em andamento e um gatilho para
+  // voltar a acompanhar pelo servidor (conexão caiu).
+  const projetoAtual = useRef(meta?.id);
+  projetoAtual.current = meta?.id;
+  const montado = useRef(true);
+  const enviandoAgora = useRef(false);
+  const [retomar, setRetomar] = useState(0);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
   const gravador = useRef<MediaRecorder | null>(null);
   const caixa = useRef<HTMLTextAreaElement>(null);
   const inputArquivo = useRef<HTMLInputElement>(null);
@@ -131,6 +150,13 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
     // Pedido em texto: a IA edita a timeline no servidor. Antes, espera a
     // análise dos arquivos (fala/visual) que ainda estiver em andamento.
     const inicio = Date.now();
+    const projetoDoPedido = meta?.id ?? null;
+    // Ainda é este chat, neste projeto? (A pessoa pode trocar de tela ou
+    // de projeto enquanto a IA trabalha: aí o resultado fica guardado no
+    // servidor e entra quando ela voltar a este projeto.)
+    const aqui = () => montado.current && projetoAtual.current === projetoDoPedido;
+    let trabalho: string | null = null;
+    enviandoAgora.current = true;
     setProgresso({ pct: 1, texto: "Analisando os arquivos…", inicio });
     try {
       const analises = await aguardarAnalises();
@@ -169,8 +195,40 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
       }
       const dados = await lerRespostaComProgresso<RespostaIA>(
         resposta.body,
-        (pct, texto) => setProgresso({ pct, texto, inicio }),
+        (pct, texto) => {
+          if (aqui()) setProgresso({ pct, texto, inicio });
+        },
+        (id) => {
+          trabalho = id;
+        },
       );
+      enviandoAgora.current = false;
+      if (!aqui()) return;
+      setProgresso(null);
+      aplicarResultado(dados, trabalho);
+    } catch (e) {
+      enviandoAgora.current = false;
+      if (!aqui()) return;
+      setProgresso(null);
+      if (trabalho) {
+        // A conexão caiu, mas o servidor continua: acompanha por lá.
+        setRetomar((n) => n + 1);
+        return;
+      }
+      partes.push(`⚠️ ${e instanceof Error ? e.message : String(e)}`);
+      adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
+    }
+  };
+
+  // Aplica o resultado de um pedido (o que acabou de chegar ou o retomado
+  // do servidor) uma vez só, e avisa o servidor que pode esquecê-lo.
+  const aplicarResultado = (dados: RespostaIA, trabalho: string | null) => {
+    if (trabalho) {
+      if (JA_APLICADOS.has(trabalho)) return;
+      JA_APLICADOS.add(trabalho);
+    }
+    let texto = dados.resposta ?? "Pronto.";
+    try {
       for (const m of dados.midiasAlteradas ?? []) {
         editarMidia(m.id, m);
       }
@@ -188,14 +246,72 @@ export const Chat: React.FC<{ compacto?: boolean; aoOcultar?: () => void }> = ({
           posicionarInserts(dados.insertsParaPosicionar);
         }
       }
-      partes.push(dados.resposta ?? "Pronto.");
     } catch (e) {
-      partes.push(`⚠️ ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setProgresso(null);
+      texto = `⚠️ ${e instanceof Error ? e.message : String(e)}`;
     }
-    adicionarMensagem({ autor: "ia", texto: partes.join(" "), anexos: [] });
+    adicionarMensagem({ autor: "ia", texto, anexos: [] });
+    if (trabalho && meta?.id) {
+      fetch(
+        `/api/ia/trabalho?projeto=${encodeURIComponent(meta.id)}&trabalho=${trabalho}`,
+        { method: "DELETE" },
+      ).catch(() => undefined);
+    }
   };
+  const aplicarResultadoRef = useRef(aplicarResultado);
+  aplicarResultadoRef.current = aplicarResultado;
+
+  // Ao abrir o chat num projeto (ou voltar a ele): se há um pedido da IA
+  // rodando no servidor, mostra a barra e acompanha; se ficou pronto
+  // enquanto a pessoa estava em outra tela, aplica agora.
+  useEffect(() => {
+    const id = meta?.id;
+    // Só depois de o projeto carregar (senão o carregamento sobrescreve).
+    if (!id || !carregado) return;
+    let parar = false;
+    let espera: ReturnType<typeof setTimeout> | undefined;
+    const olhar = async () => {
+      if (parar || enviandoAgora.current) return;
+      const r = (await fetch(`/api/ia/trabalho?projeto=${encodeURIComponent(id)}`)
+        .then((x) => x.json())
+        .catch(() => null)) as {
+        trabalho: {
+          id: string;
+          estado: "rodando" | "pronto" | "erro";
+          pct: number;
+          texto: string;
+          inicio: number;
+          resultado?: RespostaIA;
+          erro?: string;
+        } | null;
+      } | null;
+      if (parar || enviandoAgora.current || projetoAtual.current !== id) return;
+      const t = r?.trabalho;
+      if (!t) return;
+      if (t.estado === "rodando") {
+        setProgresso({ pct: t.pct, texto: t.texto, inicio: t.inicio });
+        espera = setTimeout(olhar, 1500);
+        return;
+      }
+      setProgresso(null);
+      if (t.estado === "pronto" && t.resultado) {
+        aplicarResultadoRef.current(t.resultado, t.id);
+      } else if (!JA_APLICADOS.has(t.id)) {
+        aplicarResultadoRef.current(
+          {
+            resposta: `⚠️ ${t.erro ?? "O pedido falhou."}`,
+            timeline: null,
+            acoes: [],
+          },
+          t.id,
+        );
+      }
+    };
+    olhar();
+    return () => {
+      parar = true;
+      if (espera) clearTimeout(espera);
+    };
+  }, [meta?.id, carregado, retomar]);
 
   // Microfone: 1º clique grava, 2º clique para e transcreve para a caixa.
   const alternarDitado = async () => {
