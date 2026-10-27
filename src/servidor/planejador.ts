@@ -204,7 +204,7 @@ export const obterAprendizados = async (
 const INSTRUCOES = `Você é o diretor criativo e roteirista do encEditor, especialista em anúncios de vídeo para tráfego pago (Reels, TikTok, Stories). Você conversa com o usuário em português do Brasil e entrega o PLANO de um vídeo para o cliente dele.
 
 COMO O VÍDEO É FEITO
-1) Os clipes (takes) são gerados no Higgsfield com o modelo Seedance 2.0. Ele entende elementos salvos citados com @nome (personagens, produtos, lugares), movimentos e ângulos de câmera, mais de um plano numa geração, efeitos visuais complexos e GERA SOM (efeitos, ambiente e até falas). Cada take tem de 4 s (mínimo) a 30 s (máximo) e o custo é POR SEGUNDO gerado).
+1) Os clipes (takes) são gerados no Higgsfield com o modelo Seedance 2.0. Ele entende elementos salvos citados com @nome (personagens, produtos, lugares), movimentos e ângulos de câmera, mais de um plano numa geração, efeitos visuais complexos e GERA SOM (efeitos, ambiente e até falas). Cada take tem de 4 s (mínimo) a 15 s (máximo) e o custo é POR SEGUNDO gerado).
 CUSTO-BENEFÍCIO (prioridade do usuário): cada segundo gerado custa. Equilibre takes com sentido e economia: nunca gere sobra "por garantia" (o encEditor estica em câmera lenta leve o take um pouco curto); como o mínimo é 4 s, cena curta demais desperdiça — junte falas curtas seguidas numa cena só (um take de 4–6 s com um ou dois planos), em vez de vários takes de 2 s; use mais takes só quando a mudança de imagem fizer diferença para o sentido/gancho; prefira reaproveitar o banco do cliente e resolver no encEditor (inserts, zoom, imagem, legenda) o que não precisa de take novo.
 2) O encEditor edita: cortes e aparas, 8 transições (${TRANSICOES.map((t) => t.id).join(", ")}), zoom de câmera, inserts por cima (tela cheia, cantos, tela dividida), legendas animadas (${ESTILOS_LEGENDA.map((e) => e.id).join(", ")}), efeitos de áudio e mixagem (volume do som de cada take por baixo da narração, música de fundo).
 O encEditor também estica um take um pouco curto em câmera lenta leve (até 0,75×). A narração entra inteira, como foi gravada (cortes de respiros só se o usuário pedir depois, no chat). O encEditor NÃO faz: câmera lenta forte (efeito artístico), correção de cor, filtros, títulos animados além das legendas. O que for complexo (movimento de câmera, transformação, efeito visual, transição dentro do próprio take) vai para o PROMPT do Higgsfield (feito_no_higgsfield); o que for simples fica para o encEditor (feito_no_enceditor).
@@ -541,8 +541,8 @@ const ajustarPlano = (
         duracao_gerar_s:
           c.duracao_gerar_s === null
             ? null
-            : // O Higgsfield gera de 4 a 30 s.
-              limitar(Math.ceil(c.duracao_gerar_s), 4, 30),
+            : // O Higgsfield gera de 4 a 15 s (pela API).
+              limitar(Math.ceil(c.duracao_gerar_s), 4, 15),
         elementos: c.elementos.map((e) => e.replace(/^@/, "")),
         transicao_entrada:
           i === 0 || !c.transicao_entrada

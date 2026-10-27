@@ -25,7 +25,7 @@ const global = globalThis as unknown as {
 
 // Suba este número ao criar tabelas/colunas: a conexão guardada (em
 // desenvolvimento) reaplica o esquema sem precisar reiniciar o servidor.
-const VERSAO_ESQUEMA = 7;
+const VERSAO_ESQUEMA = 8;
 
 const colunas = (db: DatabaseSync, tabela: string) =>
   (db.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map(
@@ -163,6 +163,17 @@ const banco = () => {
       dados TEXT NOT NULL,
       atualizado_em INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS geracoes (
+      id TEXT PRIMARY KEY,
+      projeto_id TEXT NOT NULL,
+      cliente_id TEXT,
+      chave TEXT NOT NULL,
+      estado TEXT NOT NULL,
+      dados TEXT NOT NULL,
+      criado_em INTEGER NOT NULL,
+      atualizado_em INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_geracoes_projeto ON geracoes (projeto_id);
     CREATE TABLE IF NOT EXISTS cotacoes (
       dia TEXT PRIMARY KEY,
       dolar REAL NOT NULL,
@@ -516,6 +527,7 @@ export const apagarProjeto = (id: string) =>
     ];
     banco().prepare("DELETE FROM exportacoes WHERE projeto_id = ?").run(id);
     banco().prepare("DELETE FROM custos WHERE projeto_id = ?").run(id);
+    banco().prepare("DELETE FROM geracoes WHERE projeto_id = ?").run(id);
     banco().prepare("DELETE FROM planos WHERE projeto_id = ?").run(id);
     banco().prepare("DELETE FROM projetos WHERE id = ?").run(id);
     return arquivos;
@@ -587,6 +599,7 @@ export const apagarCliente = (id: string) =>
     }
     db.prepare("DELETE FROM exportacoes WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM custos WHERE cliente_id = ?").run(id);
+    db.prepare("DELETE FROM geracoes WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM projetos WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM midias_cliente WHERE cliente_id = ?").run(id);
     db.prepare("DELETE FROM clientes WHERE id = ?").run(id);
@@ -950,6 +963,73 @@ export const totalDoProjeto = (projetoId: string) =>
       .prepare("SELECT COALESCE(SUM(valor), 0) AS total FROM custos WHERE projeto_id = ?")
       .get(projetoId) as { total: number }
   ).total;
+
+// ---------- Gerações no Higgsfield (takes do plano) ----------
+// Um registro por pedido de vídeo: o estado (subindo → na fila → gerando
+// → pronto/erro), o que foi pedido e, pronto, a mídia criada. Fica no
+// banco para continuar acompanhando mesmo se o encEditor reiniciar.
+
+export type LinhaGeracao = {
+  id: string;
+  projetoId: string;
+  clienteId: string | null;
+  chave: string;
+  estado: string;
+  dados: Record<string, unknown>;
+  criadoEm: number;
+  atualizadoEm: number;
+};
+
+const lerLinhaGeracao = (l: {
+  id: string;
+  projeto_id: string;
+  cliente_id: string | null;
+  chave: string;
+  estado: string;
+  dados: string;
+  criado_em: number;
+  atualizado_em: number;
+}): LinhaGeracao => ({
+  id: l.id,
+  projetoId: l.projeto_id,
+  clienteId: l.cliente_id,
+  chave: l.chave,
+  estado: l.estado,
+  dados: JSON.parse(l.dados),
+  criadoEm: l.criado_em,
+  atualizadoEm: l.atualizado_em,
+});
+
+export const salvarGeracao = (g: LinhaGeracao) => {
+  banco()
+    .prepare(
+      `INSERT INTO geracoes (id, projeto_id, cliente_id, chave, estado, dados, criado_em, atualizado_em)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET estado = excluded.estado, dados = excluded.dados, atualizado_em = excluded.atualizado_em`,
+    )
+    .run(g.id, g.projetoId, g.clienteId, g.chave, g.estado, JSON.stringify(g.dados), g.criadoEm, g.atualizadoEm);
+};
+
+export const geracoesDoProjeto = (projetoId: string) =>
+  (
+    banco()
+      .prepare("SELECT * FROM geracoes WHERE projeto_id = ? ORDER BY criado_em")
+      .all(projetoId) as Parameters<typeof lerLinhaGeracao>[0][]
+  ).map(lerLinhaGeracao);
+
+export const geracoesEmAndamento = () =>
+  (
+    banco()
+      .prepare("SELECT * FROM geracoes WHERE estado IN ('subindo', 'na fila', 'gerando', 'baixando') ORDER BY criado_em")
+      .all() as Parameters<typeof lerLinhaGeracao>[0][]
+  ).map(lerLinhaGeracao);
+
+export const lerGeracao = (id: string) => {
+  const l = banco().prepare("SELECT * FROM geracoes WHERE id = ?").get(id) as
+    | Parameters<typeof lerLinhaGeracao>[0]
+    | undefined;
+  return l ? lerLinhaGeracao(l) : null;
+};
 
 // ---------- Cotação do dólar (para mostrar os custos em real) ----------
 

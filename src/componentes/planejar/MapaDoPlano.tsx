@@ -32,6 +32,7 @@ import {
 import { ConferenciaTake, VOLUMES_TAKE } from "@/plano/tipos";
 import { UsoPlano } from "@/plano/usePlano";
 import { ConferenciaNarracao } from "./ConferenciaNarracao";
+import { GerarTake, PainelHiggsfield, useHiggsfield } from "./GerarNoHiggsfield";
 import { GuiaDeGravacao } from "./GuiaDeGravacao";
 
 // O plano gerado, como um mapa: cada take com o prompt do Higgsfield e o
@@ -307,6 +308,22 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
     atualizarAnalise,
   } = useProjeto();
   const envio = useEnviarItem(uso);
+  // Takes gerados no Higgsfield pela API: quando um fica pronto, o vídeo
+  // entra na biblioteca e é ligado ao take (como se tivesse sido enviado).
+  // Os vínculos ficam numa referência para dois prontos juntos não se
+  // sobrescreverem.
+  const { adicionarMidia } = useProjeto();
+  const vinculosAtuais = useRef(plano?.vinculos ?? {});
+  vinculosAtuais.current = plano?.vinculos ?? {};
+  const higgs = useHiggsfield(uso.projetoId, async (gerada) => {
+    if (!obterBiblioteca().some((m) => m.id === gerada.midia.id)) {
+      adicionarMidia(gerada.midia);
+      if (podeAnalisar(gerada.midia)) iniciarAnalise(gerada.midia, atualizarAnalise);
+    }
+    const vinculos = { ...vinculosAtuais.current, [gerada.chave]: gerada.midia.id };
+    vinculosAtuais.current = vinculos;
+    await mudar({ vinculos, montadoEm: null });
+  });
   const [montagem, setMontagem] = useState<{
     avisos: string[];
     erro: string | null;
@@ -660,6 +677,12 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
 
       {/* Cenas */}
       <section className="space-y-3">
+        <PainelHiggsfield
+          higgs={higgs}
+          faltam={itens
+            .filter((i) => i.tipo === "cena" && i.cena?.origem === "higgsfield" && !i.midia)
+            .map((i) => i.chave)}
+        />
         <h3 className="rotulo-zine">
           {g.modo_audio === "narracao"
             ? "Passo 2 · Gere os takes no Higgsfield e envie"
@@ -763,6 +786,9 @@ export const MapaDoPlano: React.FC<{ uso: UsoPlano }> = ({ uso }) => {
                   }
                   olhando={uso.olhando === item.chave}
                 />
+                {c.origem === "higgsfield" ? (
+                  <GerarTake higgs={higgs} chave={item.chave} temVideo={!!item.midia} />
+                ) : null}
                 <AcoesDoItem
                   item={item}
                   biblioteca={biblioteca}
